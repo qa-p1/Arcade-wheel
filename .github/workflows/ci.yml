@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux build and tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          host: linux
+          target: desktop
+          arch: gcc_64
+          modules: qtdeclarative qtshadertools
+          install-deps: true
+          cache: true
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DARCADE_REQUIRE_LAYERSHELLQT=OFF
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  windows:
+    name: Windows build, tests, and package
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Qt 6 for MSVC 2022
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtdeclarative qtshadertools
+          cache: true
+
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Package Windows application
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%i"
+          if not defined VSINSTALL (
+            echo Could not find the Visual C++ x64 toolchain on this runner.
+            exit /b 1
+          )
+          call "%VSINSTALL%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
+          if errorlevel 1 exit /b 1
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\package.ps1 -BuildDir .\build -Configuration Release -OutputDir .\dist
+          if errorlevel 1 exit /b 1
+
+      - name: Upload Windows ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: ArcadeWheel-Windows
+          path: dist/ArcadeWheel-*-Windows.zip
+          if-no-files-found: error

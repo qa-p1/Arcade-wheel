@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Arcade Wheel
+Comment=Cursor-centered radial command launcher
+Exec=arcade-wheel --settings
+Icon=arcade-wheel
+Terminal=false
+Categories=Utility;
+StartupNotify=false

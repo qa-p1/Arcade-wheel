@@ -1,0 +1,9 @@
+/build/
+/build-*/
+/.cache/
+*.user
+*.autosave
+*.log
+*.tmp
+/dist/
+/docs/original spec.md

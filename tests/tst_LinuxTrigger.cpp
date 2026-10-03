@@ -96,6 +96,10 @@ class LinuxTriggerTest final : public QObject {
     PortalFixture *portal = nullptr;
 private slots:
     void initTestCase() {
+        // The backend deliberately refuses to register a desktop identity for
+        // executables in temporary directories (see ensureDesktopIdentity).
+        if (QCoreApplication::applicationFilePath().startsWith("/tmp/"))
+            QSKIP("Build outside /tmp: shortcut registration refuses temporary executables");
         QVERIFY(data.isValid());
         qunsetenv("ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT");
         qunsetenv("HYPRLAND_INSTANCE_SIGNATURE");
@@ -190,8 +194,10 @@ private slots:
     }
     void supportedMediaAndCombinationKeys() {
         LinuxBackend backend;
-        for (const QString &key : {"Volume Mute","Volume Up","Volume Down","Ctrl+Down","Meta+Space","Ctrl+Plus","F8"})
-            QVERIFY2(backend.shortcutValidationError(key).isEmpty(),qPrintable(key));
+        // Includes names produced by the Settings recorder (QKeySequence::PortableText).
+        for (const char *key : {"Volume Mute","Volume Up","Volume Down","Ctrl+Down","Meta+Space","Ctrl+Plus","F8",
+                                "PgDown","Ins","Print","NumLock","Media Stop","Toggle Media Play/Pause"})
+            QVERIFY2(backend.shortcutValidationError(QString::fromLatin1(key)).isEmpty(),key);
         QVERIFY(!backend.shortcutValidationError("Ctrl").isEmpty());
         QVERIFY(!backend.shortcutValidationError("Mouse 4").isEmpty());
     }

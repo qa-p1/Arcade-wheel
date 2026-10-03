@@ -42,14 +42,18 @@ int main(int argc, char **argv)
     const QString command = app.arguments().size() > 1 ? app.arguments().at(1) : QStringLiteral("--settings");
     if (command == QStringLiteral("--help") || command == QStringLiteral("-h")) {
         QTextStream(stdout) << "Arcade Wheel\n\n"
-            "  arcade-wheel             Open Settings; keep the launcher running\n"
-            "  arcade-wheel --show      Open the wheel; click an action or right-click to cancel\n"
-            "  arcade-wheel --background Start the resident launcher\n"
-            "  arcade-wheel --preview   Show a safe visual preview\n"
-            "  arcade-wheel --cancel    Dismiss the wheel\n"
-            "  arcade-wheel --status    Show resident status\n"
-            "  arcade-wheel --quit      Quit the resident launcher\n\n"
-            "Once running, hold F8, move toward an action, then release.\n";
+            "  arcade-wheel               Open Settings; keep the launcher running\n"
+            "  arcade-wheel --settings    Same as above\n"
+            "  arcade-wheel --background  Start the resident launcher without a window\n"
+            "  arcade-wheel --show        Open the wheel; click an action or right-click to cancel\n"
+            "  arcade-wheel --preview     Show a safe visual preview\n"
+            "  arcade-wheel --cancel      Dismiss the wheel\n"
+            "  arcade-wheel --press       Simulate pressing the trigger\n"
+            "  arcade-wheel --release     Simulate releasing the trigger (runs the selection)\n"
+            "  arcade-wheel --status      Show resident status as JSON\n"
+            "  arcade-wheel --restart     Restart the resident launcher\n"
+            "  arcade-wheel --quit        Quit the resident launcher\n\n"
+            "Once running, hold the configured shortcut (F8 by default), move toward an action, then release.\n";
         return 0;
     }
     QByteArray identity = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation).toUtf8()
@@ -58,7 +62,15 @@ int main(int argc, char **argv)
     if (QGuiApplication::platformName() == QStringLiteral("offscreen") ||
         QGuiApplication::platformName() == QStringLiteral("minimal")) identity += "-headless";
     const auto hash = QCryptographicHash::hash(identity, QCryptographicHash::Sha256).toHex().left(12);
-    const QString serverName = QStringLiteral("arcade-wheel-%1").arg(QString::fromLatin1(hash));
+    const QString instanceKey = QStringLiteral("arcade-wheel-%1").arg(QString::fromLatin1(hash));
+    const QString runtime = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+#ifdef Q_OS_WIN
+    const QString serverName = instanceKey;
+#else
+    // A bare name would live in the shared /tmp, where another local user
+    // could pre-create it. The runtime directory is private to this user.
+    const QString serverName = QDir(runtime).filePath(instanceKey + QStringLiteral(".sock"));
+#endif
     if (command == QStringLiteral("--restarting")) {
         for (int attempt = 0; attempt < 60; ++attempt) {
             QLocalSocket probe;
@@ -87,8 +99,7 @@ int main(int argc, char **argv)
         }
     }
 
-    const QString runtime = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
-    QLockFile instanceLock(QDir(runtime).filePath(serverName + QStringLiteral(".lock")));
+    QLockFile instanceLock(QDir(runtime).filePath(instanceKey + QStringLiteral(".lock")));
     if (!instanceLock.tryLock(500)) {
         QTextStream(stderr) << "Arcade Wheel is already starting. Try again in a moment.\n";
         return 1;
@@ -96,7 +107,10 @@ int main(int argc, char **argv)
     QLocalServer server;
     server.setSocketOptions(QLocalServer::UserAccessOption);
     QLocalServer::removeServer(serverName); // a dead process may leave its socket behind
-    if (!server.listen(serverName)) return 1;
+    if (!server.listen(serverName)) {
+        QTextStream(stderr) << "Arcade Wheel could not open its command socket: " << server.errorString() << '\n';
+        return 1;
+    }
 
 #ifdef Q_OS_WIN
     WindowsBackend backend;
@@ -154,7 +168,13 @@ int main(int argc, char **argv)
     QObject::connect(&controller, &WheelController::settingsRequested, &app, showSettings);
     QObject::connect(&controller, &WheelController::quitRequested, &app, &QCoreApplication::quit);
     const auto restart = [&] {
-        QProcess::startDetached(QCoreApplication::applicationFilePath(), {QStringLiteral("--restarting")});
+        // Quitting without a successor would silently remove the launcher.
+        if (!QProcess::startDetached(QCoreApplication::applicationFilePath(), {QStringLiteral("--restarting")})) {
+            const QString message = QStringLiteral("Arcade Wheel could not start a new instance, so it kept running.");
+            if (tray.isVisible()) tray.showMessage(QStringLiteral("Arcade Wheel"), message, QSystemTrayIcon::Warning, 3000);
+            QTextStream(stderr) << message << '\n';
+            return;
+        }
         app.quit();
     };
     QObject::connect(restartAction, &QAction::triggered, &app, restart);

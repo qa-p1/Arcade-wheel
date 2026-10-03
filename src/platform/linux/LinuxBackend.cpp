@@ -193,6 +193,8 @@ QString preferredKeyName(const QString &rawKey, QString *error)
         {QStringLiteral("media play"), QStringLiteral("XF86AudioPlay")},
         {QStringLiteral("media pause"), QStringLiteral("XF86AudioPause")},
         {QStringLiteral("media play/pause"), QStringLiteral("XF86AudioPlay")},
+        {QStringLiteral("toggle media play/pause"), QStringLiteral("XF86AudioPlay")},
+        {QStringLiteral("media stop"), QStringLiteral("XF86AudioStop")},
         {QStringLiteral("media next"), QStringLiteral("XF86AudioNext")},
         {QStringLiteral("media previous"), QStringLiteral("XF86AudioPrev")},
         {QStringLiteral("plus"), QStringLiteral("plus")},
@@ -971,23 +973,6 @@ bool LinuxBackend::prepareOverlay(QQuickWindow *window, QString *error)
     return true;
 }
 
-void LinuxBackend::updateOverlayScreen()
-{
-    if (!m_overlayWindow) return;
-    QScreen *screen = QGuiApplication::screenAt(cursorPosition().toPoint());
-    if (!screen) screen = QGuiApplication::primaryScreen();
-    if (!screen) return;
-    if (m_overlayWindow->screen() != screen) m_overlayWindow->setScreen(screen);
-    m_overlayWindow->setGeometry(screen->geometry());
-#ifdef ARCADE_HAVE_LAYERSHELLQT
-    if (QGuiApplication::platformName().contains(QStringLiteral("wayland"), Qt::CaseInsensitive)) {
-        if (LayerShellQt::Window *layerWindow = LayerShellQt::Window::get(m_overlayWindow)) {
-            layerWindow->setDesiredSize(screen->geometry().size());
-        }
-    }
-#endif
-}
-
 QVector<DiscoveredApplication> LinuxBackend::applications() const
 {
     const QVector<DesktopEntry> entries = scanDesktopEntries();
@@ -1155,10 +1140,22 @@ bool LinuxBackend::focusHyprlandWindow(const DesktopEntry &entry) const
 bool LinuxBackend::movePointer(const QPointF &position)
 {
     if (!isHyprland()) return false;
+    watchHyprlandReloads(); // Reconnects the event socket if it was lost.
     // Qt submitting a frame does not mean Hyprland has mapped that surface.
     // Defer until openlayer so the warp establishes pointer focus on the wheel.
     if (m_overlayWindow && m_overlayWindow->isVisible() && !m_overlayMapped) {
         m_pendingPointer = position;
+        if (!m_hyprlandEvents || m_hyprlandEvents->state() != QLocalSocket::ConnectedState) {
+            // Without the event socket openlayer never arrives. Warp after the
+            // surface has certainly been mapped rather than never warping.
+            QTimer::singleShot(150, this, [this] {
+                if (!m_pendingPointer || !m_overlayWindow || !m_overlayWindow->isVisible()) return;
+                const QPointF pending = *m_pendingPointer;
+                m_pendingPointer.reset();
+                m_overlayMapped = true;
+                movePointer(pending);
+            });
+        }
         return true;
     }
     QString response;
@@ -1327,10 +1324,14 @@ bool LinuxBackend::setStartOnLogin(bool enabled, QString *error)
         }
         previous = current.readAll();
     }
+    // Entries this app wrote need no backup; only a hand-edited entry does.
+    // Backing up our own file left a new copy behind on every toggle.
+    const bool ownEntry = previous.startsWith("[Desktop Entry]\nType=Application\nName=Arcade Wheel\n"
+                                              "Comment=Start the Arcade Wheel background service\n");
     if (!enabled) {
         if (!existed) return true;
         const QString backup = path + QStringLiteral(".backup-") + QString::number(QDateTime::currentMSecsSinceEpoch());
-        if (!QFile::copy(path, backup)) {
+        if (!ownEntry && !QFile::copy(path, backup)) {
             if (error) *error = QStringLiteral("Could not back up the Arcade Wheel autostart entry; it was not removed.");
             return false;
         }
@@ -1367,7 +1368,7 @@ bool LinuxBackend::setStartOnLogin(bool enabled, QString *error)
                                     .arg(escapeDesktopExecPath(executable))
                                     .toUtf8();
     if (existed && previous == contents) return true;
-    if (existed) {
+    if (existed && !ownEntry) {
         const QString backup = path + QStringLiteral(".backup-") + QString::number(QDateTime::currentMSecsSinceEpoch());
         if (!QFile::copy(path, backup)) {
             if (error) *error = QStringLiteral("Could not back up the existing Arcade Wheel autostart entry; it was not changed.");
@@ -1640,7 +1641,17 @@ void LinuxBackend::setShortcutRecording(bool recording)
 
 void LinuxBackend::watchHyprlandReloads()
 {
-    if (m_hyprlandEvents || !isHyprland()) return;
+    if (!isHyprland()) return;
+    const QString eventSocket = QFileInfo(hyprlandSocketPath()).dir().filePath(QStringLiteral(".socket2.sock"));
+    if (m_hyprlandEvents) {
+        // A dropped event socket must not silently disable reload handling
+        // and openlayer-gated pointer warps for the rest of the session.
+        if (m_hyprlandEvents->state() == QLocalSocket::UnconnectedState) {
+            m_hyprlandEventBuffer.clear();
+            m_hyprlandEvents->connectToServer(eventSocket);
+        }
+        return;
+    }
     m_hyprlandEvents = new QLocalSocket(this);
     connect(m_hyprlandEvents, &QLocalSocket::readyRead, this, [this] {
         m_hyprlandEventBuffer += m_hyprlandEvents->readAll();
@@ -1674,7 +1685,7 @@ void LinuxBackend::watchHyprlandReloads()
         }
         if (m_hyprlandEventBuffer.size() > 65536) m_hyprlandEventBuffer.clear();
     });
-    m_hyprlandEvents->connectToServer(QFileInfo(hyprlandSocketPath()).dir().filePath(QStringLiteral(".socket2.sock")));
+    m_hyprlandEvents->connectToServer(eventSocket);
 }
 
 bool LinuxBackend::installHyprlandBinding(QString *error)

@@ -80,6 +80,13 @@ if(BUILD_TESTING)
         add_test(NAME ${test_name} COMMAND test_${test_name})
     endforeach()
     set_tests_properties(WheelController PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")
+    if(WIN32)
+        qt_add_executable(test_WindowsTrigger tests/tst_WindowsTrigger.cpp
+            src/platform/windows/WindowsBackend.h src/platform/windows/WindowsBackend.cpp)
+        target_link_libraries(test_WindowsTrigger PRIVATE arcade_core Qt6::Test user32 shell32 ole32 uuid advapi32 PowrProf gdi32)
+        add_test(NAME WindowsTrigger COMMAND test_WindowsTrigger)
+        set_tests_properties(WindowsTrigger PROPERTIES TIMEOUT 60)
+    endif()
     if(UNIX AND NOT APPLE)
         qt_add_executable(test_LinuxLaunch tests/tst_LinuxLaunch.cpp
             src/platform/linux/LinuxBackend.h src/platform/linux/LinuxBackend.cpp)

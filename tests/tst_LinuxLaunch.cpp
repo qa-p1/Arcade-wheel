@@ -65,6 +65,25 @@ private slots:
         QVERIFY2(backend.launchApplication("fixture.desktop",true,&error),qPrintable(error));
         QCOMPARE(compositor.focuses.load(),1); QVERIFY(!QFile::exists(marker));
     }
+    void autostartTogglingLeavesNoBackups() {
+        if (QCoreApplication::applicationFilePath().startsWith("/tmp/"))
+            QSKIP("Start on login deliberately refuses executables in temporary directories");
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        qputenv("XDG_CONFIG_HOME",dir.path().toUtf8());
+        LinuxBackend backend; QString error;
+        const QDir autostart(dir.filePath("autostart"));
+        for (int i=0;i<3;++i) {
+            QVERIFY2(backend.setStartOnLogin(true,&error),qPrintable(error)); QVERIFY(backend.startOnLogin());
+            QVERIFY2(backend.setStartOnLogin(false,&error),qPrintable(error)); QVERIFY(!backend.startOnLogin());
+        }
+        QCOMPARE(autostart.entryList(QDir::Files),QStringList());
+        // A hand-edited entry is still preserved before it is replaced.
+        QFile custom(autostart.filePath("arcade-wheel.desktop")); QVERIFY(custom.open(QIODevice::WriteOnly));
+        custom.write("[Desktop Entry]\nType=Application\nName=My launcher\nExec=true\n"); custom.close();
+        QVERIFY2(backend.setStartOnLogin(true,&error),qPrintable(error));
+        QCOMPARE(autostart.entryList({"arcade-wheel.desktop.backup-*"},QDir::Files).size(),1);
+        qunsetenv("XDG_CONFIG_HOME");
+    }
     void missingApplicationReportsFailure() {
         LinuxBackend backend; QString error;
         QVERIFY(!backend.launchApplication("nonexistent-arcade-fixture.desktop",false,&error));

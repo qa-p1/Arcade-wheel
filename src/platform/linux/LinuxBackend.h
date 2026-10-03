@@ -121,7 +121,6 @@ private:
     void clearActiveTrigger();
     QString triggerReadyStatus() const;
     bool replayTriggerTap(QString *error) const;
-    void updateOverlayScreen();
     bool installHyprlandBinding(QString *error);
     void removeHyprlandBinding();
     void watchHyprlandReloads();

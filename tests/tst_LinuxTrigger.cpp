@@ -190,8 +190,10 @@ private slots:
     }
     void supportedMediaAndCombinationKeys() {
         LinuxBackend backend;
-        for (const QString &key : {"Volume Mute","Volume Up","Volume Down","Ctrl+Down","Meta+Space","Ctrl+Plus","F8"})
-            QVERIFY2(backend.shortcutValidationError(key).isEmpty(),qPrintable(key));
+        // Includes names produced by the Settings recorder (QKeySequence::PortableText).
+        for (const char *key : {"Volume Mute","Volume Up","Volume Down","Ctrl+Down","Meta+Space","Ctrl+Plus","F8",
+                                "PgDown","Ins","Print","NumLock","Media Stop","Toggle Media Play/Pause"})
+            QVERIFY2(backend.shortcutValidationError(QString::fromLatin1(key)).isEmpty(),key);
         QVERIFY(!backend.shortcutValidationError("Ctrl").isEmpty());
         QVERIFY(!backend.shortcutValidationError("Mouse 4").isEmpty());
     }

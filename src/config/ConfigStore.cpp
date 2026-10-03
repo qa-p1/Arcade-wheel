@@ -247,9 +247,16 @@ QJsonObject ConfigStore::load(const QVector<DiscoveredApplication> &applications
         return config;
     }
     QString readError;
-    auto config = readJson(m_path, &readError);
-    if (config.isEmpty() && readError.isEmpty()) readError = QStringLiteral("Configuration is empty");
-    if (!config.isEmpty()) config = normalize(config, &readError);
+    const auto original = readJson(m_path, &readError);
+    if (original.isEmpty() && readError.isEmpty()) readError = QStringLiteral("Configuration is empty");
+    auto config = original.isEmpty() ? QJsonObject{} : normalize(original, &readError);
+    if (!config.isEmpty() && config != original) {
+        // Persist migrations and repaired IDs. Otherwise every start would run
+        // the migration again and give ID-less entries different IDs.
+        QString saveError;
+        if (!writeJson(config, m_path, &saveError) && error)
+            *error = QStringLiteral("The configuration was upgraded but could not be saved: %1").arg(saveError);
+    }
     if (config.isEmpty()) {
         const auto backup = m_path + QStringLiteral(".invalid-") + freshId() + QStringLiteral(".json");
         if (!QFile::copy(m_path, backup)) {

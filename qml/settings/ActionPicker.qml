@@ -255,8 +255,8 @@ Popup {
                     visible: picker.selectedType === "command"
                     Layout.fillWidth: true
                     Text { text: "Command and arguments"; color: "#a8b8cb"; font.pixelSize: 12 }
-                    TextField { id: commandField; Layout.fillWidth: true; placeholderText: "example: kitty --directory ~/Projects" }
-                    Text { text: "Commands run directly. Use sh -c explicitly when shell syntax is needed."; color: "#8193aa"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                    TextField { id: commandField; Layout.fillWidth: true; placeholderText: "example: kitty --directory /home/you/Projects" }
+                    Text { text: "Commands run directly, without a shell, so ~ and $VARIABLES are not expanded. Use sh -c '…' when shell syntax is needed."; color: "#8193aa"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                 }
                 ColumnLayout {
                     visible: picker.selectedType === "url"

@@ -27,6 +27,7 @@ public:
     bool prepareOverlay(QQuickWindow *window, QString *error) override;
     QPointF cursorPosition() const override;
     bool movePointer(const QPointF &position) override;
+    QString shortcutValidationError(const QString &shortcut) const override;
     QVector<DiscoveredApplication> applications() const override;
     bool launchApplication(const QString &id, bool focusExisting, QString *error) override;
     bool performSystemAction(const QString &id, QString *error) override;

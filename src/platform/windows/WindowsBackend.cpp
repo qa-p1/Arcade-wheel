@@ -178,6 +178,18 @@ UINT keyVirtualKey(const QString &name)
         {QStringLiteral("quote"), VK_OEM_7}, {QStringLiteral("leftbracket"), VK_OEM_4},
         {QStringLiteral("rightbracket"), VK_OEM_6}, {QStringLiteral("backtick"), VK_OEM_3},
         {QStringLiteral("numpadenter"), VK_RETURN},
+        // Qt's portable key names, as produced by the Settings shortcut recorder.
+        {QStringLiteral("ins"), VK_INSERT}, {QStringLiteral("pgdown"), VK_NEXT},
+        {QStringLiteral("print"), VK_SNAPSHOT}, {QStringLiteral("numlock"), VK_NUMLOCK},
+        {QStringLiteral("scrolllock"), VK_SCROLL}, {QStringLiteral("menu"), VK_APPS},
+        {QStringLiteral("volume mute"), VK_VOLUME_MUTE}, {QStringLiteral("volume up"), VK_VOLUME_UP},
+        {QStringLiteral("volume down"), VK_VOLUME_DOWN},
+        {QStringLiteral("media play"), VK_MEDIA_PLAY_PAUSE},
+        {QStringLiteral("media pause"), VK_MEDIA_PLAY_PAUSE},
+        {QStringLiteral("toggle media play/pause"), VK_MEDIA_PLAY_PAUSE},
+        {QStringLiteral("media stop"), VK_MEDIA_STOP},
+        {QStringLiteral("media next"), VK_MEDIA_NEXT_TRACK},
+        {QStringLiteral("media previous"), VK_MEDIA_PREV_TRACK},
     };
     const auto it = namedKeys.constFind(lower);
     if (it != namedKeys.cend())
@@ -532,10 +544,16 @@ QString WindowsBackend::name() const
     return QStringLiteral("Windows");
 }
 
+QString WindowsBackend::shortcutValidationError(const QString &shortcut) const
+{
+    return parseTrigger(QJsonObject{{QStringLiteral("shortcut"), shortcut}}).error;
+}
+
 void WindowsBackend::configureTrigger(const QJsonObject &trigger)
 {
+    // Replacing the trigger mid-hold must not run the current selection.
     if (m_triggerDown)
-        emit triggerReleased();
+        emit triggerCancelled();
     uninstallKeyboardHook();
     m_triggerDown = false;
 
@@ -561,7 +579,11 @@ void WindowsBackend::configureTrigger(const QJsonObject &trigger)
         return;
     }
 
-    emit triggerStatusChanged(QString());
+    // Settings treats a status beginning with "Ready" as a working trigger.
+    QString shortcut = trigger.value(QStringLiteral("shortcut")).toString().trimmed();
+    if (shortcut.isEmpty())
+        shortcut = QStringLiteral("the shortcut");
+    emit triggerStatusChanged(QStringLiteral("Ready · hold %1 to open").arg(shortcut));
 }
 
 bool WindowsBackend::prepareOverlay(QQuickWindow *window, QString *error)

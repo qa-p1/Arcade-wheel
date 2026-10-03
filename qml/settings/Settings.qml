@@ -407,12 +407,12 @@ Rectangle {
                     SettingSlider { Layout.fillWidth: true; title: "Wheel radius"; section: "appearance"; settingKey: "radius"; fromValue: 110; toValue: 240; stepValue: 2; unit: " px" }
                     SettingSlider { Layout.fillWidth: true; title: "Wheel scale"; section: "appearance"; settingKey: "scale"; fromValue: 0.75; toValue: 1.3; stepValue: 0.05 }
                     SettingSlider { Layout.fillWidth: true; title: "Center radius"; section: "appearance"; settingKey: "centerRadius"; fromValue: 36; toValue: 72; stepValue: 1; unit: " px" }
-                    SettingSlider { Layout.fillWidth: true; title: "Segment depth"; section: "appearance"; settingKey: "cardSize"; fromValue: 62; toValue: 110; stepValue: 2; unit: " px" }
+                    SettingSlider { Layout.fillWidth: true; title: "Segment depth"; section: "appearance"; settingKey: "cardSize"; fromValue: 66; toValue: 110; stepValue: 2; unit: " px" }
                     SettingSlider { Layout.fillWidth: true; title: "Gap"; section: "appearance"; settingKey: "gap"; fromValue: 4; toValue: 24; stepValue: 1; unit: " px" }
-                    SettingSlider { Layout.fillWidth: true; title: "Icon size"; section: "appearance"; settingKey: "iconSize"; fromValue: 20; toValue: 42; stepValue: 1; unit: " px" }
+                    SettingSlider { Layout.fillWidth: true; title: "Icon size"; section: "appearance"; settingKey: "iconSize"; fromValue: 24; toValue: 42; stepValue: 1; unit: " px" }
                     SettingSlider { Layout.fillWidth: true; title: "Surface opacity"; section: "appearance"; settingKey: "opacity"; fromValue: 0.45; toValue: 1; stepValue: 0.05 }
                     SettingSlider { Layout.fillWidth: true; title: "Background dim"; section: "appearance"; settingKey: "dim"; fromValue: 0; toValue: 0.3; stepValue: 0.02 }
-                    SettingSlider { Layout.fillWidth: true; title: "Selected scale"; section: "appearance"; settingKey: "selectedScale"; fromValue: 1; toValue: 1.2; stepValue: 0.01 }
+                    SettingSlider { Layout.fillWidth: true; title: "Selected scale"; section: "appearance"; settingKey: "selectedScale"; fromValue: 1; toValue: 1.12; stepValue: 0.01 }
                     SettingSlider { Layout.fillWidth: true; title: "Animation speed"; section: "appearance"; settingKey: "animationSpeed"; fromValue: 0.5; toValue: 1.5; stepValue: 0.1 }
                     SettingToggle { Layout.fillWidth: true; title: "Show outer labels"; detail: "The center still shows the selected action name."; section: "appearance"; settingKey: "labels" }
                     SettingToggle { Layout.fillWidth: true; title: "Reduce motion"; section: "appearance"; settingKey: "reduceMotion" }

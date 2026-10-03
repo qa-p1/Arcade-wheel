@@ -5,7 +5,7 @@
 The shared core consists of:
 
 - `ConfigStore`: schema migration, first-run defaults, validation, atomic JSON saves, import/export.
-- `WheelLogic`: clockwise angular selection, center dead zone, deck scrolling, and edge clamping in logical screen coordinates.
+- `WheelLogic`: clockwise angular selection, center dead zone, and deck scrolling in logical screen coordinates.
 - `WheelController`: trigger lifecycle, active deck, pointer selection, settings mutations, and immediate hide before action execution.
 - `ActionDispatcher`: built-in action routing and a small `ActionProvider` registry. `ArcadeBoxProvider` is the first external provider.
 - `PlatformBackend`: release-aware trigger signals, cursor position, overlay preparation, app discovery/launch/focus, system actions, and start-on-login.

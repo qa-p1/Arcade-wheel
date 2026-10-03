@@ -96,6 +96,10 @@ class LinuxTriggerTest final : public QObject {
     PortalFixture *portal = nullptr;
 private slots:
     void initTestCase() {
+        // The backend deliberately refuses to register a desktop identity for
+        // executables in temporary directories (see ensureDesktopIdentity).
+        if (QCoreApplication::applicationFilePath().startsWith("/tmp/"))
+            QSKIP("Build outside /tmp: shortcut registration refuses temporary executables");
         QVERIFY(data.isValid());
         qunsetenv("ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT");
         qunsetenv("HYPRLAND_INSTANCE_SIGNATURE");

@@ -973,23 +973,6 @@ bool LinuxBackend::prepareOverlay(QQuickWindow *window, QString *error)
     return true;
 }
 
-void LinuxBackend::updateOverlayScreen()
-{
-    if (!m_overlayWindow) return;
-    QScreen *screen = QGuiApplication::screenAt(cursorPosition().toPoint());
-    if (!screen) screen = QGuiApplication::primaryScreen();
-    if (!screen) return;
-    if (m_overlayWindow->screen() != screen) m_overlayWindow->setScreen(screen);
-    m_overlayWindow->setGeometry(screen->geometry());
-#ifdef ARCADE_HAVE_LAYERSHELLQT
-    if (QGuiApplication::platformName().contains(QStringLiteral("wayland"), Qt::CaseInsensitive)) {
-        if (LayerShellQt::Window *layerWindow = LayerShellQt::Window::get(m_overlayWindow)) {
-            layerWindow->setDesiredSize(screen->geometry().size());
-        }
-    }
-#endif
-}
-
 QVector<DiscoveredApplication> LinuxBackend::applications() const
 {
     const QVector<DesktopEntry> entries = scanDesktopEntries();

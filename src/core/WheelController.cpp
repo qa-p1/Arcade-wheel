@@ -498,8 +498,9 @@ void WheelController::deleteDeck(const QString &deckId)
     all.removeAt(index);
     auto updated = m_config;
     updated.insert(QStringLiteral("decks"), all);
+    const int previous = m_deckIndex;
     if (m_deckIndex >= index && m_deckIndex > 0) --m_deckIndex;
-    commit(updated);
+    if (!commit(updated)) m_deckIndex = previous; // Nothing was deleted.
 }
 
 void WheelController::moveDeck(int from, int to)

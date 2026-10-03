@@ -84,49 +84,6 @@ private slots:
         QFETCH(int, expected);
         QCOMPARE(WheelLogic::scrollIndex(current, count, steps, wrap, reverse), expected);
     }
-
-    void clampCenter_data()
-    {
-        QTest::addColumn<QPointF>("desired");
-        QTest::addColumn<QRectF>("screen");
-        QTest::addColumn<qreal>("extent");
-        QTest::addColumn<QPointF>("expected");
-
-        const QRectF leftMonitor(-1920.0, -1080.0, 1920.0, 1080.0);
-        QTest::newRow("left-edge-negative-monitor")
-            << QPointF(-1910.0, -500.0) << leftMonitor << 200.0 << QPointF(-1720.0, -500.0);
-        QTest::newRow("right-edge-negative-monitor")
-            << QPointF(-5.0, -500.0) << leftMonitor << 200.0 << QPointF(-200.0, -500.0);
-        QTest::newRow("top-edge-negative-monitor")
-            << QPointF(-900.0, -1075.0) << leftMonitor << 200.0 << QPointF(-900.0, -880.0);
-        QTest::newRow("bottom-edge-negative-monitor")
-            << QPointF(-900.0, -2.0) << leftMonitor << 200.0 << QPointF(-900.0, -200.0);
-        QTest::newRow("top-left-corner")
-            << QPointF(-1919.0, -1079.0) << leftMonitor << 200.0 << QPointF(-1720.0, -880.0);
-        QTest::newRow("bottom-right-corner")
-            << QPointF(-1.0, -1.0) << leftMonitor << 200.0 << QPointF(-200.0, -200.0);
-        QTest::newRow("extent-larger-than-screen")
-            << QPointF(8.0, 9.0) << QRectF(-50.0, 100.0, 100.0, 60.0)
-            << 200.0 << QPointF(8.0, 130.0);
-        QTest::newRow("center-unchanged")
-            << QPointF(-960.0, -540.0) << leftMonitor << 200.0 << QPointF(-960.0, -540.0);
-    }
-
-    void clampCenter()
-    {
-        QFETCH(QPointF, desired);
-        QFETCH(QRectF, screen);
-        QFETCH(qreal, extent);
-        QFETCH(QPointF, expected);
-
-        const QPointF result = WheelLogic::clampCenter(desired, screen, extent);
-        QCOMPARE(result, expected);
-        const qreal safeExtent = std::min({extent, screen.width() / 2.0, screen.height() / 2.0});
-        QVERIFY(result.x() >= screen.left() + safeExtent);
-        QVERIFY(result.x() <= screen.right() - safeExtent);
-        QVERIFY(result.y() >= screen.top() + safeExtent);
-        QVERIFY(result.y() <= screen.bottom() - safeExtent);
-    }
 };
 
 QTEST_APPLESS_MAIN(WheelLogicTest)

@@ -85,6 +85,7 @@ if(BUILD_TESTING)
             src/platform/windows/WindowsBackend.h src/platform/windows/WindowsBackend.cpp)
         target_link_libraries(test_WindowsTrigger PRIVATE arcade_core Qt6::Test user32 shell32 ole32 uuid advapi32 PowrProf gdi32)
         add_test(NAME WindowsTrigger COMMAND test_WindowsTrigger)
+        set_tests_properties(WindowsTrigger PROPERTIES TIMEOUT 60)
     endif()
     if(UNIX AND NOT APPLE)
         qt_add_executable(test_LinuxLaunch tests/tst_LinuxLaunch.cpp

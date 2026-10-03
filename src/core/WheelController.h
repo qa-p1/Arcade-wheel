@@ -31,7 +31,9 @@ class WheelController final : public QObject {
     Q_PROPERTY(QString configPath READ configPath CONSTANT)
 public:
     explicit WheelController(PlatformBackend *backend, QObject *parent = nullptr, QString configPath = {});
+    ~WheelController() override;
     void initialize();
+    bool flushPendingSave();
     void setOverlayView(QQuickView *view);
 
     QVariantMap config() const { return m_config.toVariantMap(); }
@@ -113,7 +115,9 @@ private:
     QJsonArray decks() const;
     QJsonObject deckAt(int index) const;
     int deckIndexById(const QString &id) const;
-    bool commit(QJsonObject updated, bool triggerChanged = false);
+    enum class Persist { Now, Coalesced };
+    bool commit(QJsonObject updated, bool triggerChanged = false, Persist persist = Persist::Now);
+    void applyStartOnLogin();
     void openOverlay();
     void hideOverlay();
     void executeSelection(int index);
@@ -137,6 +141,8 @@ private:
     QTimer m_closeTimer;
     QTimer m_centerClickTimer;
     QTimer m_centerHoldTimer;
+    QTimer m_saveTimer;
+    bool m_savePending = false;
     int m_centerClicks = 0;
     bool m_centerPressed = false;
     QElapsedTimer m_openClock;

@@ -1,6 +1,6 @@
 # Manual release checks
 
-Automated tests (`ctest`) cover config migration and round-trips, angular selection, the dead zone, deck scrolling, edge clamping, invalid action handling, the trigger lifecycle, and center gesture recognition. Before a release, exercise the actual desktop path on the target OS:
+Automated tests (`ctest`) cover config migration and round-trips, angular selection, the dead zone, deck scrolling, invalid action handling, the trigger lifecycle, and center gesture recognition. Before a release, exercise the actual desktop path on the target OS:
 
 1. Set a shortcut, approve the desktop portal if prompted, then press, hold, move, and release. Verify execution starts as the overlay disappears.
 2. Return to the center before release and verify nothing executes. Try rapid repeated invocations and a configured hold threshold.

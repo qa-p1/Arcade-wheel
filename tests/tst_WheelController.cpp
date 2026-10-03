@@ -1,6 +1,8 @@
 #include "core/WheelController.h"
 #include <QGuiApplication>
+#include <QFile>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QQuickView>
 #include <QQuickItem>
 #include <QQmlContext>
@@ -30,9 +32,12 @@ public:
         if (fail && error) *error="Intentional launch failure";
         return !fail;
     }
-    bool performSystemAction(const QString &, QString *) override { return true; }
-    bool setStartOnLogin(bool, QString *) override { return true; }
-    bool startOnLogin() const override { return false; }
+    bool performSystemAction(const QString &id, QString *) override { systemActions << id; return true; }
+    bool setStartOnLogin(bool enabled, QString *error) override {
+        if (loginFails) { if (error) *error="Login entry refused"; return false; }
+        login=enabled; return true;
+    }
+    bool startOnLogin() const override { return login; }
     void setShortcutRecording(bool enabled) override { recording=enabled; }
     bool recording=false;
     int launches=0;
@@ -40,7 +45,14 @@ public:
     int configures=0;
     QJsonObject configured;
     bool fail=false;
+    bool login=false;
+    bool loginFails=false;
+    QStringList systemActions;
 };
+static QJsonObject readConfig(const QString &path) {
+    QFile file(path);
+    return file.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(file.readAll()).object() : QJsonObject{};
+}
 class WheelControllerTest final : public QObject {
     Q_OBJECT
     static void addGroup(WheelController &controller, const QString &gesture, const QStringList &ids) {
@@ -346,6 +358,57 @@ private slots:
         QTest::qWait(130); QVERIFY(!controller.overlayVisible()); QCOMPARE(backend.launches,0);
         controller.showWheel(); controller.pointerMoved(controller.visualCenterX(),controller.visualCenterY()-160);
         emit backend.triggerCancelled(); QTest::qWait(10); QCOMPARE(backend.launches,0);
+    }
+    void liveSettingsAreCoalescedAndFlushed() {
+        QTemporaryDir dir; const QString path=dir.filePath("config.json");
+        {
+            ControllerBackend backend; WheelController controller(&backend,nullptr,path); controller.initialize();
+            for (int radius=150; radius<=200; radius+=2) controller.updateSetting("appearance","radius",radius);
+            // Applied at once for the live preview, written once after the drag settles.
+            QCOMPARE(controller.config().value("appearance").toMap().value("radius").toInt(),200);
+            QCOMPARE(readConfig(path).value("appearance").toObject().value("radius").toInt(),148);
+            QTRY_COMPARE(readConfig(path).value("appearance").toObject().value("radius").toInt(),200);
+            controller.updateSetting("appearance","radius",210); // Pending when the controller is destroyed.
+        }
+        QCOMPARE(readConfig(path).value("appearance").toObject().value("radius").toInt(),210);
+    }
+    void startOnLoginFollowsTheOperatingSystem() {
+        QTemporaryDir dir; const QString path=dir.filePath("config.json");
+        const QString exported=dir.filePath("export.json");
+        {
+            ControllerBackend backend; WheelController controller(&backend,nullptr,path); controller.initialize();
+            controller.updateSetting("general","startOnLogin",true);
+            QVERIFY(backend.login);
+            QVERIFY(controller.exportConfig(exported));
+            controller.resetDefaults(); // Reset turns the login entry off as well as the flag.
+            QVERIFY(!backend.login);
+            QVERIFY(controller.importConfig(exported)); // Import turns it back on.
+            QVERIFY(backend.login);
+            QVERIFY(readConfig(path).value("general").toObject().value("startOnLogin").toBool());
+        }
+        {
+            // The entry was removed outside the app: show the real state.
+            ControllerBackend backend; WheelController controller(&backend,nullptr,path); controller.initialize();
+            QVERIFY(!controller.config().value("general").toMap().value("startOnLogin").toBool());
+            backend.loginFails=true; // A refused import keeps the flag truthful.
+            QVERIFY(controller.importConfig(exported));
+            QVERIFY(!controller.config().value("general").toMap().value("startOnLogin").toBool());
+            QVERIFY(!readConfig(path).value("general").toObject().value("startOnLogin").toBool());
+            QVERIFY(controller.lastError().contains("refused"));
+        }
+    }
+    void screenshotWaitsForTheWheelToLeaveTheScreen() {
+        QTemporaryDir dir; ControllerBackend backend;
+        WheelController controller(&backend,nullptr,dir.filePath("config.json"));
+        controller.initialize(); QQuickView view; controller.setOverlayView(&view);
+        const QString deck=controller.currentDeck().value("id").toString();
+        controller.setAction(deck,0,{{"type","system"},{"name","Screenshot"},{"payload",QVariantMap{{"id","screenshot"}}}});
+        controller.setAction(deck,1,{{"type","system"},{"name","Lock"},{"payload",QVariantMap{{"id","lock"}}}});
+        controller.showWheel(); controller.activateSlot(1);
+        QTRY_COMPARE(backend.systemActions,QStringList({"lock"})); // Other actions stay immediate.
+        controller.showWheel(); controller.activateSlot(0);
+        QTest::qWait(150); QCOMPARE(backend.systemActions.size(),1);
+        QTRY_COMPARE(backend.systemActions,QStringList({"lock","screenshot"}));
     }
     void failureClosesAndReports() {
         QTemporaryDir dir; ControllerBackend backend; backend.fail=true;

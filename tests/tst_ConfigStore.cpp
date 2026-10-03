@@ -174,6 +174,40 @@ private slots:
                      .value(QStringLiteral("startOnLogin")).toBool(), true);
     }
 
+    void loadPersistsMigrationSoIdsAreStable()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString path = directory.filePath(QStringLiteral("config.json"));
+        // A hand-written v1 file: no deck or action IDs.
+        const QJsonObject legacy{{QStringLiteral("schemaVersion"), 1},
+                                 {QStringLiteral("decks"), QJsonArray{QJsonObject{
+                                      {QStringLiteral("name"), QStringLiteral("Mine")},
+                                      {QStringLiteral("actions"), QJsonArray{QJsonObject{
+                                           {QStringLiteral("type"), QStringLiteral("url")},
+                                           {QStringLiteral("payload"), QJsonObject{{QStringLiteral("url"), QStringLiteral("https://example.invalid")}}}}}}}}}};
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QJsonDocument(legacy).toJson());
+        file.close();
+
+        QString error;
+        const QJsonObject first = ConfigStore(path).load({}, &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        const QJsonObject second = ConfigStore(path).load({}, &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        const auto deckId = [](const QJsonObject &config) {
+            return config.value(QStringLiteral("decks")).toArray().first().toObject().value(QStringLiteral("id")).toString();
+        };
+        QVERIFY(!deckId(first).isEmpty());
+        QCOMPARE(deckId(second), deckId(first));
+        QCOMPARE(second, first);
+
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const QJsonObject onDisk = QJsonDocument::fromJson(file.readAll()).object();
+        QCOMPARE(onDisk.value(QStringLiteral("schemaVersion")).toInt(), ConfigStore::SchemaVersion);
+    }
+
     void invalidConfigurationsAreRejected()
     {
         QString error;

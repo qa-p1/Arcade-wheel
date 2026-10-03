@@ -13,6 +13,25 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+// Matches hideOverlay()'s close fallback plus a compositor frame to unmap the
+// surface, so a screenshot taken from the wheel does not capture the wheel.
+constexpr int kScreenCaptureDelayMs = 320;
+// Live settings (slider drags) are applied at once but written to disk only
+// after this quiet period; every save is an atomic replace with fdatasync.
+constexpr int kCoalescedSaveDelayMs = 250;
+
+bool capturesScreen(const QJsonArray &actions)
+{
+    return std::any_of(actions.begin(), actions.end(), [](const QJsonValue &value) {
+        const auto action = value.toObject();
+        return action.value(QStringLiteral("type")).toString() == QStringLiteral("system")
+            && action.value(QStringLiteral("payload")).toObject().value(QStringLiteral("id")).toString()
+                   == QStringLiteral("screenshot");
+    });
+}
+}
+
 WheelController::WheelController(PlatformBackend *backend, QObject *parent, QString configPath)
     : QObject(parent), m_backend(backend), m_store(std::move(configPath)), m_dispatcher(backend)
 {
@@ -20,6 +39,9 @@ WheelController::WheelController(PlatformBackend *backend, QObject *parent, QStr
     m_closeTimer.setSingleShot(true);
     m_centerClickTimer.setSingleShot(true);
     m_centerHoldTimer.setSingleShot(true);
+    m_saveTimer.setSingleShot(true);
+    m_saveTimer.setInterval(kCoalescedSaveDelayMs);
+    connect(&m_saveTimer, &QTimer::timeout, this, &WheelController::flushPendingSave);
     connect(&m_centerClickTimer, &QTimer::timeout, this, &WheelController::finishCenterClicks);
     connect(&m_centerHoldTimer, &QTimer::timeout, this, [this] {
         if (m_visible && m_centerPressed) executeCenterGesture(QStringLiteral("longPress"));
@@ -40,12 +62,34 @@ WheelController::WheelController(PlatformBackend *backend, QObject *parent, QStr
     });
 }
 
+WheelController::~WheelController()
+{
+    flushPendingSave();
+}
+
+bool WheelController::flushPendingSave()
+{
+    if (!m_savePending) return true;
+    m_saveTimer.stop();
+    m_savePending = false;
+    QString error;
+    if (m_store.save(m_config, &error)) return true;
+    reportError(error);
+    return false;
+}
+
 void WheelController::initialize()
 {
     refreshApplications();
     QString error;
     m_config = m_store.load(m_applications, &error);
     if (!error.isEmpty()) reportError(error);
+    // The login entry is owned by the OS and can change outside the app.
+    // Show what is actually installed rather than a stale saved flag; the
+    // next saved change records it.
+    auto general = m_config.value(QStringLiteral("general")).toObject();
+    general.insert(QStringLiteral("startOnLogin"), m_backend->startOnLogin());
+    m_config.insert(QStringLiteral("general"), general);
     m_backend->configureTrigger(m_config.value(QStringLiteral("trigger")).toObject());
     emit configChanged();
     emit currentDeckChanged();
@@ -193,7 +237,8 @@ void WheelController::executeActions(const QJsonArray &actions)
     if (actions.isEmpty()) return;
     // Execution never waits for the exit animation. Keep its selection visible
     // only for the short visual collapse, then release the native surface.
-    QTimer::singleShot(0, this, [this, actions] {
+    // Screen captures are the exception: they would record the fading wheel.
+    QTimer::singleShot(capturesScreen(actions) ? kScreenCaptureDelayMs : 0, this, [this, actions] {
         QStringList errors;
         const bool focus = m_config.value(QStringLiteral("behaviour")).toObject()
                                .value(QStringLiteral("focusExisting")).toBool(true);
@@ -338,7 +383,7 @@ void WheelController::selectDeck(int index)
     if (m_visible) pointerMoved(m_lastPointer.x(), m_lastPointer.y());
 }
 
-bool WheelController::commit(QJsonObject updated, bool triggerChanged)
+bool WheelController::commit(QJsonObject updated, bool triggerChanged, Persist persist)
 {
     QString error;
     updated = ConfigStore::normalize(updated, &error);
@@ -346,9 +391,17 @@ bool WheelController::commit(QJsonObject updated, bool triggerChanged)
         reportError(error);
         return false;
     }
-    if (!m_store.save(updated, &error)) {
-        reportError(error);
-        return false;
+    if (persist == Persist::Coalesced) {
+        m_savePending = true;
+        m_saveTimer.start();
+    } else {
+        if (!m_store.save(updated, &error)) {
+            reportError(error);
+            return false;
+        }
+        // This write also contains any coalesced change still waiting.
+        m_savePending = false;
+        m_saveTimer.stop();
     }
     m_config = updated;
     m_deckIndex = std::clamp(m_deckIndex, 0, std::max(0, deckCount() - 1));
@@ -364,7 +417,9 @@ void WheelController::updateSetting(const QString &section, const QString &key, 
         section != QStringLiteral("appearance") && section != QStringLiteral("behaviour") &&
         section != QStringLiteral("centerGestures")) return;
     if (key.isEmpty()) return;
-    if (section == QStringLiteral("general") && key == QStringLiteral("startOnLogin")) {
+    const bool loginSetting = section == QStringLiteral("general") && key == QStringLiteral("startOnLogin");
+    const bool wasStartingOnLogin = loginSetting && m_backend->startOnLogin();
+    if (loginSetting) {
         QString error;
         if (!m_backend->setStartOnLogin(value.toBool(), &error)) {
             reportError(error);
@@ -377,7 +432,10 @@ void WheelController::updateSetting(const QString &section, const QString &key, 
     updated.insert(section, object);
     // Hold timing is local to the controller; changing it must not tear down
     // the global shortcut while the slider is moving.
-    const bool saved = commit(updated, section == QStringLiteral("trigger") && key != QStringLiteral("holdThresholdMs"));
+    const bool saved = commit(updated, section == QStringLiteral("trigger") && key != QStringLiteral("holdThresholdMs"),
+                              loginSetting ? Persist::Now : Persist::Coalesced);
+    // Keep the OS entry and the saved flag in agreement.
+    if (!saved && loginSetting) m_backend->setStartOnLogin(wasStartingOnLogin, nullptr);
     if (saved && section == QStringLiteral("trigger") && key == QStringLiteral("holdThresholdMs"))
         m_backend->setTriggerHoldThreshold(value.toInt());
 }
@@ -440,8 +498,9 @@ void WheelController::deleteDeck(const QString &deckId)
     all.removeAt(index);
     auto updated = m_config;
     updated.insert(QStringLiteral("decks"), all);
+    const int previous = m_deckIndex;
     if (m_deckIndex >= index && m_deckIndex > 0) --m_deckIndex;
-    commit(updated);
+    if (!commit(updated)) m_deckIndex = previous; // Nothing was deleted.
 }
 
 void WheelController::moveDeck(int from, int to)
@@ -546,7 +605,9 @@ bool WheelController::importConfig(const QString &urlOrPath)
         reportError(error);
         return false;
     }
-    return commit(imported, true);
+    if (!commit(imported, true)) return false;
+    applyStartOnLogin();
+    return true;
 }
 
 bool WheelController::exportConfig(const QString &urlOrPath)
@@ -559,8 +620,25 @@ bool WheelController::exportConfig(const QString &urlOrPath)
 
 void WheelController::resetDefaults()
 {
-    commit(ConfigStore::defaults(m_applications), true);
+    if (commit(ConfigStore::defaults(m_applications), true)) applyStartOnLogin();
     selectDeck(0);
+}
+
+void WheelController::applyStartOnLogin()
+{
+    // Import and reset replace the saved flag wholesale; make the OS login
+    // entry follow it, or record the real state if the OS refuses.
+    const bool wanted = m_config.value(QStringLiteral("general")).toObject()
+                            .value(QStringLiteral("startOnLogin")).toBool();
+    if (wanted == m_backend->startOnLogin()) return;
+    QString error;
+    if (m_backend->setStartOnLogin(wanted, &error)) return;
+    reportError(error);
+    auto updated = m_config;
+    auto general = updated.value(QStringLiteral("general")).toObject();
+    general.insert(QStringLiteral("startOnLogin"), m_backend->startOnLogin());
+    updated.insert(QStringLiteral("general"), general);
+    commit(updated);
 }
 
 void WheelController::reportError(const QString &error)

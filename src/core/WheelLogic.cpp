@@ -24,10 +24,3 @@ int WheelLogic::scrollIndex(int current, int count, int steps, bool wrap, bool r
     if (wrap) return (target % count + count) % count;
     return std::clamp(target, 0, count - 1);
 }
-
-QPointF WheelLogic::clampCenter(QPointF desired, QRectF screen, qreal extent)
-{
-    const qreal usableExtent = std::min({extent, screen.width() / 2, screen.height() / 2});
-    return {std::clamp(desired.x(), screen.left() + usableExtent, screen.right() - usableExtent),
-            std::clamp(desired.y(), screen.top() + usableExtent, screen.bottom() - usableExtent)};
-}

@@ -28,11 +28,12 @@
 #include <array>
 #include <cstring>
 #include <cwchar>
+#include <future>
 #include <memory>
 #include <utility>
 #include <vector>
 
-WindowsBackend *WindowsBackend::s_hookOwner = nullptr;
+std::atomic<WindowsBackend *> WindowsBackend::s_hookOwner{nullptr};
 
 namespace {
 
@@ -178,6 +179,18 @@ UINT keyVirtualKey(const QString &name)
         {QStringLiteral("quote"), VK_OEM_7}, {QStringLiteral("leftbracket"), VK_OEM_4},
         {QStringLiteral("rightbracket"), VK_OEM_6}, {QStringLiteral("backtick"), VK_OEM_3},
         {QStringLiteral("numpadenter"), VK_RETURN},
+        // Qt's portable key names, as produced by the Settings shortcut recorder.
+        {QStringLiteral("ins"), VK_INSERT}, {QStringLiteral("pgdown"), VK_NEXT},
+        {QStringLiteral("print"), VK_SNAPSHOT}, {QStringLiteral("numlock"), VK_NUMLOCK},
+        {QStringLiteral("scrolllock"), VK_SCROLL}, {QStringLiteral("menu"), VK_APPS},
+        {QStringLiteral("volume mute"), VK_VOLUME_MUTE}, {QStringLiteral("volume up"), VK_VOLUME_UP},
+        {QStringLiteral("volume down"), VK_VOLUME_DOWN},
+        {QStringLiteral("media play"), VK_MEDIA_PLAY_PAUSE},
+        {QStringLiteral("media pause"), VK_MEDIA_PLAY_PAUSE},
+        {QStringLiteral("toggle media play/pause"), VK_MEDIA_PLAY_PAUSE},
+        {QStringLiteral("media stop"), VK_MEDIA_STOP},
+        {QStringLiteral("media next"), VK_MEDIA_NEXT_TRACK},
+        {QStringLiteral("media previous"), VK_MEDIA_PREV_TRACK},
     };
     const auto it = namedKeys.constFind(lower);
     if (it != namedKeys.cend())
@@ -524,7 +537,7 @@ WindowsBackend::WindowsBackend(QObject *parent)
 
 WindowsBackend::~WindowsBackend()
 {
-    uninstallKeyboardHook();
+    stopHookThread();
 }
 
 QString WindowsBackend::name() const
@@ -532,11 +545,18 @@ QString WindowsBackend::name() const
     return QStringLiteral("Windows");
 }
 
+QString WindowsBackend::shortcutValidationError(const QString &shortcut) const
+{
+    return parseTrigger(QJsonObject{{QStringLiteral("shortcut"), shortcut}}).error;
+}
+
 void WindowsBackend::configureTrigger(const QJsonObject &trigger)
 {
+    stopHookThread();
+    // Replacing the trigger mid-hold must not run the current selection. Queue
+    // the cancel so it arrives after any edge the hook thread already posted.
     if (m_triggerDown)
-        emit triggerReleased();
-    uninstallKeyboardHook();
+        QMetaObject::invokeMethod(this, [this] { emit triggerCancelled(); }, Qt::QueuedConnection);
     m_triggerDown = false;
 
     const ParsedTrigger parsed = parseTrigger(trigger);
@@ -552,16 +572,41 @@ void WindowsBackend::configureTrigger(const QJsonObject &trigger)
     // Consequently a trigger such as Caps Lock still toggles Caps Lock. The configured
     // hold threshold can choose when the wheel opens, but Windows tap behavior cannot be
     // deferred and replayed without suppressing the original key event.
-    m_keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, keyboardHookProc,
-                                       GetModuleHandleW(nullptr), 0);
-    if (!m_keyboardHook) {
+    struct HookStart {
+        DWORD error = ERROR_SUCCESS;
+        DWORD threadId = 0;
+    };
+    std::promise<HookStart> started;
+    std::future<HookStart> startResult = started.get_future();
+    m_hookThread = std::thread([started = std::move(started)]() mutable {
+        MSG message;
+        // Create this thread's message queue first so a WM_QUIT posted by
+        // stopHookThread() can never be lost.
+        PeekMessageW(&message, nullptr, WM_USER, WM_USER, PM_NOREMOVE);
+        const HHOOK hook = SetWindowsHookExW(WH_KEYBOARD_LL, keyboardHookProc,
+                                             GetModuleHandleW(nullptr), 0);
+        started.set_value({hook ? DWORD(ERROR_SUCCESS) : GetLastError(), GetCurrentThreadId()});
+        if (!hook)
+            return;
+        while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        }
+        UnhookWindowsHookEx(hook);
+    });
+    const HookStart start = startResult.get();
+    if (start.error != ERROR_SUCCESS) {
+        m_hookThread.join();
         s_hookOwner = nullptr;
         emit triggerStatusChanged(QStringLiteral("Could not register the global keyboard trigger: %1")
-                                      .arg(win32Error()));
+                                      .arg(win32Error(start.error)));
         return;
     }
+    m_hookThreadId = start.threadId;
 
-    emit triggerStatusChanged(QString());
+    // Settings treats a status beginning with "Ready" as a working trigger.
+    QString shortcut = trigger.value(QStringLiteral("shortcut")).toString().trimmed();
+    if (shortcut.isEmpty())
+        shortcut = QStringLiteral("the shortcut");
+    emit triggerStatusChanged(QStringLiteral("Ready · hold %1 to open").arg(shortcut));
 }
 
 bool WindowsBackend::prepareOverlay(QQuickWindow *window, QString *error)
@@ -821,14 +866,16 @@ bool WindowsBackend::startOnLogin() const
     return result == ERROR_SUCCESS;
 }
 
-void WindowsBackend::uninstallKeyboardHook()
+void WindowsBackend::stopHookThread()
 {
-    if (m_keyboardHook) {
-        UnhookWindowsHookEx(m_keyboardHook);
-        m_keyboardHook = nullptr;
+    if (m_hookThread.joinable()) {
+        if (m_hookThreadId)
+            PostThreadMessageW(m_hookThreadId, WM_QUIT, 0, 0);
+        m_hookThread.join();
     }
-    if (s_hookOwner == this)
-        s_hookOwner = nullptr;
+    m_hookThreadId = 0;
+    WindowsBackend *self = this;
+    s_hookOwner.compare_exchange_strong(self, nullptr);
 }
 
 bool WindowsBackend::hasRequiredModifiers() const
@@ -842,12 +889,13 @@ bool WindowsBackend::hasRequiredModifiers() const
 
 LRESULT CALLBACK WindowsBackend::keyboardHookProc(int code, WPARAM message, LPARAM data)
 {
-    if (code >= 0 && s_hookOwner && data) {
+    // Runs on the hook thread. Signals are delivered to the GUI thread queued.
+    WindowsBackend *owner = s_hookOwner.load();
+    if (code >= 0 && owner && data) {
         const auto *keyEvent = reinterpret_cast<const KBDLLHOOKSTRUCT *>(data);
         if (!(keyEvent->flags & LLKHF_INJECTED)) {
             const bool keyDown = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
             const bool keyUp = message == WM_KEYUP || message == WM_SYSKEYUP;
-            WindowsBackend *owner = s_hookOwner;
             if (keyDown && matchesConfiguredKey(owner->m_triggerVirtualKey, keyEvent->vkCode) &&
                 !owner->m_triggerDown && owner->hasRequiredModifiers()) {
                 owner->m_triggerDown = true;

@@ -30,26 +30,26 @@ jobs:
             os: ubuntu-22.04
             platform: linux
             qt_arch: linux_gcc_64
-            modules: qtshadertools qtimageformats qtsvg qtwayland
+            modules: qtshadertools qtimageformats
             artifact: Linux-x86_64
           - name: Windows x64 setup EXE
             os: windows-2022
             platform: windows
             qt_arch: win64_msvc2022_64
-            modules: qtshadertools qtimageformats qtsvg
+            modules: qtshadertools qtimageformats
             artifact: Windows-x64
           - name: macOS Apple Silicon DMG
             os: macos-15
             platform: mac
             qt_arch: clang_64
-            modules: qtshadertools qtimageformats qtsvg
+            modules: qtshadertools qtimageformats
             cpu: arm64
             artifact: macOS-arm64
           - name: macOS Intel DMG
             os: macos-15-intel
             platform: mac
             qt_arch: clang_64
-            modules: qtshadertools qtimageformats qtsvg
+            modules: qtshadertools qtimageformats
             cpu: x86_64
             artifact: macOS-x86_64
     runs-on: ${{ matrix.os }}

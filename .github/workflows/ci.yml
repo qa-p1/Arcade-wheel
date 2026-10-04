@@ -1,84 +1,210 @@
-name: CI
+name: Build, test and package
 
 on:
   push:
+    branches: [main]
+    tags: ['v*']
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-jobs:
-  linux:
-    name: Linux build and tests
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-      - name: Install Qt 6
-        uses: jurplel/install-qt-action@v4
+env:
+  QT_VERSION: '6.8.3'
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64 AppImage
+            os: ubuntu-22.04
+            platform: linux
+            qt_arch: linux_gcc_64
+            modules: qtshadertools qtimageformats
+            artifact: Linux-x86_64
+          - name: Windows x64 setup EXE
+            os: windows-2022
+            platform: windows
+            qt_arch: win64_msvc2022_64
+            modules: qtshadertools qtimageformats
+            artifact: Windows-x64
+          - name: macOS Apple Silicon DMG
+            os: macos-15
+            platform: mac
+            qt_arch: clang_64
+            modules: qtshadertools qtimageformats
+            cpu: arm64
+            artifact: macOS-arm64
+          - name: macOS Intel DMG
+            os: macos-15-intel
+            platform: mac
+            qt_arch: clang_64
+            modules: qtshadertools qtimageformats
+            cpu: x86_64
+            artifact: macOS-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          version: "6.8.*"
-          host: linux
+          persist-credentials: false
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libglib2.0-dev dbus libwayland-dev wayland-protocols libxkbcommon-dev libgl1-mesa-dev libegl1-mesa-dev libfuse2 desktop-file-utils
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: ${{ matrix.platform }}
           target: desktop
-          arch: linux_gcc_64
-          modules: qtshadertools
+          arch: ${{ matrix.qt_arch }}
+          modules: ${{ matrix.modules }}
           install-deps: true
           cache: true
 
-      - name: Install Linux build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev dbus
+      - name: Build matching LayerShellQt
+        if: runner.os == 'Linux'
+        run: bash packaging/linux/build-dependencies.sh "$RUNNER_TEMP/deps" "$RUNNER_TEMP/deps-build"
 
-      - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DARCADE_REQUIRE_LAYERSHELLQT=OFF
+      - name: Configure Linux
+        if: runner.os == 'Linux'
+        run: >-
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/deps;$QT_ROOT_DIR"
+          -DARCADE_REQUIRE_LAYERSHELLQT=ON
 
-      - name: Build
-        run: cmake --build build --parallel
-
-      - name: Test
-        run: ctest --test-dir build --output-on-failure
-
-  windows:
-    name: Windows build, tests, and package
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Qt 6 for MSVC 2022
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: "6.8.*"
-          host: windows
-          target: desktop
-          arch: win64_msvc2022_64
-          modules: qtshadertools
-          cache: true
-
-      - name: Configure
+      - name: Configure Windows
+        if: runner.os == 'Windows'
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON
 
+      - name: Configure macOS
+        if: runner.os == 'macOS'
+        env:
+          TARGET_ARCH: ${{ matrix.cpu }}
+        run: >-
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          -DCMAKE_OSX_ARCHITECTURES="$TARGET_ARCH" -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+
       - name: Build
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release --parallel 3
 
       - name: Test
-        run: ctest --test-dir build -C Release --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 120
 
-      - name: Package Windows application
+      - name: Check release tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          version=$(sed -nE 's/^project\(ArcadeWheel VERSION ([^ ]+).*/\1/p' CMakeLists.txt)
+          test "$GITHUB_REF_NAME" = "v$version"
+
+      - name: Package and smoke-test Linux AppImage
+        if: runner.os == 'Linux'
+        run: |
+          export LAYERSHELL_PLUGIN="$RUNNER_TEMP/deps/lib/plugins/wayland-shell-integration/liblayer-shell.so"
+          export LD_LIBRARY_PATH="$RUNNER_TEMP/deps/lib:$QT_ROOT_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          export QMAKE="$QT_ROOT_DIR/bin/qmake"
+          bash packaging/linux/package.sh build dist
+
+      - name: Ensure Inno Setup is available
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          }
+
+      - name: Package and smoke-test Windows installer and portable ZIP
+        if: runner.os == 'Windows'
         shell: cmd
         run: |
           for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%i"
-          if not defined VSINSTALL (
-            echo Could not find the Visual C++ x64 toolchain on this runner.
-            exit /b 1
-          )
+          if not defined VSINSTALL exit /b 1
           call "%VSINSTALL%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64
           if errorlevel 1 exit /b 1
           powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\packaging\windows\package.ps1 -BuildDir .\build -Configuration Release -OutputDir .\dist
           if errorlevel 1 exit /b 1
 
-      - name: Upload Windows ZIP
-        uses: actions/upload-artifact@v7
+      - name: Test Windows installation and uninstallation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-Item dist/*-Setup.exe
+          $destination = Join-Path $env:RUNNER_TEMP 'Arcade Wheel Installed'
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          python packaging/smoke-test.py "$destination/arcade-wheel.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed app smoke test failed' }
+          $process = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Uninstaller failed: $($process.ExitCode)" }
+          if (Test-Path "$destination/arcade-wheel.exe") { throw 'Uninstaller left the executable behind' }
+
+      - name: Package and smoke-test macOS DMG
+        if: runner.os == 'macOS'
+        env:
+          TARGET_ARCH: ${{ matrix.cpu }}
+        run: bash packaging/macos/package.sh build dist "$TARGET_ARCH"
+
+      - name: Upload installable packages and checksums
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ArcadeWheel-Windows
-          path: dist/ArcadeWheel-*-Windows.zip
+          name: ArcadeWheel-${{ matrix.artifact }}
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/*.AppImage
+            dist/*.dmg
+            dist/*.sha256
           if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: test-logs-${{ matrix.artifact }}
+          path: build/Testing/Temporary/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    name: Publish tagged release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: ArcadeWheel-*
+          path: dist
+          merge-multiple: true
+      - name: Publish packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Arcade Wheel $GITHUB_REF_NAME" --generate-notes --draft
+          fi
+          gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false

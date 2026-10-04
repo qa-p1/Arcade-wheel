@@ -2,6 +2,8 @@
 #include "core/WheelController.h"
 #ifdef Q_OS_WIN
 #include "platform/windows/WindowsBackend.h"
+#elif defined(Q_OS_MACOS)
+#include "platform/macos/MacOSBackend.h"
 #else
 #include "platform/linux/LinuxBackend.h"
 #endif
@@ -26,6 +28,7 @@
 #include <QSystemTrayIcon>
 #include <QThread>
 #include <QTimer>
+#include <QTemporaryDir>
 #include <memory>
 
 int main(int argc, char **argv)
@@ -36,10 +39,19 @@ int main(int argc, char **argv)
     QCoreApplication::setOrganizationName(QStringLiteral("Arcade Wheel"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("arcadewheel.org"));
     QCoreApplication::setApplicationName(QStringLiteral("Arcade Wheel"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(ARCADE_VERSION));
     app.setQuitOnLastWindowClosed(false);
     app.setDesktopFileName(QStringLiteral("com.arcadewheel.ArcadeWheel"));
 
     const QString command = app.arguments().size() > 1 ? app.arguments().at(1) : QStringLiteral("--settings");
+    const bool smokeTest = command == QStringLiteral("--smoke-test");
+    std::unique_ptr<QTemporaryDir> smokeDirectory;
+    if (smokeTest) {
+        smokeDirectory = std::make_unique<QTemporaryDir>();
+        if (!smokeDirectory->isValid()) return 1;
+        qputenv("ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT", "1");
+        qputenv("ARCADE_WHEEL_INSTANCE", smokeDirectory->path().toUtf8());
+    }
     if (command == QStringLiteral("--help") || command == QStringLiteral("-h")) {
         QTextStream(stdout) << "Arcade Wheel\n\n"
             "  arcade-wheel               Open Settings; keep the launcher running\n"
@@ -114,10 +126,13 @@ int main(int argc, char **argv)
 
 #ifdef Q_OS_WIN
     WindowsBackend backend;
+#elif defined(Q_OS_MACOS)
+    MacOSBackend backend;
 #else
     LinuxBackend backend;
 #endif
-    WheelController controller(&backend);
+    WheelController controller(&backend, nullptr,
+        smokeTest ? smokeDirectory->filePath(QStringLiteral("config.json")) : QString());
     controller.initialize();
     QIcon appIcon(QStringLiteral(":/assets/arcade-wheel.png"));
     if (appIcon.isNull()) appIcon = QIcon::fromTheme(QStringLiteral("applications-system"));
@@ -131,6 +146,7 @@ int main(int argc, char **argv)
     overlay.engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);
     overlay.rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
     overlay.setSource(QUrl(QStringLiteral("qrc:/qml/wheel/Overlay.qml")));
+    if (overlay.status() == QQuickView::Error) return 1;
     if (overlay.rootObject())
         overlay.rootObject()->setProperty("controller", QVariant::fromValue(static_cast<QObject *>(&controller)));
     controller.setOverlayView(&overlay);
@@ -147,6 +163,10 @@ int main(int argc, char **argv)
             settings->engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);
             settings->rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
             settings->setSource(QUrl(QStringLiteral("qrc:/qml/settings/Settings.qml")));
+            if (settings->status() == QQuickView::Error) {
+                app.exit(1);
+                return;
+            }
         }
         settings->show();
         settings->raise();
@@ -169,7 +189,11 @@ int main(int argc, char **argv)
     QObject::connect(&controller, &WheelController::quitRequested, &app, &QCoreApplication::quit);
     const auto restart = [&] {
         // Quitting without a successor would silently remove the launcher.
-        if (!QProcess::startDetached(QCoreApplication::applicationFilePath(), {QStringLiteral("--restarting")})) {
+        QString executable = QCoreApplication::applicationFilePath();
+#ifdef Q_OS_LINUX
+        if (!qEnvironmentVariableIsEmpty("APPIMAGE")) executable = qEnvironmentVariable("APPIMAGE");
+#endif
+        if (!QProcess::startDetached(executable, {QStringLiteral("--restarting")})) {
             const QString message = QStringLiteral("Arcade Wheel could not start a new instance, so it kept running.");
             if (tray.isVisible()) tray.showMessage(QStringLiteral("Arcade Wheel"), message, QSystemTrayIcon::Warning, 3000);
             QTextStream(stderr) << message << '\n';
@@ -230,7 +254,13 @@ int main(int argc, char **argv)
             receive(); // Data may have arrived before readyRead was connected.
         }
     });
-    if (command != QStringLiteral("--background"))
+    if (smokeTest) {
+        QTimer::singleShot(0, &app, showSettings);
+        QTimer::singleShot(1500, &app, [&] {
+            app.exit(settings && settings->status() == QQuickView::Ready
+                     && overlay.status() == QQuickView::Ready ? 0 : 1);
+        });
+    } else if (command != QStringLiteral("--background"))
         QTimer::singleShot(0, &app, [&] { handleCommand(command); });
     return app.exec();
 }

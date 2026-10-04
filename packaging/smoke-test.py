@@ -14,7 +14,8 @@ def main():
         if key.startswith(("QT_", "QML", "DYLD_")) or key in ("LD_LIBRARY_PATH", "LD_PRELOAD"):
             environment.pop(key)
     if sys.platform == "win32":
-        system_root = Path(environment["SystemRoot"])
+        # os.environ is case-insensitive on Windows; its plain dict copy is not.
+        system_root = Path(os.environ["SystemRoot"])
         environment["PATH"] = os.pathsep.join(map(str, (system_root / "System32", system_root)))
     else:
         environment["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"

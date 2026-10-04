@@ -52,7 +52,7 @@ Builds currently have no publisher certificate: Windows installers are unsigned 
 
 - CMake 3.25+ and a C++20 compiler
 - Qt **6.8+**: Core, Gui, Qml, Quick, QuickControls2, Widgets, Network, Test
-- **Linux:** Qt DBus, GLib/GIO (`gio-unix-2.0`), pkg-config, and KDE's [LayerShellQt](https://github.com/KDE/layer-shell-qt) for the Wayland overlay. Global shortcuts need a compositor portal that implements `org.freedesktop.portal.GlobalShortcuts` (Hyprland's does).
+- **Linux:** Qt DBus, GLib/GIO (`gio-unix-2.0`), pkg-config, and KDE's [LayerShellQt 6.4+](https://github.com/KDE/layer-shell-qt) for the Wayland overlay. Global shortcuts need a compositor portal that implements `org.freedesktop.portal.GlobalShortcuts` (Hyprland's does).
 - **Windows:** MSVC with a Qt 6 MSVC kit
 - **macOS:** Xcode command-line tools and a Qt 6 macOS kit
 

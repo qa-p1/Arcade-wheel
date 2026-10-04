@@ -57,7 +57,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_upload_finishes_before_stable_publication(self):
         published = {"draft": False, "prerelease": False, "html_url": "https://example.com/release"}
-        with patch.object(release, "api", side_effect=[None, None, self.uploaded(), None, published]), \
+        with patch.object(release, "api", side_effect=[None, [], None, self.uploaded(), None, published]), \
                 patch.object(release, "gh") as gh:
             self.publish()
         commands = [call.args for call in gh.call_args_list]
@@ -72,7 +72,7 @@ class ReleaseTests(unittest.TestCase):
     def test_partial_upload_stays_a_draft(self):
         uploaded = self.uploaded()
         uploaded["assets"].pop()
-        with patch.object(release, "api", side_effect=[None, None, uploaded]), \
+        with patch.object(release, "api", side_effect=[None, [], None, uploaded]), \
                 patch.object(release, "gh") as gh:
             with self.assertRaisesRegex(ValueError, "keeping the release as a draft"):
                 self.publish()
@@ -86,7 +86,7 @@ class ReleaseTests(unittest.TestCase):
         gh.assert_not_called()
 
     def test_tag_pointing_to_another_commit_is_rejected(self):
-        with patch.object(release, "api", side_effect=[None, {"base_commit": {"sha": "b" * 40}}]), \
+        with patch.object(release, "api", side_effect=[None, [], {"base_commit": {"sha": "b" * 40}}]), \
                 patch.object(release, "gh") as gh:
             with self.assertRaisesRegex(ValueError, "different commit"):
                 self.publish()
@@ -94,19 +94,26 @@ class ReleaseTests(unittest.TestCase):
 
     def test_older_build_does_not_replace_latest(self):
         published = {"draft": False, "prerelease": False, "html_url": "https://example.com/release"}
-        with patch.object(release, "api", side_effect=[None, None, self.uploaded(),
+        with patch.object(release, "api", side_effect=[None, [], None, self.uploaded(),
                 {"tag_name": "v0.2.0+build.16"}, {"status": "behind"}, published]), \
                 patch.object(release, "gh") as gh:
             self.publish()
         self.assertIn("--latest=false", gh.call_args_list[-1].args)
 
     def test_draft_is_resumed_without_creating_a_duplicate(self):
-        existing = self.uploaded() | {"target_commitish": self.commit}
+        existing = self.uploaded() | {"target_commitish": self.commit, "tag_name": self.tag}
         published = {"draft": False, "prerelease": False, "html_url": "https://example.com/release"}
-        with patch.object(release, "api", side_effect=[existing, None, self.uploaded(), None, published]), \
+        with patch.object(release, "api", side_effect=[None, [existing], None, None, [existing], None, published]), \
                 patch.object(release, "gh") as gh:
             self.publish()
         self.assertEqual([call.args[1] for call in gh.call_args_list], ["upload", "edit"])
+
+    def test_draft_lookup_checks_subsequent_release_pages(self):
+        draft = {"tag_name": self.tag, "draft": True}
+        older = [{"tag_name": f"other-{number}"} for number in range(100)]
+        with patch.object(release, "api", side_effect=[None, older, [draft]]) as api:
+            self.assertEqual(release.release_by_tag("owner/repo", self.tag), draft)
+        self.assertEqual(api.call_args.args[0], "repos/owner/repo/releases?per_page=100&page=2")
 
 
 if __name__ == "__main__":

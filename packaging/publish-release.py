@@ -66,10 +66,27 @@ def api(path, allow_missing=False):
     return json.loads(result.stdout)
 
 
+def release_by_tag(repository, tag):
+    result = api(f"repos/{repository}/releases/tags/{tag}", allow_missing=True)
+    if result:
+        return result
+    # GitHub's tag endpoint returns only published releases. Authenticated
+    # release listings include drafts, whose tags may not exist yet.
+    page = 1
+    while True:
+        releases = api(f"repos/{repository}/releases?per_page=100&page={page}")
+        for candidate in releases:
+            if candidate["tag_name"] == tag:
+                return candidate
+        if len(releases) < 100:
+            return None
+        page += 1
+
+
 def publish(repository, version, tag, commit, assets, run_url, run_number):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Release target must be the full tested commit SHA")
-    existing = api(f"repos/{repository}/releases/tags/{tag}", allow_missing=True)
+    existing = release_by_tag(repository, tag)
     # Also reject a pre-existing tag pointing elsewhere, even without a release.
     comparison = api(f"repos/{repository}/compare/{tag}...{commit}", allow_missing=True)
     if comparison and comparison["base_commit"]["sha"] != commit:
@@ -103,7 +120,9 @@ def publish(repository, version, tag, commit, assets, run_url, run_number):
                "--title", title, "--notes-file", str(notes_file), "--generate-notes", "--draft")
         # A failed upload leaves an unpublished draft which a rerun can resume.
         gh("release", "upload", tag, *map(str, assets), "--repo", repository, "--clobber")
-    uploaded = api(f"repos/{repository}/releases/tags/{tag}")
+    uploaded = release_by_tag(repository, tag)
+    if uploaded is None:
+        raise ValueError("Could not find the uploaded draft release")
     sizes = {asset.name: asset.stat().st_size for asset in assets}
     if {asset["name"]: asset["size"] for asset in uploaded["assets"]} != sizes:
         raise ValueError("Uploaded assets are incomplete; keeping the release as a draft")

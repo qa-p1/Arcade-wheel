@@ -2,10 +2,15 @@
 
 All notable changes to Arcade Wheel are documented here.
 
-## Unreleased
+## 0.2.0 — 2026-10-04
+
+Builds of this version are published automatically from `main` as `v0.2.0+build.N`. See [Packaging and releases](docs/PACKAGING.md).
 
 ### Added
 
+- **macOS support (13+, Apple Silicon and Intel).** A registered global keyboard shortcut supplies press and release events. Application discovery, launch/focus, the overlay across Spaces and fullscreen apps, screenshot and sleep actions, and start on login (from Applications) are implemented. Mouse, media, and modifier-only triggers and other system actions are not available on macOS yet.
+- **Installers.** CI builds a Windows setup EXE and portable ZIP, a Linux AppImage, and macOS DMGs for both architectures, each with a SHA-256 checksum. Every package is smoke-tested before upload.
+- **Automatic releases.** Every successful build on `main` publishes a stable GitHub Release. Explicit `vX.Y.Z` tags still publish that exact version. Interrupted uploads leave a draft that the next run finds and completes.
 - **Single-click center gesture.** A single left click in the wheel's hub can now run its own group of up to 16 apps or actions, configured under **Settings → Center gestures** like double-click, triple-click, and long press. When double- or triple-click is also enabled, a single click waits for the click interval before running; releasing the trigger runs it immediately.
 
 ### Unchanged
@@ -28,6 +33,7 @@ All notable changes to Arcade Wheel are documented here.
 - Older configuration files are upgraded on disk when loaded. Before, the upgrade was redone on every start, and entries without IDs got new IDs each time.
 - **Restart** keeps the running instance if a new one can't be started, instead of quitting.
 - Appearance sliders no longer extend past the values the wheel can display (icon size, segment depth, selected scale).
+- **Linux AppImage:** start on login and **Restart** use the `.AppImage` file itself instead of its temporary mount, which disappears when the app exits.
 
 ### Changed
 
@@ -37,9 +43,13 @@ All notable changes to Arcade Wheel are documented here.
 - Removed unused code (`WheelLogic::clampCenter` and its tests, `LinuxBackend::updateOverlayScreen`); the wheel is always centered on the screen.
 - The Linux trigger tests skip with an explanation, instead of failing, when the build directory is under `/tmp`.
 - The command action help text says that `~` and environment variables aren't expanded.
+- Linux builds require LayerShellQt 6.4 or later.
+- The Windows package is named `ArcadeWheel-<version>-Windows-x64` and bundles the Visual C++ runtime, so the per-user installer runs without administrator rights.
 
 ### Documentation
 
 - Rewrote the README for the open-source release: features, requirements (Qt 6.8+), build, usage, CLI reference, configuration, platform notes, layout, and contributing.
 - Updated the architecture notes for schema version 3, center gesture recognition, and how the wheel is positioned.
 - Added single-click checks to the manual release checklist.
+- Added [packaging and release documentation](docs/PACKAGING.md) and download instructions to the README.
+- Added macOS to the architecture notes and the manual release checklist.

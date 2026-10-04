@@ -20,9 +20,9 @@ The current schema version is 3. Older files are migrated on load. The top level
 
 ## Trigger path
 
-On Hyprland/Wayland the backend registers one shortcut with the XDG GlobalShortcuts portal and receives `Activated` and `Deactivated` signals. On Windows a passive native hook watches only the configured key and required modifiers and emits the same two signals. `WheelController` applies the optional hold threshold, opens the preloaded overlay, and handles release. A release first hides the overlay and then queues action execution on the next event-loop turn.
+On Hyprland/Wayland the backend registers one shortcut with the XDG GlobalShortcuts portal and receives `Activated` and `Deactivated` signals. On Windows a passive native hook watches only the configured key and required modifiers and emits the same two signals. On macOS the backend registers the shortcut with the Carbon hot key API and maps its pressed and released events to the same signals; only single keyboard shortcuts are accepted. `WheelController` applies the optional hold threshold, opens the preloaded overlay, and handles release. A release first hides the overlay and then queues action execution on the next event-loop turn.
 
-The settings UI does not promise tap passthrough because neither platform backend can provide it reliably for all keys without taking over normal input.
+The settings UI does not promise tap passthrough because no platform backend can provide it reliably for all keys without taking over normal input.
 
 ## Center gestures
 
@@ -30,7 +30,7 @@ The overlay forwards left-button presses and releases inside the hub to `WheelCo
 
 ## Coordinates
 
-The platform backend supplies a global logical cursor position. The controller finds the `QScreen` that contains it, covers that screen with the overlay, and draws the wheel at the screen center. That center is also the selection origin. After the first frame is presented, the controller asks the backend to move the pointer to the origin (Hyprland IPC on Linux, `QCursor::setPos` on Windows), so selection always starts in the cancel zone. Pointer events from before the move lands are ignored briefly. The overlay reports pointer positions in screen-local logical coordinates.
+The platform backend supplies a global logical cursor position. The controller finds the `QScreen` that contains it, covers that screen with the overlay, and draws the wheel at the screen center. That center is also the selection origin. After the first frame is presented, the controller asks the backend to move the pointer to the origin (Hyprland IPC on Linux, `QCursor::setPos` on Windows and macOS), so selection always starts in the cancel zone. Pointer events from before the move lands are ignored briefly. The overlay reports pointer positions in screen-local logical coordinates.
 
 ## Extension points
 

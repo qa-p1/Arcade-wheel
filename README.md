@@ -16,7 +16,7 @@ It targets **Linux Wayland (especially Hyprland)**, **Windows**, and **macOS 13+
 
 ## Download and install
 
-Download a version from [Releases](https://github.com/qa-p1/Arcade-wheel/releases), or open the latest successful [GitHub Actions run](https://github.com/qa-p1/Arcade-wheel/actions/workflows/ci.yml) and download its package artifact.
+Every successful build on `main` publishes a stable release with installers and checksums. Download a version from [Releases](https://github.com/qa-p1/Arcade-wheel/releases), or open the latest successful [GitHub Actions run](https://github.com/qa-p1/Arcade-wheel/actions/workflows/ci.yml) and download its package artifact.
 
 | Platform | Package | Installation |
 | --- | --- | --- |

@@ -4,14 +4,16 @@ The [workflow](../.github/workflows/ci.yml) builds a Release configuration, runs
 
 ## Triggers and downloads
 
-- Every push to `main` produces Windows x64, Linux x86_64, macOS arm64, and macOS x86_64 artifacts, retained for 30 days.
+- Every successful push to `main` publishes a **stable GitHub Release** with the Windows setup EXE and portable ZIP, Linux AppImage, both macOS DMGs, and all five checksums. CI artifacts are also retained for 30 days; release downloads do not have that artifact expiry.
 - Pull requests targeting `main` run the same checks and packaging. Superseded PR runs are cancelled.
-- **Run workflow** starts a manual build.
-- A `vX.Y.Z` tag must match the version in `CMakeLists.txt`. When all platform jobs succeed, the workflow publishes a GitHub Release containing the packages and checksums. Ordinary main commits do not create public releases.
+- **Run workflow** starts a manual build; successful runs on `main` also publish a stable release.
+- Main releases use `vX.Y.Z+build.N`, where `X.Y.Z` is the version in `CMakeLists.txt` and `N` is the GitHub Actions run number. Build metadata gives each run a unique tag without modifying source files or creating a commit loop. These releases are explicitly marked stable, not prereleases. Installer filenames and the installed application's version retain `X.Y.Z`.
+- Explicit `vX.Y.Z` tags still publish a release with that exact tag, after verifying the version matches `CMakeLists.txt` and all platform jobs succeed.
+- Pull requests, failed jobs, and cancelled runs never publish releases. A rerun preserves an already published release. Interrupted uploads leave a draft and can be retried. A slower build of an older commit cannot replace a newer release as **Latest**.
 
-Choose an Actions run for the desired commit, then download `ArcadeWheel-Windows-x64`, `ArcadeWheel-Linux-x86_64`, `ArcadeWheel-macOS-arm64`, or `ArcadeWheel-macOS-x86_64` from **Artifacts**. GitHub wraps artifacts in a ZIP; extract it to obtain the installer. Public tagged releases contain the files directly.
+Use [Releases](https://github.com/qa-p1/Arcade-wheel/releases) for direct installer downloads. Release notes link to the exact tested commit and CI run and include GitHub-generated change notes. All five packages are checksum-verified before upload, and the complete upload is checked before the draft is published. Alternatively, choose an Actions run and download its platform **Artifacts**; GitHub wraps these in ZIPs.
 
-No repository secrets are needed for unsigned builds. Build jobs have read-only repository permissions; only the tagged-release job gets `contents: write`. GitHub Actions must be enabled. Actions and downloaded Linux packaging tools/dependency sources are pinned to revisions or checksums. Qt is fixed at 6.8.3; upgrade Qt and rebuild LayerShellQt together because the latter uses Qt's private API.
+No repository secrets are needed for unsigned builds. Build jobs have read-only repository permissions; only the release job gets `contents: write`. The built-in `GITHUB_TOKEN` publishes releases and creates tags without triggering another CI run. GitHub Actions must be enabled. Actions and downloaded Linux packaging tools/dependency sources are pinned to revisions or checksums. Qt is fixed at 6.8.3; upgrade Qt and rebuild LayerShellQt together because the latter uses Qt's private API.
 
 ## What is bundled
 

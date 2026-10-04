@@ -6,4 +6,5 @@
 *.log
 *.tmp
 /dist/
+__pycache__/
 /docs/original spec.md

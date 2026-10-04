@@ -518,7 +518,10 @@ bool LinuxBackend::ensureDesktopIdentity(QString *error)
     }
     // Installed packages supply this file. A build launched from its checkout
     // needs the same durable identity before Registry.Register can succeed.
-    const QString executable = QFileInfo(QCoreApplication::applicationFilePath()).canonicalFilePath();
+    // AppImage's internal binary is mounted under /tmp and disappears on exit.
+    const QString imagePath = qEnvironmentVariable("APPIMAGE");
+    const QString executable = QFileInfo(imagePath.isEmpty()
+        ? QCoreApplication::applicationFilePath() : imagePath).canonicalFilePath();
     const QString dataHome = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     for (const QString &root : {QStringLiteral("/tmp"), QStringLiteral("/var/tmp"), QStringLiteral("/run")}) {
         if (executable.startsWith(root + QLatin1Char('/'))) {
@@ -1342,7 +1345,9 @@ bool LinuxBackend::setStartOnLogin(bool enabled, QString *error)
         return !QFile::exists(path);
     }
 
-    const QString executable = QFileInfo(QCoreApplication::applicationFilePath()).canonicalFilePath();
+    const QString imagePath = qEnvironmentVariable("APPIMAGE");
+    const QString executable = QFileInfo(imagePath.isEmpty()
+        ? QCoreApplication::applicationFilePath() : imagePath).canonicalFilePath();
     if (executable.isEmpty() || !QFileInfo(executable).isExecutable()) {
         if (error) *error = QStringLiteral("The running Arcade Wheel executable could not be located.");
         return false;

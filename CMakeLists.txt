@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.25)
 project(ArcadeWheel VERSION 0.2.0 LANGUAGES CXX)
 
 if(APPLE)
-    message(FATAL_ERROR "Arcade Wheel currently targets Linux and Windows")
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 20)
+    set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
@@ -26,12 +28,29 @@ target_include_directories(arcade_core PUBLIC src)
 target_link_libraries(arcade_core PUBLIC Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
 
 qt_add_executable(arcade-wheel src/main.cpp)
+set_target_properties(arcade-wheel PROPERTIES
+    WIN32_EXECUTABLE TRUE
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_BUNDLE_NAME "Arcade Wheel"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "com.arcadewheel.ArcadeWheel"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+)
+target_compile_definitions(arcade-wheel PRIVATE ARCADE_VERSION="${PROJECT_VERSION}")
 target_link_libraries(arcade-wheel PRIVATE arcade_core Qt6::Widgets Qt6::QuickControls2 Qt6::Network)
 
 if(WIN32)
     target_sources(arcade-wheel PRIVATE
         src/platform/windows/WindowsBackend.h src/platform/windows/WindowsBackend.cpp)
     target_link_libraries(arcade-wheel PRIVATE user32 shell32 ole32 uuid advapi32 PowrProf gdi32)
+elseif(APPLE)
+    add_library(arcade_macos STATIC
+        src/platform/macos/MacOSBackend.h src/platform/macos/MacOSBackend.mm)
+    target_link_libraries(arcade_macos PUBLIC arcade_core
+        "-framework AppKit" "-framework Carbon" "-framework ServiceManagement")
+    target_link_libraries(arcade-wheel PRIVATE arcade_macos)
+    set_target_properties(arcade-wheel PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in")
 else()
     find_package(Qt6 REQUIRED COMPONENTS DBus)
     find_package(PkgConfig REQUIRED)
@@ -65,7 +84,8 @@ qt_add_resources(arcade-wheel arcade_qml PREFIX "/" FILES
     assets/arcade-wheel.png
 )
 
-install(TARGETS arcade-wheel RUNTIME DESTINATION bin)
+install(TARGETS arcade-wheel RUNTIME DESTINATION bin BUNDLE DESTINATION .)
+install(FILES LICENSE README.md DESTINATION share/doc/arcade-wheel)
 if(UNIX AND NOT APPLE)
     install(FILES packaging/linux/com.arcadewheel.ArcadeWheel.desktop DESTINATION share/applications)
     install(FILES assets/arcade-wheel.svg DESTINATION share/icons/hicolor/scalable/apps)
@@ -86,6 +106,11 @@ if(BUILD_TESTING)
         target_link_libraries(test_WindowsTrigger PRIVATE arcade_core Qt6::Test user32 shell32 ole32 uuid advapi32 PowrProf gdi32)
         add_test(NAME WindowsTrigger COMMAND test_WindowsTrigger)
         set_tests_properties(WindowsTrigger PROPERTIES TIMEOUT 60)
+    endif()
+    if(APPLE)
+        qt_add_executable(test_MacOSTrigger tests/tst_MacOSTrigger.cpp)
+        target_link_libraries(test_MacOSTrigger PRIVATE arcade_macos Qt6::Test)
+        add_test(NAME MacOSTrigger COMMAND test_MacOSTrigger)
     endif()
     if(UNIX AND NOT APPLE)
         qt_add_executable(test_LinuxLaunch tests/tst_LinuxLaunch.cpp

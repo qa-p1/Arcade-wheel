@@ -113,6 +113,8 @@ QJsonObject ConfigStore::defaults(const QVector<DiscoveredApplication> &applicat
     return {{QStringLiteral("schemaVersion"), SchemaVersion},
             {QStringLiteral("general"), QJsonObject{{QStringLiteral("startOnLogin"), false},
                                                       {QStringLiteral("showNotifications"), true}}},
+            {QStringLiteral("link"), QJsonObject{{QStringLiteral("enabled"), true},
+                                                   {QStringLiteral("disabledPeers"), QJsonArray{}}}},
             {QStringLiteral("trigger"), QJsonObject{{QStringLiteral("shortcut"), QStringLiteral("F8")},
                                                       {QStringLiteral("holdThresholdMs"), 0}}},
             {QStringLiteral("appearance"), QJsonObject{{QStringLiteral("radius"), 148},
@@ -171,7 +173,7 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
         config.insert(QStringLiteral("appearance"),appearance);
     }
     const auto baseline = defaults();
-    for (const auto &section : {"general", "trigger", "appearance", "behaviour"}) {
+    for (const auto &section : {"general", "link", "trigger", "appearance", "behaviour"}) {
         const auto key = QString::fromLatin1(section);
         config.insert(key, mergeDefaults(baseline.value(key).toObject(), config.value(key).toObject()));
     }

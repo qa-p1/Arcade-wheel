@@ -23,9 +23,11 @@ add_library(arcade_core STATIC
     src/actions/ActionDispatcher.h src/actions/ActionDispatcher.cpp
     src/providers/ActionProvider.h
     src/providers/ArcadeBoxProvider.h src/providers/ArcadeBoxProvider.cpp
+    src/link/ArcadeLink.h src/link/ArcadeLink.cpp
+    src/link/WheelLink.h src/link/WheelLink.cpp
 )
 target_include_directories(arcade_core PUBLIC src)
-target_link_libraries(arcade_core PUBLIC Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
+target_link_libraries(arcade_core PUBLIC Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Network)
 
 qt_add_executable(arcade-wheel src/main.cpp)
 set_target_properties(arcade-wheel PROPERTIES
@@ -99,6 +101,11 @@ if(BUILD_TESTING)
         target_link_libraries(test_${test_name} PRIVATE arcade_core Qt6::Test)
         add_test(NAME ${test_name} COMMAND test_${test_name})
     endforeach()
+    # Arcade Link conformance vectors, vendored from Arcade-link/spec/vectors.
+    qt_add_executable(test_LinkVectors tests/tst_LinkVectors.cpp)
+    target_link_libraries(test_LinkVectors PRIVATE arcade_core Qt6::Test)
+    target_compile_definitions(test_LinkVectors PRIVATE ARCADE_LINK_VECTORS="${CMAKE_CURRENT_SOURCE_DIR}/tests/link-vectors")
+    add_test(NAME LinkVectors COMMAND test_LinkVectors)
     # Match the application's Material style. The native macOS style expects
     # Cocoa windows and cannot be used with the offscreen test platform.
     set_tests_properties(WheelController PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Material;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")

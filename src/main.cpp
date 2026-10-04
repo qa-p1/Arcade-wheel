@@ -1,5 +1,6 @@
 #include "core/IconImageProvider.h"
 #include "core/WheelController.h"
+#include "link/WheelLink.h"
 #ifdef Q_OS_WIN
 #include "platform/windows/WindowsBackend.h"
 #elif defined(Q_OS_MACOS)
@@ -11,6 +12,7 @@
 #include <QApplication>
 #include <QCryptographicHash>
 #include <QDir>
+#include <QFile>
 #include <QJsonDocument>
 #include <QLockFile>
 #include <QTextStream>
@@ -64,8 +66,24 @@ int main(int argc, char **argv)
             "  arcade-wheel --release     Simulate releasing the trigger (runs the selection)\n"
             "  arcade-wheel --status      Show resident status as JSON\n"
             "  arcade-wheel --restart     Restart the resident launcher\n"
-            "  arcade-wheel --quit        Quit the resident launcher\n\n"
+            "  arcade-wheel --quit        Quit the resident launcher\n"
+            "  arcade-wheel --version     Print the version\n"
+            "  arcade-wheel --arcade-manifest\n"
+            "                             Print the Arcade Link manifest (no side effects)\n\n"
             "Once running, hold the configured shortcut (F8 by default), move toward an action, then release.\n";
+        return 0;
+    }
+    if (command == QStringLiteral("--version") || command == QStringLiteral("-V")) {
+        QTextStream(stdout) << "Arcade Wheel " << ARCADE_VERSION << '\n';
+        return 0;
+    }
+    if (command == QStringLiteral("--arcade-manifest")) {
+        // Read the configuration without the store, which would write defaults.
+        QJsonObject config;
+        QFile file(ConfigStore().path());
+        if (file.open(QIODevice::ReadOnly)) config = ConfigStore::normalize(QJsonDocument::fromJson(file.readAll()).object());
+        if (config.isEmpty()) config = ConfigStore::defaults();
+        QTextStream(stdout) << QJsonDocument(WheelLink::manifest(config, QStringLiteral(ARCADE_VERSION))).toJson(QJsonDocument::Indented);
         return 0;
     }
     QByteArray identity = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation).toUtf8()
@@ -134,6 +152,18 @@ int main(int argc, char **argv)
     WheelController controller(&backend, nullptr,
         smokeTest ? smokeDirectory->filePath(QStringLiteral("config.json")) : QString());
     controller.initialize();
+    // Arcade Link, set up once the event loop runs. Test instances (the smoke
+    // test, offscreen platforms) stay out of the real registry unless they
+    // were given their own ARCADE_HOME.
+    const bool headless = QGuiApplication::platformName() == QStringLiteral("offscreen")
+        || QGuiApplication::platformName() == QStringLiteral("minimal");
+    std::unique_ptr<WheelLink> link;
+    if (!smokeTest && (!headless || !qEnvironmentVariableIsEmpty("ARCADE_HOME"))) {
+        link = std::make_unique<WheelLink>(QStringLiteral(ARCADE_VERSION));
+        QTimer::singleShot(0, link.get(), [&] { link->apply(QJsonObject::fromVariantMap(controller.config())); });
+        QObject::connect(&controller, &WheelController::configChanged, link.get(),
+                         [&] { link->apply(QJsonObject::fromVariantMap(controller.config())); });
+    }
     QIcon appIcon(QStringLiteral(":/assets/arcade-wheel.png"));
     if (appIcon.isNull()) appIcon = QIcon::fromTheme(QStringLiteral("applications-system"));
     app.setWindowIcon(appIcon);

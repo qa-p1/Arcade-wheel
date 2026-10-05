@@ -106,6 +106,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(t->isFinished(), 5000);
         delete t;
         QCOMPARE(cancelled.code, QStringLiteral("denied"));
+        QCOMPARE(cancelled.reason, QStringLiteral("user_cancelled"));
         QCOMPARE(cancelled.userMessage("Arcade Wheel"), QStringLiteral("Cancelled."));
         qunsetenv("ARCADE_HOME");
     }

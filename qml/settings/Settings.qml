@@ -30,6 +30,7 @@ Rectangle {
         controller.selectDeck(next)
     }
     readonly property bool linkPending: Object.keys(controller.linkDraft).length > 0
+    Shortcut { sequence: StandardKey.Close; onActivated: root.Window.window.close() }
     Connections {
         target: controller
         function onCurrentDeckChanged() { if(root.selectedSlot >= root.activeActions.length) root.selectedSlot=-1 }

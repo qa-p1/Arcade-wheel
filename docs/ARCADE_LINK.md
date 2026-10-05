@@ -30,6 +30,16 @@ arcade-wheel --version
 Smoke-test and offscreen instances never register in the real registry
 unless they are given their own `ARCADE_HOME`.
 
+## Isolated verification
+
+Run `python3 ../../Rust/Arcade-link/tools/e2e.py --only wheel` from the
+Wheel checkout. The Wheel check starts
+the real executable under a private D-Bus session and Xvfb with temporary
+HOME/XDG/Arcade directories. It checks `wheel.show`, confirms a URL into a
+selected slot through Settings, and checks both Cancel and closing Settings
+without changing the saved deck. The Qt test checks the wire-level
+`denied`/`user_cancelled` response; the CLI displays `Cancelled.`.
+
 ## Platforms
 
 | | Linux X11 | Linux Wayland | Windows | macOS |

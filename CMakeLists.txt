@@ -22,9 +22,10 @@ add_library(arcade_core STATIC
     src/core/IconImageProvider.h src/core/IconImageProvider.cpp
     src/actions/ActionDispatcher.h src/actions/ActionDispatcher.cpp
     src/providers/ActionProvider.h
-    src/providers/ArcadeBoxProvider.h src/providers/ArcadeBoxProvider.cpp
+    src/providers/ArcadeLinkProvider.h src/providers/ArcadeLinkProvider.cpp
     src/link/ArcadeLink.h src/link/ArcadeLink.cpp
     src/link/WheelLink.h src/link/WheelLink.cpp
+    src/link/WheelInvoke.h src/link/WheelInvoke.cpp
 )
 target_include_directories(arcade_core PUBLIC src)
 target_link_libraries(arcade_core PUBLIC Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Network)
@@ -78,10 +79,18 @@ qt_add_resources(arcade-wheel arcade_qml PREFIX "/" FILES
     qml/wheel/Overlay.qml
     qml/settings/Settings.qml
     qml/settings/ActionPicker.qml
+    qml/settings/LinkActivity.qml
     qml/settings/CenterGesturesPage.qml
     qml/components/UiButton.qml
     qml/components/SettingSlider.qml
     qml/components/SettingToggle.qml
+    assets/arcade/arcade.box.svg
+    assets/arcade/arcade.lens.svg
+    assets/arcade/arcade.look.svg
+    assets/arcade/arcade.wheel.svg
+    assets/arcade/arcade.clipboard.svg
+    assets/arcade/arcade.tools.svg
+    assets/arcade/tokens.json
     assets/arcade-wheel.svg
     assets/arcade-wheel.png
 )
@@ -110,6 +119,11 @@ if(BUILD_TESTING)
     target_link_libraries(test_WheelLink PRIVATE arcade_core Qt6::Test)
     add_test(NAME WheelLink COMMAND test_WheelLink)
     set_tests_properties(WheelLink PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")
+    qt_add_executable(test_ArcadeLinkProvider tests/tst_ArcadeLinkProvider.cpp)
+    target_link_libraries(test_ArcadeLinkProvider PRIVATE arcade_core Qt6::Test)
+    target_compile_definitions(test_ArcadeLinkProvider PRIVATE ARCADE_PROVIDER_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+    add_test(NAME ArcadeLinkProvider COMMAND test_ArcadeLinkProvider)
+    set_tests_properties(ArcadeLinkProvider PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     # Match the application's Material style. The native macOS style expects
     # Cocoa windows and cannot be used with the offscreen test platform.
     set_tests_properties(WheelController PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Material;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")

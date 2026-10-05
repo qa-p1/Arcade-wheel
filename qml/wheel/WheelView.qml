@@ -25,7 +25,7 @@ Item {
     function iconSource(action) { return action && action.icon ? "image://icons/" + encodeURIComponent(action.icon) : "" }
     function selectedName() {
         const a = actions[effectiveSelection]
-        return a ? a.name || "" : ""
+        return a ? (a.name || "") + (a.outbound ? " ↗" : "") : ""
     }
     function polar(radius, angle) {
         return Qt.point(width / 2 + radius * Math.cos(angle), height / 2 + radius * Math.sin(angle))
@@ -164,6 +164,7 @@ Item {
                     y: slot.iconPoint.y-height/2-(root.labelsEnabled ? 8 : 0)
                     width: root.iconSize; height: width
                     scale: 1+0.08*slot.highlight
+                    opacity: slot.action && slot.action.unavailableReason ? 0.35 : 1
                     Text {
                         anchors.centerIn: parent
                         visible: appIcon.status !== Image.Ready
@@ -212,6 +213,13 @@ Item {
                 wrapMode: Text.WordWrap; maximumLineCount: 3; elide: Text.ElideRight
                 opacity: root.effectiveSelection >= 0 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: root.duration(65) } }
+            }
+            Text {
+                anchors.top: parent.bottom; anchors.topMargin: 10
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: 300; color: "#e3aab5"; font.pixelSize: 11
+                horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
+                text: root.effectiveSelection >= 0 && root.actions[root.effectiveSelection] ? root.actions[root.effectiveSelection].unavailableReason || "" : ""
             }
             Row {
                 anchors.centerIn: parent; spacing: 6

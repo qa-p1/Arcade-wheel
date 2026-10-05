@@ -52,6 +52,29 @@ private slots:
         QVERIFY(WheelLink::draftFor(fileContent(dir.filePath("missing.txt")), &error).isEmpty());
     }
 
+    void structuredActionPreservesOptions()
+    {
+        QString error;
+        const QJsonObject data{{"app", Ids::Box}, {"action", "box.pipeline.run"}, {"version", 1},
+            {"title", "Send optimized screenshot"}, {"input", "clipboard"},
+            {"preset", "share"}, {"options", QJsonObject{{"pipeline", "p-optimized-screenshot"}}}};
+        auto draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error);
+        QCOMPARE(draft.value("type").toString(), QStringLiteral("arcade"));
+        const auto payload = QJsonObject::fromVariantMap(draft.value("payload").toMap());
+        QCOMPARE(payload.value("options"), data.value("options"));
+        QCOMPARE(payload.value("input").toString(), QStringLiteral("clipboard"));
+        QCOMPARE(payload.value("preset").toString(), QStringLiteral("share"));
+        auto invalid = data; invalid.insert("input", "shell");
+        QVERIFY(WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", invalid}}, &error).isEmpty());
+        invalid = data; invalid.insert("options", "shell command");
+        QVERIFY(WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", invalid}}, &error).isEmpty());
+        bool offered = false;
+        for (const auto &value : WheelLink::actions())
+            if (value.toObject().value("id").toString() == "wheel.add_action")
+                offered = value.toObject().value("accepts").toArray().contains("structured/arcade-action");
+        QVERIFY(offered);
+    }
+
     void addActionWaitsForTheUser()
     {
         QTemporaryDir dir;
@@ -62,7 +85,7 @@ private slots:
         WheelLink link(QStringLiteral("9.9"));
         link.setController(&controller);
         link.apply(QJsonObject::fromVariantMap(controller.config()));
-        QVERIFY2(link.listening(), qPrintable(link.lastError()));
+        QTRY_VERIFY_WITH_TIMEOUT(link.listening(), 5000);
         QSignalSpy opened(&controller, &WheelController::settingsRequested);
         const Locations loc = link.locations();
 

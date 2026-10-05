@@ -25,7 +25,8 @@ class WheelController final : public QObject {
     Q_PROPERTY(bool centerGesturePressed READ centerGesturePressed NOTIFY centerGestureChanged)
     Q_PROPERTY(QString shortcutConflict READ shortcutConflict NOTIFY shortcutConflictChanged)
     Q_PROPERTY(QVariantList applications READ applications NOTIFY applicationsChanged)
-    Q_PROPERTY(QVariantList arcadeBoxTools READ arcadeBoxTools NOTIFY providersChanged)
+    Q_PROPERTY(QVariantList arcadeActions READ arcadeActions NOTIFY providersChanged)
+    Q_PROPERTY(QVariantList linkJobs READ linkJobs NOTIFY linkJobsChanged)
     Q_PROPERTY(QString triggerStatus READ triggerStatus NOTIFY triggerStatusChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
     Q_PROPERTY(QString configPath READ configPath CONSTANT)
@@ -52,12 +53,14 @@ public:
     bool centerGesturePressed() const { return m_centerPressed; }
     QString shortcutConflict() const { return m_shortcutConflict; }
     QVariantList applications() const;
-    QVariantList arcadeBoxTools() const { return m_dispatcher.arcadeBox().tools(); }
+    QVariantList arcadeActions() const { return m_dispatcher.arcade().tools(); }
+    QVariantList linkJobs() const { return m_linkJobs; }
     QString triggerStatus() const { return m_triggerStatus; }
     QString lastError() const { return m_lastError; }
     QString configPath() const { return m_store.path(); }
     QVariantMap linkDraft() const { return m_linkDraft; }
     QString linkSource() const { return m_linkSource; }
+    QObject *arcadeWorker() const { return m_dispatcher.arcade().ioWorker(); }
     bool linkPending() const { return !m_linkDraft.isEmpty(); }
     // Starts a pending add (false if one is already waiting) and opens Settings.
     bool beginLinkAction(const QVariantMap &draft, const QString &sourceName);
@@ -92,11 +95,14 @@ public:
     Q_INVOKABLE void deleteDeck(const QString &deckId);
     Q_INVOKABLE void moveDeck(int from, int to);
     Q_INVOKABLE void resizeDeck(const QString &deckId, int size);
-    Q_INVOKABLE void setAction(const QString &deckId, int slot, const QVariantMap &action);
+    Q_INVOKABLE bool setAction(const QString &deckId, int slot, const QVariantMap &action);
     Q_INVOKABLE void moveAction(const QString &deckId, int from, int to);
     Q_INVOKABLE QString actionUnavailableReason(const QVariantMap &action) const;
     Q_INVOKABLE void refreshApplications();
     Q_INVOKABLE void refreshProviders();
+    Q_INVOKABLE void cancelLinkJob(const QString &job);
+    Q_INVOKABLE void dismissLinkJobs();
+    Q_INVOKABLE QVariantMap arcadeActionInfo(const QVariantMap &action) const;
     Q_INVOKABLE bool importConfig(const QString &urlOrPath);
     Q_INVOKABLE bool exportConfig(const QString &urlOrPath);
     Q_INVOKABLE void resetDefaults();
@@ -115,6 +121,8 @@ signals:
     void shortcutConflictChanged();
     void applicationsChanged();
     void providersChanged();
+    void linkJobsChanged();
+    void linkActivityRequested();
     void triggerStatusChanged();
     void lastErrorChanged();
     void settingsRequested();
@@ -177,6 +185,7 @@ private:
     QString m_shortcutConflict;
     QString m_triggerStatus;
     QString m_lastError;
+    QVariantList m_linkJobs;
     QVariantMap m_linkDraft;
     QString m_linkSource;
 };

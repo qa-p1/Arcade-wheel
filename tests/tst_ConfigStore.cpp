@@ -10,6 +10,35 @@ class ConfigStoreTest final : public QObject {
     Q_OBJECT
 
 private slots:
+    void boxSlotsMigrateWithoutLosingPayload()
+    {
+        auto old = ConfigStore::defaults(); old.insert("schemaVersion", 3);
+        const QJsonObject payload{{"toolId", "arcade.image.convert"}, {"preset", "webp"},
+            {"input", "clipboard-url"}, {"custom", QJsonObject{{"keep", true}}}};
+        const QJsonObject slot{{"id", "legacy"}, {"type", "arcade_box"}, {"name", "My tool"}, {"payload", payload}};
+        old.insert("decks", QJsonArray{QJsonObject{{"id", "deck"}, {"actions", QJsonArray{slot}}}});
+        auto gestures = old.value("centerGestures").toObject();
+        gestures.insert("singleClick", QJsonObject{{"enabled", true}, {"actions", QJsonArray{slot}}});
+        old.insert("centerGestures", gestures);
+        const auto upgraded = ConfigStore::normalize(old);
+        QCOMPARE(upgraded.value("schemaVersion").toInt(), 4);
+        const auto migrated = upgraded.value("decks").toArray().first().toObject().value("actions").toArray().first().toObject();
+        QCOMPARE(migrated.value("id").toString(), QStringLiteral("legacy"));
+        QCOMPARE(migrated.value("name").toString(), QStringLiteral("My tool"));
+        QCOMPARE(migrated.value("type").toString(), QStringLiteral("arcade"));
+        const auto converted = migrated.value("payload").toObject();
+        QCOMPARE(converted.value("app").toString(), QStringLiteral("arcade.box"));
+        QCOMPARE(converted.value("action").toString(), QStringLiteral("box:arcade.image.convert"));
+        QCOMPARE(converted.value("input").toString(), QStringLiteral("clipboard"));
+        QCOMPARE(converted.value("legacyPayload").toObject(), payload);
+        QCOMPARE(converted.value("preset"), payload.value("preset"));
+        QCOMPARE(converted.value("custom"), payload.value("custom"));
+        QCOMPARE(upgraded.value("centerGestures").toObject().value("singleClick").toObject().value("actions").toArray().first().toObject().value("type").toString(), QStringLiteral("arcade"));
+        QCOMPARE(ConfigStore::normalize(upgraded), upgraded);
+        QTemporaryDir dir; ConfigStore store(dir.filePath("config.json"));
+        QVERIFY(store.save(upgraded)); QCOMPARE(store.load({}), upgraded);
+    }
+
     void centerGesturesMigrateAndRoundTrip()
     {
         auto old = ConfigStore::defaults();

@@ -7,14 +7,14 @@ The shared core consists of:
 - `ConfigStore`: schema migration, first-run defaults, validation, atomic JSON saves, import/export.
 - `WheelLogic`: clockwise angular selection, center dead zone, and deck scrolling in logical screen coordinates.
 - `WheelController`: trigger lifecycle, active deck, pointer selection, settings mutations, and immediate hide before action execution.
-- `ActionDispatcher`: built-in action routing and a small `ActionProvider` registry. `ArcadeBoxProvider` is the first external provider.
+- `ActionDispatcher`: built-in action routing and a small `ActionProvider` registry. `ArcadeLinkProvider` discovers peer actions on a registry worker; bounded invocation workers report progress and cancellation. `WheelLink` shares the discovery worker for its manifest and listener.
 - `PlatformBackend`: release-aware trigger signals, cursor position, overlay preparation, app discovery/launch/focus, system actions, and start-on-login.
 
 The QML wheel consumes deck data and selection state but does not execute actions. Settings reuses the same `WheelView` for live preview. Editing actions or appearance updates the resident controller immediately.
 
 ## Configuration schema
 
-The current schema version is 3. Older files are migrated on load. The top level has `general`, `trigger`, `appearance`, `behaviour`, `centerGestures`, and ordered `decks`. Each deck has a stable ID, name, and 4–8 ordered actions. Each action has a stable ID, type, name, icon key, and `payload` object. Six slots are the default. Unknown action types and unavailable providers are preserved so an import cannot silently discard a user's wheel. A future contextual deck can add matching metadata to a deck and a resolver can select it before fixed decks; fixed decks remain the default.
+The current schema version is 4. Older files are migrated on load. The top level has `general`, `link`, `trigger`, `appearance`, `behaviour`, `centerGestures`, and ordered `decks`. Each deck has a stable ID, name, and 4–8 ordered actions. Each action has a stable ID, type, name, icon key, and `payload` object. Six slots are the default. Unknown action types and unavailable providers are preserved so an import cannot silently discard a user's wheel. A future contextual deck can add matching metadata to a deck and a resolver can select it before fixed decks; fixed decks remain the default.
 
 `centerGestures` holds `clickIntervalMs` (160–500), `longPressMs` (250–1500), and one group each for `singleClick`, `doubleClick`, `tripleClick`, and `longPress`. A group has a `name`, an `enabled` flag, and up to 16 actions using the same action shape as deck slots. Missing groups are filled in from defaults during normalization, so older configurations gain new gestures disabled.
 

@@ -1,6 +1,7 @@
 #include "core/WheelController.h"
 
 #include "core/WheelLogic.h"
+#include "link/WheelInvoke.h"
 
 #include <QCursor>
 #include <QGuiApplication>
@@ -27,7 +28,9 @@ bool capturesScreen(const QJsonArray &actions)
         const auto action = value.toObject();
         return action.value(QStringLiteral("type")).toString() == QStringLiteral("system")
             && action.value(QStringLiteral("payload")).toObject().value(QStringLiteral("id")).toString()
-                   == QStringLiteral("screenshot");
+                   == QStringLiteral("screenshot")
+            || action.value("type").toString() == "arcade" && (action.value("payload").toObject().value("input").toString() == "lens-selection"
+                || action.value("payload").toObject().value("action").toString().startsWith("lens.capture"));
     });
 }
 }
@@ -35,6 +38,35 @@ bool capturesScreen(const QJsonArray &actions)
 WheelController::WheelController(PlatformBackend *backend, QObject *parent, QString configPath)
     : QObject(parent), m_backend(backend), m_store(std::move(configPath)), m_dispatcher(backend)
 {
+    auto &arcade = m_dispatcher.arcade();
+    connect(&arcade, &ArcadeLinkProvider::changed, this, [this] {
+        emit providersChanged(); emit currentDeckChanged();
+    });
+    connect(&arcade, &ArcadeLinkProvider::jobStarted, this,
+        [this](const QString &job, const QString &app, const QString &title, const QString &preview, bool outbound) {
+            m_linkJobs.append(QVariantMap{{"id", job}, {"app", app}, {"title", title}, {"preview", preview},
+                {"outbound", outbound}, {"running", true}, {"fraction", -1.0}, {"message", "Working…"}});
+            emit linkJobsChanged(); emit linkActivityRequested();
+        });
+    connect(&arcade, &ArcadeLinkProvider::jobProgress, this, [this](const QString &job, double fraction, const QString &message) {
+        for (auto &value : m_linkJobs) {
+            auto row = value.toMap();
+            if (row.value("id").toString() != job) continue;
+            row.insert("fraction", fraction); row.insert("message", message); value = row;
+        }
+        emit linkJobsChanged();
+    });
+    connect(&arcade, &ArcadeLinkProvider::jobFinished, this, [this](const QString &job, const QJsonObject &result, const QString &error) {
+        for (auto &value : m_linkJobs) {
+            auto row = value.toMap();
+            if (row.value("id").toString() != job) continue;
+            row.insert("running", false); row.insert("fraction", error.isEmpty() ? 1.0 : -1.0);
+            row.insert("message", error.isEmpty() ? result.value("message").toString("Done.") : error);
+            row.insert("outputs", result.value("outputs").toArray().toVariantList()); value = row;
+        }
+        emit linkJobsChanged();
+        if (!error.isEmpty() && error != "Cancelled.") { reportError(error); emit actionFailed(error); }
+    });
     m_holdTimer.setSingleShot(true);
     m_closeTimer.setSingleShot(true);
     m_centerClickTimer.setSingleShot(true);
@@ -91,6 +123,7 @@ void WheelController::initialize()
     general.insert(QStringLiteral("startOnLogin"), m_backend->startOnLogin());
     m_config.insert(QStringLiteral("general"), general);
     m_backend->configureTrigger(m_config.value(QStringLiteral("trigger")).toObject());
+    m_dispatcher.arcade().apply(m_config.value("link").toObject());
     emit configChanged();
     emit currentDeckChanged();
 }
@@ -138,7 +171,19 @@ int WheelController::deckIndexById(const QString &id) const
 
 QVariantMap WheelController::currentDeck() const
 {
-    return deckAt(m_deckIndex).toVariantMap();
+    auto deck = deckAt(m_deckIndex).toVariantMap();
+    auto actions = deck.value("actions").toList();
+    for (auto &value : actions) {
+        auto action = value.toMap();
+        if (action.value("type").toString() != "arcade") continue;
+        const auto info = arcadeActionInfo(action);
+        action.insert("unavailableReason", info.value("reason"));
+        action.insert("outbound", info.value("outbound"));
+        action.insert("preview", info.value("preview"));
+        value = action;
+    }
+    deck.insert("actions", actions);
+    return deck;
 }
 
 int WheelController::deckCount() const
@@ -226,6 +271,7 @@ void WheelController::executeSelection(int index)
 {
     const auto actions = deckAt(m_deckIndex).value(QStringLiteral("actions")).toArray();
     const QJsonObject action = index >= 0 && index < actions.size() ? actions.at(index).toObject() : QJsonObject{};
+    if (action.value("type").toString() == "arcade" && !m_dispatcher.unavailableReason(action).isEmpty()) { hideOverlay(); return; }
     executeActions(action.isEmpty() ? QJsonArray{} : QJsonArray{action});
 }
 
@@ -247,7 +293,7 @@ void WheelController::executeActions(const QJsonArray &actions)
             if (action.value(QStringLiteral("type")).toString() == QStringLiteral("none")) continue;
             QString error;
             if (!m_dispatcher.execute(action, focus, &error))
-                errors << action.value(QStringLiteral("name")).toString() + QStringLiteral(": ") + error;
+                errors << (action.value("type").toString() == "arcade" ? error : action.value(QStringLiteral("name")).toString() + QStringLiteral(": ") + error);
         }
         if (!errors.isEmpty()) {
             const QString message = errors.join(QLatin1Char('\n'));
@@ -405,6 +451,7 @@ bool WheelController::commit(QJsonObject updated, bool triggerChanged, Persist p
     }
     m_config = updated;
     m_deckIndex = std::clamp(m_deckIndex, 0, std::max(0, deckCount() - 1));
+    m_dispatcher.arcade().apply(m_config.value("link").toObject());
     if (triggerChanged) m_backend->configureTrigger(m_config.value(QStringLiteral("trigger")).toObject());
     emit configChanged();
     emit currentDeckChanged();
@@ -415,7 +462,7 @@ void WheelController::updateSetting(const QString &section, const QString &key, 
 {
     if (section != QStringLiteral("general") && section != QStringLiteral("trigger") &&
         section != QStringLiteral("appearance") && section != QStringLiteral("behaviour") &&
-        section != QStringLiteral("centerGestures")) return;
+        section != QStringLiteral("centerGestures") && section != QStringLiteral("link")) return;
     if (key.isEmpty()) return;
     const bool loginSetting = section == QStringLiteral("general") && key == QStringLiteral("startOnLogin");
     const bool wasStartingOnLogin = loginSetting && m_backend->startOnLogin();
@@ -433,7 +480,7 @@ void WheelController::updateSetting(const QString &section, const QString &key, 
     // Hold timing is local to the controller; changing it must not tear down
     // the global shortcut while the slider is moving.
     const bool saved = commit(updated, section == QStringLiteral("trigger") && key != QStringLiteral("holdThresholdMs"),
-                              loginSetting ? Persist::Now : Persist::Coalesced);
+                              loginSetting || section == QStringLiteral("link") ? Persist::Now : Persist::Coalesced);
     // Keep the OS entry and the saved flag in agreement.
     if (!saved && loginSetting) m_backend->setStartOnLogin(wasStartingOnLogin, nullptr);
     if (saved && section == QStringLiteral("trigger") && key == QStringLiteral("holdThresholdMs"))
@@ -533,14 +580,14 @@ void WheelController::resizeDeck(const QString &deckId, int size)
     commit(updated);
 }
 
-void WheelController::setAction(const QString &deckId, int slot, const QVariantMap &action)
+bool WheelController::setAction(const QString &deckId, int slot, const QVariantMap &action)
 {
     const int index = deckIndexById(deckId);
-    if (index < 0) return;
+    if (index < 0) return false;
     auto all = decks();
     auto deck = all.at(index).toObject();
     auto actions = deck.value(QStringLiteral("actions")).toArray();
-    if (slot < 0 || slot >= actions.size()) return;
+    if (slot < 0 || slot >= actions.size()) return false;
     auto replacement = QJsonObject::fromVariantMap(action);
     replacement.insert(QStringLiteral("id"), actions.at(slot).toObject().value(QStringLiteral("id")).toString());
     if (!replacement.value(QStringLiteral("payload")).isObject())
@@ -550,7 +597,7 @@ void WheelController::setAction(const QString &deckId, int slot, const QVariantM
     all.replace(index, deck);
     auto updated = m_config;
     updated.insert(QStringLiteral("decks"), all);
-    commit(updated);
+    return commit(updated);
 }
 
 bool WheelController::beginLinkAction(const QVariantMap &draft, const QString &sourceName)
@@ -606,8 +653,28 @@ void WheelController::refreshApplications()
 
 void WheelController::refreshProviders()
 {
-    m_dispatcher.arcadeBox().refresh();
-    emit providersChanged();
+    m_dispatcher.arcade().refresh();
+}
+
+void WheelController::cancelLinkJob(const QString &job) { m_dispatcher.arcade().cancel(job); }
+
+void WheelController::dismissLinkJobs()
+{
+    for (int i = m_linkJobs.size() - 1; i >= 0; --i)
+        if (!m_linkJobs[i].toMap().value("running").toBool()) m_linkJobs.removeAt(i);
+    emit linkJobsChanged();
+}
+
+QVariantMap WheelController::arcadeActionInfo(const QVariantMap &slot) const
+{
+    const auto payload = QJsonObject::fromVariantMap(slot.value("payload").toMap());
+    const auto action = WheelInvoke::actionFor(m_dispatcher.arcade().manifestFor(payload.value("app").toString()), payload);
+    const auto effects = action.value("effects").toArray();
+    const bool outbound = effects.contains("sends-to-device") || effects.contains("network") || effects.contains("uploads-content")
+        || action.value("privacy").toString() == "cloud" || action.value("privacy").toString() == "network";
+    return {{"reason", actionUnavailableReason(slot)}, {"outbound", outbound},
+        {"preview", payload.value("input").toString("none")},
+        {"glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(payload.value("app").toString())}};
 }
 
 QString WheelController::localPath(const QString &urlOrPath)

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "platform/PlatformBackend.h"
-#include "providers/ArcadeBoxProvider.h"
+#include "providers/ArcadeLinkProvider.h"
 
 #include <QJsonObject>
 #include <QString>
@@ -16,13 +16,13 @@ public:
     void registerProvider(std::unique_ptr<ActionProvider> provider);
     QString unavailableReason(const QJsonObject &action) const;
     bool execute(const QJsonObject &action, bool focusExisting, QString *error);
-    ArcadeBoxProvider &arcadeBox() { return *m_arcadeBox; }
-    const ArcadeBoxProvider &arcadeBox() const { return *m_arcadeBox; }
+    ArcadeLinkProvider &arcade() { return *m_arcade; }
+    const ArcadeLinkProvider &arcade() const { return *m_arcade; }
 
 private:
     PlatformBackend *m_backend;
     QVector<DiscoveredApplication> m_applications;
     std::vector<std::unique_ptr<ActionProvider>> m_providers;
-    ArcadeBoxProvider *m_arcadeBox = nullptr;
+    ArcadeLinkProvider *m_arcade = nullptr;
     ActionProvider *provider(const QString &id) const;
 };

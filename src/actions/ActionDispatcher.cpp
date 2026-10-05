@@ -9,9 +9,9 @@
 
 ActionDispatcher::ActionDispatcher(PlatformBackend *backend) : m_backend(backend)
 {
-    auto box = std::make_unique<ArcadeBoxProvider>();
-    m_arcadeBox = box.get();
-    registerProvider(std::move(box));
+    auto link = std::make_unique<ArcadeLinkProvider>();
+    m_arcade = link.get();
+    registerProvider(std::move(link));
 }
 
 void ActionDispatcher::registerProvider(std::unique_ptr<ActionProvider> provider)
@@ -54,9 +54,9 @@ QString ActionDispatcher::unavailableReason(const QJsonObject &action) const
         return QFileInfo::exists(payload.value(QStringLiteral("path")).toString()) ? QString() : QStringLiteral("File or folder is missing");
     if (type == QStringLiteral("system") || type == QStringLiteral("media") || type == QStringLiteral("desktop"))
         return payload.value(QStringLiteral("id")).toString().isEmpty() ? QStringLiteral("Action is incomplete") : QString();
-    if (type == QStringLiteral("arcade_box") || type == QStringLiteral("plugin")) {
-        const auto id = type == QStringLiteral("arcade_box") ? QStringLiteral("arcade_box")
-                                                              : payload.value(QStringLiteral("providerId")).toString();
+    if (type == QStringLiteral("arcade")) return m_arcade->unavailableReason(action);
+    if (type == QStringLiteral("plugin")) {
+        const auto id = payload.value(QStringLiteral("providerId")).toString();
         const auto *resolved = provider(id);
         if (!resolved) return QStringLiteral("Provider is unavailable");
         if (!resolved->available()) return resolved->unavailableReason();
@@ -105,9 +105,9 @@ bool ActionDispatcher::execute(const QJsonObject &action, bool focusExisting, QS
         return m_backend->performSystemAction(QStringLiteral("media:") + payload.value(QStringLiteral("id")).toString(), error);
     if (type == QStringLiteral("desktop"))
         return m_backend->performSystemAction(QStringLiteral("desktop:") + payload.value(QStringLiteral("id")).toString(), error);
-    if (type == QStringLiteral("arcade_box") || type == QStringLiteral("plugin")) {
-        const auto id = type == QStringLiteral("arcade_box") ? QStringLiteral("arcade_box")
-                                                              : payload.value(QStringLiteral("providerId")).toString();
+    if (type == QStringLiteral("arcade")) return m_arcade->execute(action, error);
+    if (type == QStringLiteral("plugin")) {
+        const auto id = payload.value(QStringLiteral("providerId")).toString();
         return provider(id)->execute(action, error);
     }
     if (error) *error = QStringLiteral("Provider is unavailable");

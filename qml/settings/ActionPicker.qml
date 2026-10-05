@@ -23,9 +23,27 @@ Popup {
         { id: "system", title: "System" },
         { id: "media", title: "Media" },
         { id: "desktop", title: "Desktop" },
-        { id: "arcade_box", title: "Arcade Box" },
+        { id: "arcade", title: "Arcade apps" },
         { id: "plugin", title: "Provider" }
     ]
+    property var arcadePayload: ({})
+    property var arcadeRows: controller.arcadeActions.filter(function(row) {
+        const search = arcadeSearch.text.toLowerCase()
+        return (row.appName + " " + row.title + " " + row.id).toLowerCase().indexOf(search) >= 0
+    })
+    property var arcadeModes: {
+        const row = controller.arcadeActions.find(function(row) { return row.app === arcadePayload.app && row.id === arcadePayload.action })
+        let modes = row ? row.inputModes.slice() : []
+        if (arcadePayload.input && modes.indexOf(arcadePayload.input) < 0) modes.push(arcadePayload.input)
+        return modes
+    }
+    function arcadeSlot() { return {type: "arcade", payload: arcadePayload} }
+    function chooseArcade(row) {
+        arcadePayload = {app: row.app, action: row.id, version: row.version || 1, input: row.input, options: {}}
+        if (row.preset) arcadePayload.preset = row.preset
+        nameField.text = row.title
+        selectedIcon = row.glyph
+    }
     property var systemActions: [
         { id: "lock", name: "Lock screen", icon: "system-lock-screen" },
         { id: "suspend", name: "Suspend", icon: "system-suspend" },
@@ -64,8 +82,8 @@ Popup {
         desktopField.text = action && action.payload ? (action.payload.id || "") : ""
         providerField.text = action && action.payload ? (action.payload.providerId || "") : ""
         toolField.text = action && action.payload ? (action.payload.toolId || "") : ""
-        presetField.text = action && action.payload ? (action.payload.preset || "") : ""
-        inputField.text = action && action.payload ? (action.payload.input || "") : ""
+        arcadePayload = action && action.type === "arcade" && action.payload ? JSON.parse(JSON.stringify(action.payload)) : ({})
+        arcadeSearch.text = ""
         appSearch.text = ""
         systemCombo.currentIndex = 0
         mediaCombo.currentIndex = 0
@@ -120,12 +138,11 @@ Popup {
             payload.id = desktopField.text.trim()
             icon = "preferences-desktop"
             if (!title) title = "Desktop action"
-        } else if (selectedType === "arcade_box") {
-            payload.toolId = toolField.text.trim()
-            payload.preset = presetField.text.trim()
-            payload.input = inputField.text.trim()
-            icon = "applications-utilities"
-            if (!title) title = "Arcade Box tool"
+        } else if (selectedType === "arcade") {
+            payload = JSON.parse(JSON.stringify(arcadePayload))
+            if (!payload.app || !payload.action) return
+            icon = "qrc:/assets/arcade/" + payload.app + ".svg"
+            if (!title) title = "Arcade action"
         } else if (selectedType === "plugin") {
             payload.providerId = providerField.text.trim()
             payload.toolId = toolField.text.trim()
@@ -134,7 +151,7 @@ Popup {
         }
         const action = {type: selectedType, name: title, icon: icon, payload: payload}
         if (gestureId.length > 0) controller.setCenterGestureAction(gestureId, slotIndex, action)
-        else controller.setAction(deckId, slotIndex, action)
+        else if (!controller.setAction(deckId, slotIndex, action)) return
         if (linkMode) controller.finishLinkAction(true, linkDeckName)
         linkMode = false
         close()
@@ -147,6 +164,7 @@ Popup {
     focus: true
     padding: 0
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    onClosed: { if (linkMode) controller.finishLinkAction(false); linkMode = false }
     Overlay.modal: Rectangle { color: "#aa070b12" }
     background: Rectangle { color: "#18171f"; radius: 18; border.color: "#3a3044"; border.width: 1 }
 
@@ -178,7 +196,7 @@ Popup {
                         width: parent.width
                         spacing: 3
                         Repeater {
-                            model: picker.types
+                            model: picker.types.filter(function(type) { return type.id !== "arcade" || controller.arcadeActions.length > 0 || picker.selectedType === "arcade" })
                             delegate: Rectangle {
                                 required property var modelData
                                 Layout.fillWidth: true
@@ -302,28 +320,61 @@ Popup {
                     Text { text: "Supported desktop actions depend on the platform backend."; color: "#8193aa"; font.pixelSize: 12 }
                 }
                 ColumnLayout {
-                    visible: picker.selectedType === "arcade_box"
+                    visible: picker.selectedType === "arcade"
                     Layout.fillWidth: true
-                    spacing: 10
-                    Text { text: controller.arcadeBoxTools.length ? "Arcade Box tools are available" : "Arcade Box is unavailable. This slot will be saved and enabled when it is installed."; color: "#92a7c2"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                    TextField { id: toolField; Layout.fillWidth: true; placeholderText: "Tool ID" }
-                    ComboBox {
+                    Layout.fillHeight: true
+                    spacing: 7
+                    TextField { id: arcadeSearch; Layout.fillWidth: true; placeholderText: "Search Arcade actions" }
+                    ListView {
+                        id: arcadeList
                         Layout.fillWidth: true
-                        visible: controller.arcadeBoxTools.length > 0
-                        model: controller.arcadeBoxTools.map(function(x) { return x.name })
-                        onActivated: function(index) {
-                            toolField.text = controller.arcadeBoxTools[index].id
-                            nameField.text = controller.arcadeBoxTools[index].name
+                        Layout.fillHeight: true
+                        Layout.minimumHeight: 100
+                        clip: true
+                        model: picker.arcadeRows
+                        section.property: "appName"
+                        section.delegate: Text {
+                            required property string section
+                            text: section; color: "#9AA3B2"; font.pixelSize: 11; height: 24
+                        }
+                        delegate: ItemDelegate {
+                            required property var modelData
+                            width: arcadeList.width; height: 38
+                            text: modelData.title + (modelData.outbound ? " ↗" : "")
+                            highlighted: picker.arcadePayload.app === modelData.app && picker.arcadePayload.action === modelData.id
+                            icon.source: modelData.glyph
+                            icon.color: "#E7EAF0"
+                            onClicked: picker.chooseArcade(modelData)
                         }
                     }
-                    TextField { id: inputField; Layout.fillWidth: true; placeholderText: "Input (example: clipboard-url)" }
-                    TextField { id: presetField; Layout.fillWidth: true; placeholderText: "Preset ID (optional)" }
+                    Text {
+                        Layout.fillWidth: true; color: "#9AA3B2"; font.pixelSize: 11; elide: Text.ElideRight
+                        text: (picker.arcadePayload.app || "") + " · " + (picker.arcadePayload.action || "Choose an action")
+                    }
+                    ComboBox {
+                        Layout.fillWidth: true
+                        model: picker.arcadeModes
+                        currentIndex: picker.arcadeModes.indexOf(picker.arcadePayload.input || "none")
+                        onActivated: function(index) {
+                            let payload = JSON.parse(JSON.stringify(picker.arcadePayload))
+                            payload.input = picker.arcadeModes[index]
+                            picker.arcadePayload = payload
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#e3aab5"; font.pixelSize: 11
+                        text: picker.arcadePayload.action ? controller.actionUnavailableReason(picker.arcadeSlot()) : ""
+                    }
+                    Text {
+                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#9AA3B2"; font.pixelSize: 11
+                        text: picker.arcadePayload.options && picker.arcadePayload.options.pipeline ? "Pipeline: " + picker.arcadePayload.options.pipeline : ""
+                    }
                 }
                 ColumnLayout {
                     visible: picker.selectedType === "plugin"
                     Layout.fillWidth: true
                     TextField { id: providerField; Layout.fillWidth: true; placeholderText: "Provider ID" }
-                    TextField { Layout.fillWidth: true; placeholderText: "Action/tool ID"; text: toolField.text; onTextEdited: toolField.text = text }
+                    TextField { id: toolField; Layout.fillWidth: true; placeholderText: "Action/tool ID" }
                     Text { text: "Provider actions remain visible when their provider is unavailable."; color: "#8193aa"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
                 }
                 Item { Layout.fillHeight: true }
@@ -351,7 +402,7 @@ Popup {
             UiButton {
                 text: "Save action"
                 accent: true
-                enabled: picker.selectedType !== "application" || picker.selectedAppId.length > 0
+                enabled: picker.selectedType === "arcade" ? !!picker.arcadePayload.app && !!picker.arcadePayload.action : picker.selectedType !== "application" || picker.selectedAppId.length > 0
                 onClicked: picker.saveAction()
             }
         }

@@ -7,7 +7,7 @@
 
 class ConfigStore {
 public:
-    static constexpr int SchemaVersion = 3;
+    static constexpr int SchemaVersion = 4;
 
     explicit ConfigStore(QString path = {});
     QString path() const { return m_path; }

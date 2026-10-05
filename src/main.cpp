@@ -208,6 +208,20 @@ int main(int argc, char **argv)
         settings->requestActivate();
     };
 
+    std::unique_ptr<QQuickView> activity;
+    QObject::connect(&controller, &WheelController::linkActivityRequested, &app, [&] {
+        if (!activity) {
+            activity = std::make_unique<QQuickView>();
+            activity->setTitle(QStringLiteral("Arcade Wheel · Activity"));
+            activity->setResizeMode(QQuickView::SizeRootObjectToView);
+            activity->resize(540, 320);
+            activity->engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);
+            activity->rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
+            activity->setSource(QUrl(QStringLiteral("qrc:/qml/settings/LinkActivity.qml")));
+        }
+        activity->show();
+    });
+
     QSystemTrayIcon tray;
     tray.setToolTip(QStringLiteral("Arcade Wheel"));
     tray.setIcon(appIcon);

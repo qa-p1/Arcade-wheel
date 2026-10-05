@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QPointer>
+#include <QTimer>
 #include <memory>
 #include <optional>
 
@@ -12,8 +13,8 @@ class WheelController;
 
 // Arcade Wheel's presence among the other Arcade apps: its manifest and its
 // Link endpoint, kept in step with the "Connect with other Arcade apps"
-// setting. Lives on the GUI thread; the server is event-driven (no extra
-// threads, no timers while idle).
+// setting. Its manifest and event-driven server share the registry worker;
+// controller state and cached diagnostics remain on the GUI thread.
 class WheelLink final : public QObject {
     Q_OBJECT
 public:
@@ -37,11 +38,16 @@ public:
     const ArcadeLink::Locations &locations() const { return m_locations; }
 
 private:
-    void invoke(const QJsonObject &request, const ArcadeLink::Responder &responder);
+    void invoke(const QJsonObject &request, const ArcadeLink::Responder &responder, const QVariantMap &draft, const QString &draftError);
     QString m_version;
     QPointer<WheelController> m_controller;
     std::optional<ArcadeLink::Responder> m_pendingAdd;
     ArcadeLink::Locations m_locations;
-    std::unique_ptr<ArcadeLink::Server> m_server;
+    struct PresenceState;
+    std::shared_ptr<PresenceState> m_presence;
+    QPointer<QObject> m_ioWorker;
+    std::atomic_bool m_listening{false};
+    QTimer m_addCancelTimer;
+    void respond(const ArcadeLink::Responder &r, std::function<void(const ArcadeLink::Responder &)> reply);
     QString m_lastError;
 };

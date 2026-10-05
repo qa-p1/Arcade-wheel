@@ -43,7 +43,7 @@ Builds currently have no publisher certificate: Windows installers are unsigned 
 - **Hold → move → release.** You don't have to aim at an icon; each action owns a whole slice of the circle.
 - **Decks.** Up to 8 actions per deck, any number of decks. Scroll while holding the trigger to switch.
 - **Center gestures.** Single-click, double-click, triple-click, and long press in the hub can each run a group of up to 16 apps or actions.
-- **Actions:** launch or focus applications, run commands, open URLs, files, or folders, system actions (lock, suspend, log out, power off, screenshot), media keys, compositor actions, and external providers such as [Arcade Box](docs/ARCADE_BOX_BRIDGE.md).
+- **Actions:** launch or focus applications, run commands, open URLs, files, or folders, system actions (lock, suspend, log out, power off, screenshot), media keys, compositor actions, and external providers such as [Arcade apps](docs/ARCADE_LINK.md).
 - **Live settings.** Changes apply to the running wheel immediately, and the Wheel page has a live preview.
 - **Plain JSON config**, saved atomically, with versioned migrations and import/export.
 - **Quiet UI.** The wheel shows action icons, a center label, and deck dots. Nothing else.
@@ -130,7 +130,7 @@ The configuration is a versioned JSON file. Its path is shown on the **General**
 
 Commands run as a program plus arguments, not through a shell. Use `sh -c '…'` explicitly if you need shell syntax.
 
-Arcade Box integration is optional and goes through a small CLI. Arcade Wheel calls `arcade-box tools --json` to list tools and `arcade-box run --tool ID [--input INPUT] [--preset ID]` to run one. See the [bridge contract](docs/ARCADE_BOX_BRIDGE.md).
+Arcade Wheel optionally discovers Box, Lens, Look and Clipboard through [Arcade Link](docs/ARCADE_LINK.md). Search their actions in the picker, bind a tool or pipeline, and supply the clipboard or a Lens selection. Registry updates and jobs run off the UI thread; unavailable saved slots retain their reason. Wheel works on its own without any peers.
 
 ## Platform notes
 

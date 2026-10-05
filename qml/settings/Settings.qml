@@ -487,23 +487,23 @@ Rectangle {
         id: integrationsPage
         ColumnLayout {
             anchors.fill: parent; anchors.margins: 28; spacing: 16
-            Text { text: "Arcade Box"; color: "#e8e3ef"; font.pixelSize: 18; font.weight: Font.Medium }
-            Text { text: "Arcade Wheel can call tools exposed by the Arcade Box command-line bridge. Saved slots remain in your decks when Arcade Box is unavailable."; color: "#91889f"; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Text { text: "Arcade actions"; color: "#e8e3ef"; font.pixelSize: 18; font.weight: Font.Medium }
+            Text { text: "Saved Arcade actions remain in your decks when their app is unavailable."; color: "#91889f"; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: controller.arcadeBoxTools.length ? controller.arcadeBoxTools.length + " tools available" : "No tools discovered"; color: "#b7aacb"; font.pixelSize: 13; Layout.fillWidth: true }
+                Text { text: controller.arcadeActions.length ? controller.arcadeActions.length + " tools available" : "No tools discovered"; color: "#b7aacb"; font.pixelSize: 13; Layout.fillWidth: true }
                 UiButton { text: "Refresh"; onClicked: controller.refreshProviders() }
             }
             Rectangle {
                 Layout.fillWidth: true; Layout.fillHeight: true; radius: 13; color: "#17171f"; border.color: "#282532"
                 ListView {
                     anchors.fill: parent; anchors.margins: 12; clip: true; spacing: 5
-                    model: controller.arcadeBoxTools
+                    model: controller.arcadeActions
                     delegate: Rectangle {
                         required property var modelData
                         width: ListView.view.width; height: 58; radius: 8; color: "#20202a"
                         Column { anchors.verticalCenter: parent.verticalCenter; anchors.left: parent.left; anchors.leftMargin: 13; spacing: 3
-                            Text { text: modelData.name || modelData.id; color: "#e8e2f0"; font.pixelSize: 13 }
+                            Text { text: modelData.title || modelData.id; color: "#e8e2f0"; font.pixelSize: 13 }
                             Text { text: modelData.description || modelData.id; color: "#91839f"; font.pixelSize: 11 }
                         }
                     }

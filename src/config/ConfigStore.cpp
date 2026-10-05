@@ -20,6 +20,25 @@ QJsonObject mergeDefaults(const QJsonObject &defaults, const QJsonObject &actual
     return result;
 }
 
+// Preserve the complete legacy payload, including its old free-form input.
+// Only the new input mode gets normalized; the original remains repairable.
+QJsonObject migrateAction(QJsonObject action)
+{
+    if (action.value("type").toString() != "arcade_box") return action;
+    const auto legacy = action.value("payload").toObject();
+    auto payload = legacy;
+    payload.insert("app", "arcade.box");
+    payload.insert("action", "box:" + legacy.value("toolId").toString());
+    payload.insert("version", 1);
+    const auto oldInput = legacy.value("input").toString();
+    const QStringList modes{"none", "clipboard", "lens-selection", "file-selection"};
+    payload.insert("input", modes.contains(oldInput) ? oldInput : oldInput.startsWith("clipboard") ? "clipboard" : "none");
+    payload.insert("legacyPayload", legacy);
+    action.insert("type", "arcade");
+    action.insert("payload", payload);
+    return action;
+}
+
 QJsonObject readJson(const QString &path, QString *error)
 {
     QFile file(path);
@@ -196,7 +215,7 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
         QJsonArray normalizedActions;
         for (const auto &value : actions) {
             if (!value.isObject()) continue;
-            auto action = mergeDefaults(emptyAction(), value.toObject());
+            auto action = mergeDefaults(emptyAction(), migrateAction(value.toObject()));
             QString actionId = action.value(QStringLiteral("id")).toString();
             if (actionId.isEmpty() || ids.contains(actionId)) actionId = freshId();
             ids.insert(actionId);
@@ -222,7 +241,7 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
         QJsonArray actions;
         for (const auto &value : group.value("actions").toArray()) {
             if (!value.isObject()) continue;
-            auto action = mergeDefaults(emptyAction(), value.toObject());
+            auto action = mergeDefaults(emptyAction(), migrateAction(value.toObject()));
             QString id = action.value("id").toString();
             if (id.isEmpty() || ids.contains(id)) id = freshId();
             ids.insert(id);

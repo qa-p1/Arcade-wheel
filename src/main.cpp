@@ -160,6 +160,7 @@ int main(int argc, char **argv)
     std::unique_ptr<WheelLink> link;
     if (!smokeTest && (!headless || !qEnvironmentVariableIsEmpty("ARCADE_HOME"))) {
         link = std::make_unique<WheelLink>(QStringLiteral(ARCADE_VERSION));
+        link->setController(&controller);
         QTimer::singleShot(0, link.get(), [&] { link->apply(QJsonObject::fromVariantMap(controller.config())); });
         QObject::connect(&controller, &WheelController::configChanged, link.get(),
                          [&] { link->apply(QJsonObject::fromVariantMap(controller.config())); });
@@ -197,6 +198,10 @@ int main(int argc, char **argv)
                 app.exit(1);
                 return;
             }
+            // Closing Settings gives up an action another app asked to add.
+            QObject::connect(settings.get(), &QWindow::visibleChanged, &controller, [&](bool visible) {
+                if (!visible) controller.finishLinkAction(false);
+            });
         }
         settings->show();
         settings->raise();

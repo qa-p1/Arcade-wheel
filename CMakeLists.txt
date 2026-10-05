@@ -106,6 +106,10 @@ if(BUILD_TESTING)
     target_link_libraries(test_LinkVectors PRIVATE arcade_core Qt6::Test)
     target_compile_definitions(test_LinkVectors PRIVATE ARCADE_LINK_VECTORS="${CMAKE_CURRENT_SOURCE_DIR}/tests/link-vectors")
     add_test(NAME LinkVectors COMMAND test_LinkVectors)
+    qt_add_executable(test_WheelLink tests/tst_WheelLink.cpp)
+    target_link_libraries(test_WheelLink PRIVATE arcade_core Qt6::Test)
+    add_test(NAME WheelLink COMMAND test_WheelLink)
+    set_tests_properties(WheelLink PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")
     # Match the application's Material style. The native macOS style expects
     # Cocoa windows and cannot be used with the offscreen test platform.
     set_tests_properties(WheelController PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Material;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")

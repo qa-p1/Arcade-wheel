@@ -553,6 +553,25 @@ void WheelController::setAction(const QString &deckId, int slot, const QVariantM
     commit(updated);
 }
 
+bool WheelController::beginLinkAction(const QVariantMap &draft, const QString &sourceName)
+{
+    if (linkPending()) return false;
+    m_linkDraft = draft;
+    m_linkSource = sourceName;
+    emit linkDraftChanged();
+    emit settingsRequested();
+    return true;
+}
+
+void WheelController::finishLinkAction(bool saved, const QString &where)
+{
+    if (!linkPending()) return;
+    m_linkDraft.clear();
+    m_linkSource.clear();
+    emit linkDraftChanged();
+    emit linkActionFinished(saved, where);
+}
+
 void WheelController::moveAction(const QString &deckId, int from, int to)
 {
     const int index = deckIndexById(deckId);

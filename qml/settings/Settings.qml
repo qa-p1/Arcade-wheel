@@ -29,11 +29,37 @@ Rectangle {
         next = b.wrapDecks ? (next+controller.deckCount)%controller.deckCount : Math.max(0,Math.min(controller.deckCount-1,next))
         controller.selectDeck(next)
     }
+    readonly property bool linkPending: Object.keys(controller.linkDraft).length > 0
     Connections {
         target: controller
         function onCurrentDeckChanged() { if(root.selectedSlot >= root.activeActions.length) root.selectedSlot=-1 }
+        function onLinkDraftChanged() { if (root.linkPending) root.currentPage = "Wheel" }
     }
     ActionPicker { id: actionPicker }
+    // Another Arcade app asked to add an action. Nothing is saved until the
+    // user chooses a slot and saves it in the picker.
+    Rectangle {
+        id: linkBanner
+        visible: root.linkPending
+        z: 10
+        anchors.top: parent.top; anchors.topMargin: 14
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: Math.min(parent.width - 240, 760); height: 58; radius: 12
+        color: "#2a2338"; border.color: "#514462"; border.width: 1
+        RowLayout {
+            anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 10; spacing: 10
+            Text {
+                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#e9e1f5"; font.pixelSize: 12
+                text: (controller.linkSource || "Another Arcade app") + " wants to add “" + (controller.linkDraft.name || "an action") + "” to the Wheel. Select a slot, then place it."
+            }
+            UiButton {
+                text: "Place in selected slot"; accent: true; compact: true
+                enabled: root.selectedSlot >= 0
+                onClicked: actionPicker.editLinkAction(root.activeDeck.id, root.activeDeck.name || "the Wheel", root.selectedSlot, controller.linkDraft)
+            }
+            UiButton { text: "Cancel"; compact: true; onClicked: controller.finishLinkAction(false) }
+        }
+    }
     FileDialog {
         id: importDialog; title: "Import configuration"; nameFilters: ["JSON configuration (*.json)"]
         onAccepted: controller.importConfig(selectedFile.toString())

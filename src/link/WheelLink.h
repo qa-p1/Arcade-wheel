@@ -4,7 +4,11 @@
 
 #include <QJsonObject>
 #include <QObject>
+#include <QPointer>
 #include <memory>
+#include <optional>
+
+class WheelController;
 
 // Arcade Wheel's presence among the other Arcade apps: its manifest and its
 // Link endpoint, kept in step with the "Connect with other Arcade apps"
@@ -20,6 +24,11 @@ public:
     static QJsonObject manifest(const QJsonObject &config, const QString &version);
     static QJsonArray actions();
 
+    // The controller that shows the wheel and opens Settings for wheel.add_action.
+    void setController(WheelController *controller);
+    // The Wheel action a Link value would become (empty, with `error`, if none).
+    static QVariantMap draftFor(const QJsonObject &content, QString *error);
+
     // Writes the manifest and starts or stops listening to match `config`.
     void apply(const QJsonObject &config);
     void stop();
@@ -28,7 +37,10 @@ public:
     const ArcadeLink::Locations &locations() const { return m_locations; }
 
 private:
+    void invoke(const QJsonObject &request, const ArcadeLink::Responder &responder);
     QString m_version;
+    QPointer<WheelController> m_controller;
+    std::optional<ArcadeLink::Responder> m_pendingAdd;
     ArcadeLink::Locations m_locations;
     std::unique_ptr<ArcadeLink::Server> m_server;
     QString m_lastError;

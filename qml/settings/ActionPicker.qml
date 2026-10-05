@@ -11,6 +11,9 @@ Popup {
     property string selectedType: "application"
     property string selectedAppId: ""
     property string selectedIcon: "applications-other"
+    // Placing an action another Arcade app asked to add (Arcade Link).
+    property bool linkMode: false
+    property string linkDeckName: ""
     readonly property bool compact: width < 640
     property var types: [
         { id: "application", title: "Applications" },
@@ -46,6 +49,7 @@ Popup {
     }
 
     function editAction(deckIdValue, slot, action) {
+        linkMode = false
         gestureId = ""
         deckId = deckIdValue
         slotIndex = slot
@@ -70,6 +74,12 @@ Popup {
         for (let i = 0; i < mediaActions.length; i++)
             if (action && action.payload && mediaActions[i].id === action.payload.id) mediaCombo.currentIndex = i
         open()
+    }
+
+    function editLinkAction(deckIdValue, deckNameValue, slot, action) {
+        editAction(deckIdValue, slot, action)
+        linkMode = true
+        linkDeckName = deckNameValue
     }
 
     function editCenterAction(gesture, slot, action) {
@@ -125,6 +135,8 @@ Popup {
         const action = {type: selectedType, name: title, icon: icon, payload: payload}
         if (gestureId.length > 0) controller.setCenterGestureAction(gestureId, slotIndex, action)
         else controller.setAction(deckId, slotIndex, action)
+        if (linkMode) controller.finishLinkAction(true, linkDeckName)
+        linkMode = false
         close()
     }
 

@@ -29,6 +29,10 @@ class WheelController final : public QObject {
     Q_PROPERTY(QString triggerStatus READ triggerStatus NOTIFY triggerStatusChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
     Q_PROPERTY(QString configPath READ configPath CONSTANT)
+    // Arcade Link: an action another app asked to add, waiting for the user
+    // to choose a slot and save it.
+    Q_PROPERTY(QVariantMap linkDraft READ linkDraft NOTIFY linkDraftChanged)
+    Q_PROPERTY(QString linkSource READ linkSource NOTIFY linkDraftChanged)
 public:
     explicit WheelController(PlatformBackend *backend, QObject *parent = nullptr, QString configPath = {});
     ~WheelController() override;
@@ -52,6 +56,13 @@ public:
     QString triggerStatus() const { return m_triggerStatus; }
     QString lastError() const { return m_lastError; }
     QString configPath() const { return m_store.path(); }
+    QVariantMap linkDraft() const { return m_linkDraft; }
+    QString linkSource() const { return m_linkSource; }
+    bool linkPending() const { return !m_linkDraft.isEmpty(); }
+    // Starts a pending add (false if one is already waiting) and opens Settings.
+    bool beginLinkAction(const QVariantMap &draft, const QString &sourceName);
+    // The user saved the draft into a slot, or gave up (Cancel, closing Settings).
+    Q_INVOKABLE void finishLinkAction(bool saved, const QString &where = {});
 
     Q_INVOKABLE void pressTrigger();
     Q_INVOKABLE void releaseTrigger();
@@ -110,6 +121,8 @@ signals:
     void quitRequested();
     void restartRequested();
     void actionFailed(const QString &message);
+    void linkDraftChanged();
+    void linkActionFinished(bool saved, const QString &where);
 
 private:
     QJsonArray decks() const;
@@ -164,4 +177,6 @@ private:
     QString m_shortcutConflict;
     QString m_triggerStatus;
     QString m_lastError;
+    QVariantMap m_linkDraft;
+    QString m_linkSource;
 };

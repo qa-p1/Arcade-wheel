@@ -1,0 +1,10 @@
+{
+  "id": "arcade.look", "name": "Arcade Look", "version": "0.0.0-mock",
+  "actions": [
+    {"id": "look.preview_selection", "title": "Preview the file manager's selection", "verb": "preview",
+     "effects": ["opens-ui"], "produces": ["file/*[]"], "interactive": true,
+     "mock": {"result": {"message": "Previewing the selection", "outputs": []}}},
+    {"id": "look.preview", "title": "Quick Look", "verb": "preview", "accepts": ["file/*", "file/*[]"],
+     "effects": ["opens-ui"], "interactive": true}
+  ]
+}

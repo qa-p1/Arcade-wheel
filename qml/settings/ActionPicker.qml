@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../components"
@@ -14,6 +15,7 @@ Popup {
     // Placing an action another Arcade app asked to add (Arcade Link).
     property bool linkMode: false
     property string linkDeckName: ""
+    property var placementDeck: controller.config.decks.find(function(deck) { return deck.id === picker.deckId }) || ({})
     readonly property bool compact: width < 640
     property var types: [
         { id: "application", title: "Applications" },
@@ -27,19 +29,25 @@ Popup {
         { id: "plugin", title: "Provider" }
     ]
     property var arcadePayload: ({})
+    property var visibleTypes: types.filter(function(type) { return type.id !== "arcade" || controller.arcadeActions.length > 0 || picker.selectedType === "arcade" })
+    function sameArcade(row) {
+        return row.app === arcadePayload.app && row.id === arcadePayload.action
+            && (row.options && row.options.pipeline || "") === (arcadePayload.options && arcadePayload.options.pipeline || "")
+            && (row.preset || "") === (arcadePayload.preset || "")
+    }
     property var arcadeRows: controller.arcadeActions.filter(function(row) {
         const search = arcadeSearch.text.toLowerCase()
         return (row.appName + " " + row.title + " " + row.id).toLowerCase().indexOf(search) >= 0
     })
     property var arcadeModes: {
-        const row = controller.arcadeActions.find(function(row) { return row.app === arcadePayload.app && row.id === arcadePayload.action })
+        const row = controller.arcadeActions.find(function(row) { return picker.sameArcade(row) })
         let modes = row ? row.inputModes.slice() : []
         if (arcadePayload.input && modes.indexOf(arcadePayload.input) < 0) modes.push(arcadePayload.input)
         return modes
     }
     function arcadeSlot() { return {type: "arcade", payload: arcadePayload} }
     function chooseArcade(row) {
-        arcadePayload = {app: row.app, action: row.id, version: row.version || 1, input: row.input, options: {}}
+        arcadePayload = {app: row.app, action: row.id, version: row.version || 1, input: row.input, options: row.options ? JSON.parse(JSON.stringify(row.options)) : {}}
         if (row.preset) arcadePayload.preset = row.preset
         nameField.text = row.title
         selectedIcon = row.glyph
@@ -159,13 +167,18 @@ Popup {
 
     anchors.centerIn: Overlay.overlay
     width: Math.max(1, Math.min(880, (parent ? parent.width : 916) - 36))
-    height: Math.max(1, Math.min(660, (parent ? parent.height : 696) - 36))
+    height: Math.max(1, Math.min(linkMode ? 760 : 660, (parent ? parent.height : 796) - 36))
     modal: true
     focus: true
     padding: 0
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     onClosed: { if (linkMode) controller.finishLinkAction(false); linkMode = false }
     Overlay.modal: Rectangle { color: "#aa070b12" }
+    Shortcut {
+        sequence: StandardKey.Close
+        enabled: picker.visible
+        onActivated: { picker.close(); picker.parent.Window.window.close() }
+    }
     background: Rectangle { color: "#18171f"; radius: 18; border.color: "#3a3044"; border.width: 1 }
 
     ColumnLayout {
@@ -176,10 +189,49 @@ Popup {
             Layout.preferredHeight: 68
             Layout.leftMargin: 24
             Layout.rightMargin: 22
-            Text { text: "Choose action"; color: "#f0e9f6"; font.pixelSize: 21; font.weight: Font.DemiBold; Layout.fillWidth: true }
+            Text { text: picker.linkMode ? "Add to Wheel" : "Choose action"; color: "#f0e9f6"; font.pixelSize: 21; font.weight: Font.DemiBold; Layout.fillWidth: true }
             UiButton { text: "Close"; compact: true; onClicked: picker.close() }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: "#2e2737" }
+        ColumnLayout {
+            visible: picker.linkMode
+            Layout.fillWidth: true
+            Layout.leftMargin: 24; Layout.rightMargin: 22; Layout.topMargin: picker.linkMode ? 12 : 0; Layout.bottomMargin: picker.linkMode ? 12 : 0
+            spacing: 8
+            Text {
+                Layout.fillWidth: true; color: "#c9bfd9"; font.pixelSize: 12; wrapMode: Text.WordWrap
+                text: (controller.linkSource || "Another Arcade app") + " wants to add “" + (controller.linkDraft.name || "an action") + "”. Choose a slot, then confirm."
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 12
+                ColumnLayout {
+                    Layout.fillWidth: true; spacing: 3
+                    Text { text: "Deck"; color: "#9AA3B2"; font.pixelSize: 11 }
+                    ComboBox {
+                        Layout.fillWidth: true
+                        model: controller.config.decks.map(function(deck) { return deck.name })
+                        currentIndex: controller.config.decks.findIndex(function(deck) { return deck.id === picker.deckId })
+                        onActivated: function(index) {
+                            const deck = controller.config.decks[index]
+                            picker.deckId = deck.id; picker.linkDeckName = deck.name; picker.slotIndex = -1
+                        }
+                    }
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true; spacing: 3
+                    Text { text: "Slot"; color: "#9AA3B2"; font.pixelSize: 11 }
+                    ComboBox {
+                        id: placementSlot; objectName: "placementSlot"
+                        Layout.fillWidth: true
+                        model: (picker.placementDeck.actions || []).map(function(action, index) { return (index + 1) + " · " + (action.name || "Choose action") })
+                        currentIndex: picker.slotIndex
+                        displayText: picker.slotIndex < 0 ? "Choose a slot" : currentText
+                        onActivated: function(index) { picker.slotIndex = index }
+                    }
+                }
+            }
+        }
+        Rectangle { visible: picker.linkMode; Layout.fillWidth: true; height: 1; color: "#2e2737" }
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -196,7 +248,7 @@ Popup {
                         width: parent.width
                         spacing: 3
                         Repeater {
-                            model: picker.types.filter(function(type) { return type.id !== "arcade" || controller.arcadeActions.length > 0 || picker.selectedType === "arcade" })
+                            model: picker.visibleTypes
                             delegate: Rectangle {
                                 required property var modelData
                                 Layout.fillWidth: true
@@ -219,13 +271,13 @@ Popup {
                 ComboBox {
                     visible: picker.compact
                     Layout.fillWidth: true
-                    model: picker.types.map(function(type) { return type.title })
+                    model: picker.visibleTypes.map(function(type) { return type.title })
                     currentIndex: {
-                        for (let i = 0; i < picker.types.length; ++i)
-                            if (picker.types[i].id === picker.selectedType) return i
+                        for (let i = 0; i < picker.visibleTypes.length; ++i)
+                            if (picker.visibleTypes[i].id === picker.selectedType) return i
                         return 0
                     }
-                    onActivated: function(index) { picker.selectedType = picker.types[index].id }
+                    onActivated: function(index) { picker.selectedType = picker.visibleTypes[index].id }
                 }
                 Text { visible: !picker.compact; text: picker.selectedTypeTitle(); color: "#f1f6ff"; font.pixelSize: 18; font.weight: Font.Medium }
                 Text { text: "Action name"; color: "#a8b8cb"; font.pixelSize: 12 }
@@ -341,7 +393,7 @@ Popup {
                             required property var modelData
                             width: arcadeList.width; height: 38
                             text: modelData.title + (modelData.outbound ? " ↗" : "")
-                            highlighted: picker.arcadePayload.app === modelData.app && picker.arcadePayload.action === modelData.id
+                            highlighted: picker.sameArcade(modelData)
                             icon.source: modelData.glyph
                             icon.color: "#E7EAF0"
                             onClicked: picker.chooseArcade(modelData)
@@ -389,7 +441,7 @@ Popup {
             spacing: 10
             UiButton {
                 text: picker.gestureId.length > 0 ? "Remove action" : "Clear slot"
-                visible: picker.gestureId.length === 0 || picker.slotIndex >= 0
+                visible: !picker.linkMode && (picker.gestureId.length === 0 || picker.slotIndex >= 0)
                 destructive: true
                 onClicked: {
                     if (picker.gestureId.length > 0) controller.removeCenterGestureAction(picker.gestureId, picker.slotIndex)
@@ -400,9 +452,10 @@ Popup {
             Item { Layout.fillWidth: true }
             UiButton { text: "Cancel"; onClicked: picker.close() }
             UiButton {
-                text: "Save action"
+                objectName: "saveActionButton"
+                text: picker.linkMode ? "Add to selected slot" : "Save action"
                 accent: true
-                enabled: picker.selectedType === "arcade" ? !!picker.arcadePayload.app && !!picker.arcadePayload.action : picker.selectedType !== "application" || picker.selectedAppId.length > 0
+                enabled: (!picker.linkMode || picker.slotIndex >= 0) && (picker.selectedType === "arcade" ? !!picker.arcadePayload.app && !!picker.arcadePayload.action : picker.selectedType !== "application" || picker.selectedAppId.length > 0)
                 onClicked: picker.saveAction()
             }
         }

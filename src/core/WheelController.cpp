@@ -679,6 +679,11 @@ QVariantMap WheelController::linkDiagnostics() const
     return {{"registry", m_dispatcher.arcade().locations().registry}, {"endpoint", m_linkEndpointState}, {"lastError", m_linkLastError}};
 }
 
+QString WheelController::peerDisplayName(const QString &app) const
+{
+    return m_dispatcher.arcade().manifestFor(app).value("name").toString(ArcadeLink::appName(app));
+}
+
 void WheelController::setLinkDiagnostics(const QString &endpoint, const QString &error)
 {
     m_linkEndpointState = endpoint; m_linkLastError = error;
@@ -787,11 +792,16 @@ bool WheelController::applyShortcut(const QString &shortcut, bool overrideConfli
     const QString validationError = m_backend->shortcutValidationError(shortcut);
     if (!validationError.isEmpty()) {
         m_shortcutConflict.clear();
+        m_shortcutPeerConflict = false;
         emit shortcutConflictChanged();
         reportError(validationError);
         return false;
     }
-    m_shortcutConflict = m_backend->shortcutConflict(shortcut);
+    const auto owner = m_dispatcher.arcade().shortcutOwner(shortcut);
+    m_shortcutPeerConflict = !owner.isEmpty();
+    m_shortcutConflict = owner.isEmpty() ? QString() : QStringLiteral("Used by %1").arg(owner);
+    const auto backendConflict = m_backend->shortcutConflict(shortcut);
+    if (!backendConflict.isEmpty()) m_shortcutConflict += (m_shortcutConflict.isEmpty() ? QString() : QStringLiteral(". ")) + backendConflict;
     emit shortcutConflictChanged();
     if (!overrideConflict && !m_shortcutConflict.isEmpty()) return false;
     auto updated = m_config;
@@ -802,6 +812,7 @@ bool WheelController::applyShortcut(const QString &shortcut, bool overrideConfli
     updated.insert(QStringLiteral("trigger"),trigger);
     if (!commit(updated,true)) return false;
     m_shortcutConflict.clear();
+    m_shortcutPeerConflict = false;
     emit shortcutConflictChanged();
     return true;
 }

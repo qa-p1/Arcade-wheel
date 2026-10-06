@@ -30,37 +30,20 @@ Rectangle {
         controller.selectDeck(next)
     }
     readonly property bool linkPending: Object.keys(controller.linkDraft).length > 0
+    function syncLinkDraft() {
+        if (root.linkPending) {
+            root.currentPage = "Wheel"
+            actionPicker.editLinkAction(root.activeDeck.id, root.activeDeck.name || "the Wheel", -1, controller.linkDraft)
+        } else if (actionPicker.linkMode) actionPicker.close()
+    }
+    Component.onCompleted: syncLinkDraft()
     Shortcut { sequence: StandardKey.Close; onActivated: root.Window.window.close() }
     Connections {
         target: controller
         function onCurrentDeckChanged() { if(root.selectedSlot >= root.activeActions.length) root.selectedSlot=-1 }
-        function onLinkDraftChanged() { if (root.linkPending) root.currentPage = "Wheel" }
+        function onLinkDraftChanged() { root.syncLinkDraft() }
     }
-    ActionPicker { id: actionPicker }
-    // Another Arcade app asked to add an action. Nothing is saved until the
-    // user chooses a slot and saves it in the picker.
-    Rectangle {
-        id: linkBanner
-        visible: root.linkPending
-        z: 10
-        anchors.top: parent.top; anchors.topMargin: 14
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: Math.min(parent.width - 240, 760); height: 58; radius: 12
-        color: "#2a2338"; border.color: "#514462"; border.width: 1
-        RowLayout {
-            anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 10; spacing: 10
-            Text {
-                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#e9e1f5"; font.pixelSize: 12
-                text: (controller.linkSource || "Another Arcade app") + " wants to add “" + (controller.linkDraft.name || "an action") + "” to the Wheel. Select a slot, then place it."
-            }
-            UiButton {
-                text: "Place in selected slot"; accent: true; compact: true
-                enabled: root.selectedSlot >= 0
-                onClicked: actionPicker.editLinkAction(root.activeDeck.id, root.activeDeck.name || "the Wheel", root.selectedSlot, controller.linkDraft)
-            }
-            UiButton { text: "Cancel"; compact: true; onClicked: controller.finishLinkAction(false) }
-        }
-    }
+    ActionPicker { id: actionPicker; objectName: "actionPicker" }
     FileDialog {
         id: importDialog; title: "Import configuration"; nameFilters: ["JSON configuration (*.json)"]
         onAccepted: controller.importConfig(selectedFile.toString())
@@ -408,9 +391,9 @@ Rectangle {
                         id: conflictContent
                         anchors.fill: parent; anchors.margins: 14; spacing: 12
                         Text { text: controller.shortcutConflict; color: "#efd8bd"; font.pixelSize: 13; wrapMode: Text.Wrap; Layout.fillWidth: true }
-                        Text { text: "Override uses this key for Arcade Wheel while it is running. The previous shortcut is restored when you change keys or quit."; color: "#bca995"; font.pixelSize: 12; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                        Text { text: controller.shortcutPeerConflict ? "Sharing this shortcut can prevent one app from receiving it. Choose another key or save it anyway." : "Override uses this key for Arcade Wheel while it is running. The previous shortcut is restored when you change keys or quit."; color: "#bca995"; font.pixelSize: 12; wrapMode: Text.Wrap; Layout.fillWidth: true }
                         RowLayout {
-                            UiButton { text: "Override"; accent: true; onClicked: shortcutField.acceptCandidate(true) }
+                            UiButton { text: controller.shortcutPeerConflict ? "Use anyway" : "Override"; accent: true; onClicked: shortcutField.acceptCandidate(true) }
                             UiButton { text: "Choose another key"; onClicked: { shortcutField.forceActiveFocus(); shortcutField.beginRecording() } }
                         }
                     }

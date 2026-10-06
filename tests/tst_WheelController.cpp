@@ -282,6 +282,32 @@ private slots:
         controller.releaseTrigger();
         QVERIFY(!controller.overlayVisible());
     }
+    void incomingPickerRequiresAChosenSlotAndOneConfirmation() {
+        QTemporaryDir dir; ControllerBackend backend;
+        WheelController controller(&backend, nullptr, dir.filePath("config.json")); controller.initialize();
+        const QVariantMap draft{{"type", "command"}, {"name", "printf"},
+            {"payload", QVariantMap{{"command", "/usr/bin/printf literal"}}}};
+        QVERIFY(controller.beginLinkAction(draft, "Arcade Lens"));
+        const auto before = controller.config();
+        QQuickView settings; settings.rootContext()->setContextProperty("controller", &controller);
+        settings.setSource(QUrl::fromLocalFile(QFINDTESTDATA("../qml/settings/Settings.qml")));
+        QCOMPARE(settings.status(), QQuickView::Ready); settings.show();
+        auto *picker = settings.rootObject()->findChild<QObject *>("actionPicker");
+        QVERIFY(picker); QTRY_VERIFY(picker->property("visible").toBool());
+        QVERIFY(picker->property("linkMode").toBool());
+        QCOMPARE(picker->property("slotIndex").toInt(), -1);
+        auto *save = picker->findChild<QObject *>("saveActionButton");
+        auto *slot = picker->findChild<QObject *>("placementSlot");
+        QVERIFY(save); QVERIFY(slot); QVERIFY(!save->property("enabled").toBool());
+        QCOMPARE(controller.config(), before);
+        QVERIFY(QMetaObject::invokeMethod(slot, "activated", Q_ARG(int, 0)));
+        QTRY_VERIFY(save->property("enabled").toBool());
+        QCOMPARE(controller.config(), before);
+        QVERIFY(QMetaObject::invokeMethod(save, "clicked"));
+        QVERIFY(!controller.linkPending());
+        QCOMPARE(controller.currentDeck().value("actions").toList().first().toMap().value("payload").toMap().value("command").toString(),
+            QStringLiteral("/usr/bin/printf literal"));
+    }
     void shortcutAndOverrideSurviveRestart() {
         QTemporaryDir dir;
         const auto path=dir.filePath("config.json");
@@ -310,6 +336,32 @@ private slots:
         controller.initialize();
         QCOMPARE(backend.configured.value("shortcut").toString(),QString("Ctrl+Down"));
         QVERIFY(!backend.configured.value("overrideConflict").toBool());
+    }
+    void registryShortcutWarningKeepsTheSavedShortcutUntilConfirmed() {
+        QTemporaryDir dir;
+        const auto previous = qgetenv("ARCADE_HOME");
+        qputenv("ARCADE_HOME", dir.filePath("arcade").toUtf8());
+        {
+            const QJsonObject manifest{{"schema", 1}, {"id", ArcadeLink::Ids::Box}, {"name", "Arcade Box"}, {"version", "1"},
+                {"executable", QCoreApplication::applicationFilePath()}, {"link", QJsonObject{{"protocol", QJsonArray{1}}}},
+                {"settings", QJsonObject{{"linkEnabled", true}}}, {"actions", QJsonArray{}},
+                {"shortcuts", QJsonArray{QJsonObject{{"id", "island"}, {"accelerator", "Alt+Control+Space"}}}}};
+            QVERIFY(ArcadeLink::writeManifest(ArcadeLink::Locations::discover(), manifest));
+            ControllerBackend backend; WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+            controller.initialize();
+            QTRY_VERIFY_WITH_TIMEOUT(controller.connectedApps().first().toMap().value("installed").toBool(), 5000);
+            QCOMPARE(controller.peerDisplayName(ArcadeLink::Ids::Box), QStringLiteral("Arcade Box"));
+            QCOMPARE(controller.peerDisplayName("unknown.caller"), QStringLiteral("unknown.caller"));
+            const int registrations = backend.configures;
+            QVERIFY(!controller.applyShortcut("Ctrl+Alt+Space", false));
+            QCOMPARE(controller.shortcutConflict(), QStringLiteral("Used by Arcade Box"));
+            QVERIFY(controller.shortcutPeerConflict());
+            QCOMPARE(backend.configures, registrations);
+            QCOMPARE(controller.config().value("trigger").toMap().value("shortcut").toString(), QStringLiteral("F8"));
+            QVERIFY(controller.applyShortcut("Ctrl+Alt+Space", true));
+            QCOMPARE(controller.config().value("trigger").toMap().value("shortcut").toString(), QStringLiteral("Ctrl+Alt+Space"));
+        }
+        qputenv("ARCADE_HOME", previous);
     }
     void centeredSelectionLaunchesBeforeExitFinishes() {
         QTemporaryDir dir; ControllerBackend backend;

@@ -43,6 +43,7 @@ ScrollView {
                         }
                         Switch {
                             objectName: "peerToggle-" + modelData.id
+                            visible: modelData.installed && modelData.id !== "arcade.tools"
                             text: "Use with Arcade Wheel"
                             checked: modelData.enabled
                             enabled: controller.config.link.enabled

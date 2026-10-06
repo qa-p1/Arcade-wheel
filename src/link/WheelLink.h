@@ -18,7 +18,7 @@ class WheelController;
 class WheelLink final : public QObject {
     Q_OBJECT
 public:
-    WheelLink(QString version, QObject *parent = nullptr);
+    WheelLink(QString version, QObject *parent = nullptr, bool background = false);
     ~WheelLink() override;
 
     // The manifest for this configuration (also printed by --arcade-manifest).
@@ -43,6 +43,7 @@ signals:
 private:
     void invoke(const QJsonObject &request, const ArcadeLink::Responder &responder, const QVariantMap &draft, const QString &draftError);
     QString m_version;
+    const QString m_startMode;
     QPointer<WheelController> m_controller;
     std::optional<ArcadeLink::Responder> m_pendingAdd;
     ArcadeLink::Locations m_locations;

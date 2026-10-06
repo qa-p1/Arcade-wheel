@@ -24,6 +24,7 @@ class WheelController final : public QObject {
     Q_PROPERTY(bool overlayRevealed READ overlayRevealed NOTIFY overlayRevealedChanged)
     Q_PROPERTY(bool centerGesturePressed READ centerGesturePressed NOTIFY centerGestureChanged)
     Q_PROPERTY(QString shortcutConflict READ shortcutConflict NOTIFY shortcutConflictChanged)
+    Q_PROPERTY(bool shortcutPeerConflict READ shortcutPeerConflict NOTIFY shortcutConflictChanged)
     Q_PROPERTY(QVariantList applications READ applications NOTIFY applicationsChanged)
     Q_PROPERTY(QVariantList arcadeActions READ arcadeActions NOTIFY providersChanged)
     Q_PROPERTY(QVariantList linkJobs READ linkJobs NOTIFY linkJobsChanged)
@@ -54,10 +55,12 @@ public:
     bool overlayRevealed() const { return m_revealed; }
     bool centerGesturePressed() const { return m_centerPressed; }
     QString shortcutConflict() const { return m_shortcutConflict; }
+    bool shortcutPeerConflict() const { return m_shortcutPeerConflict; }
     QVariantList applications() const;
     QVariantList arcadeActions() const { return m_dispatcher.arcade().tools(); }
     QVariantList linkJobs() const { return m_linkJobs; }
     QVariantList connectedApps() const { return m_dispatcher.arcade().connectedApps(); }
+    QString peerDisplayName(const QString &app) const;
     QVariantMap linkDiagnostics() const;
     void setLinkDiagnostics(const QString &endpoint, const QString &error);
     QString triggerStatus() const { return m_triggerStatus; }
@@ -191,6 +194,7 @@ private:
     bool m_revealOnFrame = false;
     bool m_recordingShortcut = false;
     QString m_shortcutConflict;
+    bool m_shortcutPeerConflict = false;
     QString m_triggerStatus;
     QString m_lastError;
     QString m_linkEndpointState = QStringLiteral("Starting");

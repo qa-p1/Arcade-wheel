@@ -20,6 +20,11 @@ class Discovery final : public QObject {
     Q_OBJECT
 public:
     explicit Discovery(Locations locations) : loc(std::move(locations)) {}
+    ~Discovery() override
+    {
+        for (auto &cancel : queries) cancel->store(true);
+        for (auto *thread : queries.keys()) thread->wait();
+    }
     void start()
     {
         registry = new Registry(loc, this);
@@ -50,6 +55,7 @@ public:
             if (wanted && !peers.contains(id)) attach(id, ep);
         }
         for (const auto &id : peers.keys()) if (!seen.contains(id)) remove(id);
+        refreshPipelines();
         publish();
     }
     void clipboard(const WheelClipboard &snapshot, quint64 generation);
@@ -67,6 +73,7 @@ private:
         bool authed = false;
         QJsonArray actions;
         bool described = false;
+        bool pipelinesDirty = false;
         qint64 nextId = 3;
     };
     void remove(const QString &id)
@@ -92,6 +99,7 @@ private:
         deadline->setSingleShot(true);
         Peer peer;
         peer.socket = socket; peer.deadline = deadline; peer.token = ep.token;
+        peer.pipelinesDirty = id == Ids::Box;
         peers.insert(id, peer);
         connect(deadline, &QTimer::timeout, this, [this, id] {
             errors.insert(id, standardMessage("timeout", appName(id)));
@@ -135,8 +143,12 @@ private:
                     p.socket->write(requestLine(2, "subscribe", {{"topics", QJsonArray{"app.changed"}}}));
                     describe(id); publish();
                 } else if (result.contains("actions")) {
-                    p.actions = result.value("actions").toArray(); p.described = true; p.deadline->stop(); publish();
+                    p.actions = result.value("actions").toArray(); p.described = true; p.deadline->stop();
+                    const bool force = p.pipelinesDirty; p.pipelinesDirty = false;
+                    if (id == Ids::Box) refreshPipelines(force);
+                    publish();
                 } else if (message.value("method").toString() == "app.changed") {
+                    p.pipelinesDirty = true;
                     describe(id);
                 }
             }
@@ -158,14 +170,74 @@ private:
                 states.insert(id, "Running");
                 if (peers[id].described) app.insert("actions", peers[id].actions);
             } else states.insert(id, "Installed");
+            if (id == Ids::Box) {
+                app.insert("pipelines", pipelines);
+                app.insert("pipelinesLoaded", pipelinesLoaded);
+            }
             manifests.append(app);
         }
         emit snapshot(manifests, states, errors);
+    }
+    void refreshPipelines(bool force = false)
+    {
+        QJsonObject manifest;
+        for (const auto &app : registry->apps()) if (app.value("id").toString() == Ids::Box) manifest = app;
+        if (peers.contains(Ids::Box) && peers[Ids::Box].described) manifest.insert("actions", peers[Ids::Box].actions);
+        const auto list = WheelInvoke::actionFor(manifest, {{"action", "box.pipelines"}});
+        const auto run = WheelInvoke::actionFor(manifest, {{"action", "box.pipeline.run"}});
+        const bool wanted = enabled && !disabled.contains(Ids::Box)
+            && !list.isEmpty() && !run.isEmpty() && actionUsable(manifest, list) && actionUsable(manifest, run);
+        const auto signature = wanted ? QJsonDocument(manifest).toJson(QJsonDocument::Compact) : QByteArray();
+        if (!force && signature == pipelineSignature) return;
+        pipelineSignature = signature;
+        const auto generation = ++pipelineGeneration;
+        for (auto &cancel : queries) cancel->store(true);
+        pipelines = {}; pipelinesLoaded = false;
+        if (!wanted) return;
+        const auto cancel = std::make_shared<std::atomic_bool>(false);
+        auto *thread = QThread::create([this, manifest, generation, cancel, locations = loc] {
+            Error error; QJsonObject result; QJsonArray values;
+            const QJsonObject request{{"action", "box.pipelines"}, {"version", 1}, {"inputs", QJsonArray{}},
+                {"options", QJsonObject{}}, {"context", QJsonObject{{"source", Ids::Wheel}, {"interactive", false}, {"reason", "discovery"}}}};
+            // Never launch a resident UI just to fill an editor. Only a live
+            // endpoint or Box's advertised headless entry point is used.
+            Endpoint endpoint;
+            if (!Endpoint::read(locations, Ids::Box, &endpoint)
+                && !manifest.value("launch").toObject().value("invoke").isArray())
+                error = Error::make("not_running", {});
+            else WheelInvoke::run(locations, manifest, request, &result, &error, {}, cancel.get(), LaunchTimeoutMs);
+            if (!error.isError()) {
+                bool found = false;
+                for (const auto &output : result.value("outputs").toArray()) {
+                    const auto content = output.toObject();
+                    if (content.value("type").toString() == "structured/pipelines" && content.value("data").isArray()) {
+                        values = content.value("data").toArray(); found = true; break;
+                    }
+                }
+                if (!found) error = Error::make("internal", {}, "invalid pipeline listing");
+            }
+            QMetaObject::invokeMethod(this, [this, generation, values, error] {
+                if (generation != pipelineGeneration) return;
+                pipelines = values; pipelinesLoaded = !error.isError();
+                if (error.isError()) errors.insert(Ids::Box, error.userMessage(appName(Ids::Box)));
+                else errors.remove(Ids::Box);
+                publish();
+            });
+        });
+        thread->setParent(this);
+        queries.insert(thread, cancel);
+        connect(thread, &QThread::finished, this, [this, thread] { queries.remove(thread); thread->deleteLater(); });
+        thread->start();
     }
     Locations loc;
     Registry *registry = nullptr;
     QHash<QString, Peer> peers;
     QJsonObject errors;
+    QJsonArray pipelines;
+    bool pipelinesLoaded = false;
+    QByteArray pipelineSignature;
+    quint64 pipelineGeneration = 0;
+    QHash<QThread *, std::shared_ptr<std::atomic_bool>> queries;
     bool enabled = true;
     QJsonArray disabled;
 };
@@ -247,6 +319,39 @@ bool outbound(const QJsonObject &action)
     const auto effects = action.value("effects").toArray();
     return effects.contains("sends-to-device") || effects.contains("uploads-content") || effects.contains("network")
         || action.value("privacy").toString() == "cloud" || action.value("privacy").toString() == "network";
+}
+
+bool selectionCompatible(const QJsonArray &accepts, const QString &produces)
+{
+    if (acceptsType(accepts, produces)) return true;
+    // A file-manager resolver advertises all file kinds. The selected kind is
+    // checked on the worker after resolveOnly returns the actual files.
+    if (produces == "file/*[]" || produces == "file/any[]")
+        for (const auto &type : accepts) if (type.toString().startsWith("file/")) return true;
+    return false;
+}
+
+QJsonArray selectionInputs(const QJsonArray &accepts, const QJsonArray &outputs)
+{
+    QJsonArray inputs;
+    QMap<QString, QJsonArray> batches;
+    QJsonArray values;
+    for (const auto &value : outputs) {
+        const auto content = value.toObject();
+        if (content.value("paths").isArray()) {
+            for (const auto &path : content.value("paths").toArray()) values.append(fileContent(path.toString()));
+        } else values.append(content);
+    }
+    for (const auto &value : values) {
+        const auto content = value.toObject();
+        const auto type = content.value("type").toString();
+        if (type.startsWith("file/") && content.contains("path") && acceptsType(accepts, type + "[]"))
+            batches[type].append(content.value("path"));
+        else if (acceptsContent(accepts, content)) inputs.append(content);
+    }
+    for (auto it = batches.cbegin(); it != batches.cend(); ++it)
+        inputs.append(QJsonObject{{"type", it.key() + "[]"}, {"paths", it.value()}});
+    return inputs;
 }
 }
 
@@ -375,12 +480,9 @@ QString ArcadeLinkProvider::unavailableReason(const QJsonObject &slot) const
     const auto resolverReason = referenceReason(resolverApp, resolverPayload);
     if (!resolverReason.isEmpty()) return resolverReason;
     const auto resolver = WheelInvoke::actionFor(manifestFor(resolverApp), resolverPayload);
-#ifdef Q_OS_LINUX
-    if (mode == "file-selection") return standardMessage("unavailable", appName(Ids::Look), "the file manager's selection isn't available on Linux");
-#endif
     if (mode != "lens-selection" && mode != "file-selection") return standardMessage("unsupported_input", name);
     for (const auto &type : resolver.value("produces").toArray())
-        if (acceptsType(accepts, type.toString())) return {};
+        if (selectionCompatible(accepts, type.toString())) return {};
     return standardMessage("unavailable", appName(resolverApp), "the selection resolver doesn't return content for this action");
 }
 
@@ -391,14 +493,11 @@ QStringList ArcadeLinkProvider::inputModes(const QJsonObject &action) const
     if (accepts.isEmpty() || accepts.contains("*")) modes << "none";
     if (!accepts.isEmpty()) modes << "clipboard";
     for (const auto &pair : {QPair{Ids::Lens, QStringLiteral("lens.capture")}, QPair{Ids::Look, QStringLiteral("look.preview_selection")}}) {
-#ifdef Q_OS_LINUX
-        if (pair.first == Ids::Look) continue;
-#endif
         const QJsonObject payload{{"action", pair.second}, {"version", 1}};
         if (!referenceReason(pair.first, payload).isEmpty()) continue;
         const auto resolver = WheelInvoke::actionFor(manifestFor(pair.first), payload);
         for (const auto &type : resolver.value("produces").toArray()) {
-            if (!acceptsType(accepts, type.toString())) continue;
+            if (!selectionCompatible(accepts, type.toString())) continue;
             modes << (pair.first == Ids::Lens ? "lens-selection" : "file-selection"); break;
         }
     }
@@ -415,6 +514,7 @@ QVariantList ArcadeLinkProvider::tools() const
         if (id == Ids::Wheel || m_disabledPeers.contains(id)) continue;
         for (const auto &value : manifest.value("actions").toArray()) {
             auto action = value.toObject();
+            if (id == Ids::Box && (action.value("id").toString() == "box.pipeline.run" || action.value("id").toString() == "box.pipelines")) continue;
             if (!actionUsable(manifest, action)) continue;
             const auto modes = inputModes(action);
             if (modes.isEmpty()) continue;
@@ -422,6 +522,21 @@ QVariantList ArcadeLinkProvider::tools() const
             action.insert("version", action.value("version").toInt(1));
             action.insert("inputModes", QJsonArray::fromStringList(modes));
             action.insert("input", modes.first());
+            action.insert("outbound", outbound(action));
+            action.insert("glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(id));
+            rows.append(action.toVariantMap());
+        }
+        if (id == Ids::Box) for (const auto &pipeline : manifest.value("pipelines").toArray()) {
+            const auto entry = pipeline.toObject();
+            if (entry.value("id").toString().isEmpty() || entry.value("name").toString().isEmpty()) continue;
+            auto action = WheelInvoke::actionFor(manifest, {{"action", "box.pipeline.run"},
+                {"options", QJsonObject{{"pipeline", entry.value("id")}}}});
+            if (action.isEmpty() || !actionUsable(manifest, action)) continue;
+            const auto modes = inputModes(action);
+            if (modes.isEmpty()) continue;
+            action.insert("app", id); action.insert("appName", appName(id));
+            action.insert("version", action.value("version").toInt(1));
+            action.insert("inputModes", QJsonArray::fromStringList(modes)); action.insert("input", modes.first());
             action.insert("outbound", outbound(action));
             action.insert("glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(id));
             rows.append(action.toVariantMap());
@@ -469,8 +584,7 @@ bool ArcadeLinkProvider::execute(const QJsonObject &slot, QString *error)
             WheelInvoke::run(loc, resolverManifest, request, &result, &failure, progress, cancel.get(), timeout);
             if (!failure.isError()) {
                 const auto target = WheelInvoke::actionFor(manifest, payload);
-                for (const auto &value : result.value("outputs").toArray())
-                    if (acceptsContent(target.value("accepts").toArray(), value.toObject())) inputs.append(value);
+                inputs = selectionInputs(target.value("accepts").toArray(), result.value("outputs").toArray());
                 failingApp = manifest.value("id").toString();
                 if (inputs.isEmpty()) failure = Error::make("unsupported_input", {});
             }

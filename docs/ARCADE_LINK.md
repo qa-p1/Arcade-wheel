@@ -12,6 +12,13 @@ assets into `assets/arcade/`. Unavailable saved slots remain in the deck,
 dimmed with the standard reason. They cannot be invoked until repaired or the
 peer becomes available. An incompatible action version needs an app update.
 
+Saved Box pipelines are fetched with `box.pipelines` on a worker and cached.
+Each picker row stores `box.pipeline.run` and `options.pipeline`, and uses the
+pipeline's own input types and effects. `app.changed` or a new endpoint
+refreshes the cache; opening or searching the picker performs no IPC. A removed
+pipeline keeps its saved slot and shows an unavailable reason. The optimized
+screenshot flow uses input `none` and carries the pipeline's ↗ badge.
+
 Schema 4 stores `type: "arcade"` and a payload:
 
 ```json
@@ -39,10 +46,12 @@ Input modes:
   use Wheel-owned private handoff files, removed on success, error or cancel.
 - `lens-selection`: Lens's `lens.capture` runs first; only output types the
   target accepts are passed along. Wheel unmaps before requesting a capture.
-- `file-selection`: only offered off Linux when Look advertises selection
-  outputs accepted by the target. The current Look `look.preview_selection`
-  opens a preview without returning files, so this mode stays hidden. The
-  direct Preview selection action is available on supported platforms.
+- `file-selection`: Look's `look.preview_selection` is called first with
+  `options.resolveOnly: true`, which returns selected files without opening a
+  preview. It is offered only when Look advertises the resolver and file
+  outputs on this platform. Actual file kinds are checked before the target
+  runs; no selection returns Look's unavailable reason. Linux's resolver is
+  currently absent, so this mode is hidden there outside mock tests.
 
 The owner applies its normal grants, confirmations, Private mode and secret
 guard. Outbound actions show ↗ and a payload preview. The Activity window
@@ -88,12 +97,17 @@ given an explicit `ARCADE_HOME`.
 no actions, closes Wheel's listener and hides all peer entries.
 `link.disabledPeers` hides one peer's actions in Wheel only. Settings →
 Connected apps shows every peer and Arcade Tools with its monochrome glyph,
-state and “Use with Arcade Wheel” toggle. Missing apps have one short pitch
+state and “Use with Arcade Wheel” toggle for installed action peers. Arcade
+Tools has no peer toggle. Missing apps have one short pitch
 and Get. Get invokes `tools.install` with `options.app` in an available Arcade
 Tools, launching it if needed; otherwise it opens that app's releases URL
 through `QDesktopServices`. Nothing is opened
 automatically. Diagnostics expands the registry path, Wheel's listener state,
 peer endpoint states and the last errors.
+
+The shortcut recorder compares recorded keys with effective shortcuts in the
+cached registry and warns “Used by Arcade Box” (or the relevant app). It keeps
+the current shortcut until the user chooses another key or confirms Use anyway.
 
 ```sh
 arcade-wheel --arcade-manifest  # print only; never writes defaults
@@ -122,7 +136,7 @@ Private mode and secret errors.
 | Registry / resident and one-shot calls | Real isolated runs | Not run | Not run | Not run |
 | Settings placement | Real Xvfb run | Not run | Not run | Not run |
 | Lens selection | Mock run; real capture owned by Lens | Not run | Not run | Not run |
-| File selection input | Hidden | Hidden | Hidden until Look returns selections | Hidden until Look returns selections |
+| File selection input | Mock run; hidden for real Look | Hidden | Not run | Not run |
 
 Only Linux has been built on this machine. Platform-neutral Qt paths and
 Windows/macOS branches are code-reviewed; cross-platform compilation and real

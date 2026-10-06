@@ -38,6 +38,31 @@ static void onWorker(F &&f)
 class WheelLinkTest final : public QObject {
     Q_OBJECT
 private slots:
+    void statusReportsTheOriginalLaunchMode_data()
+    {
+        QTest::addColumn<bool>("background");
+        QTest::newRow("foreground") << false;
+        QTest::newRow("background") << true;
+    }
+    void statusReportsTheOriginalLaunchMode()
+    {
+        QFETCH(bool, background);
+        QTemporaryDir dir; const auto previous = qgetenv("ARCADE_HOME");
+        qputenv("ARCADE_HOME", dir.filePath("arcade").toUtf8());
+        {
+            LinkBackend backend; WheelController controller(&backend, nullptr, dir.filePath("config.json")); controller.initialize();
+            WheelLink link("1", nullptr, background); link.setController(&controller); link.apply(QJsonObject::fromVariantMap(controller.config()));
+            QTRY_VERIFY(link.listening());
+            Error error; QJsonObject result;
+            onWorker([&] {
+                auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
+                if (client) result = client->call("app.status", {}, &error).toObject();
+            });
+            QVERIFY2(!error.isError(), qPrintable(error.message));
+            QCOMPARE(result.value("status").toObject().value("mode").toString(), background ? QStringLiteral("background") : QStringLiteral("foreground"));
+        }
+        qputenv("ARCADE_HOME", previous);
+    }
     void drafts()
     {
         QString error;

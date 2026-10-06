@@ -10,6 +10,40 @@ class ConfigStoreTest final : public QObject {
     Q_OBJECT
 
 private slots:
+    void savedSchema3FileMigratesOnLoadAndPersists()
+    {
+        // The schema-3 export uses the bridge's original documented payload,
+        // rather than deriving an old file from today's schema-4 defaults.
+        QTemporaryDir dir;
+        const auto path = dir.filePath("config.json");
+        const auto source = QFINDTESTDATA("fixtures/wheel-schema3.json");
+        QVERIFY(!source.isEmpty()); QVERIFY(QFile::copy(source, path));
+        QFile fixture(source); QVERIFY(fixture.open(QIODevice::ReadOnly));
+        const auto original = QJsonDocument::fromJson(fixture.readAll()).object();
+        ConfigStore store(path); QString error;
+        const auto migrated = store.load({}, &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(migrated.value("schemaVersion").toInt(), 4);
+        QCOMPARE(migrated.value("trigger"), original.value("trigger"));
+        const auto actions = migrated.value("decks").toArray().first().toObject().value("actions").toArray();
+        const auto oldActions = original.value("decks").toArray().first().toObject().value("actions").toArray();
+        QCOMPARE(actions.at(1), oldActions.at(1));
+        const auto slot = actions.first().toObject();
+        QCOMPARE(slot.value("id"), oldActions.first().toObject().value("id"));
+        QCOMPARE(slot.value("type").toString(), QStringLiteral("arcade"));
+        const auto payload = slot.value("payload").toObject();
+        QCOMPARE(payload.value("action").toString(), QStringLiteral("box:download-audio"));
+        QCOMPARE(payload.value("legacyPayload"), oldActions.first().toObject().value("payload"));
+        const auto group = migrated.value("centerGestures").toObject().value("doubleClick").toObject();
+        QVERIFY(group.value("enabled").toBool());
+        const auto gesture = group.value("actions").toArray().first().toObject();
+        QCOMPARE(gesture.value("type").toString(), QStringLiteral("arcade"));
+        QCOMPARE(gesture.value("payload").toObject().value("legacyPayload"),
+            original.value("centerGestures").toObject().value("doubleClick").toObject().value("actions").toArray().first().toObject().value("payload"));
+        QFile saved(path); QVERIFY(saved.open(QIODevice::ReadOnly));
+        QCOMPARE(QJsonDocument::fromJson(saved.readAll()).object(), migrated);
+        QCOMPARE(store.load({}), migrated);
+    }
     void boxSlotsMigrateWithoutLosingPayload()
     {
         auto old = ConfigStore::defaults(); old.insert("schemaVersion", 3);

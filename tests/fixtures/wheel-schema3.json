@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 3,
+  "general": {"startOnLogin": false, "showNotifications": false},
+  "trigger": {"shortcut": "Ctrl+Shift+F8", "holdThresholdMs": 120},
+  "decks": [{
+    "id": "saved-deck", "name": "My shortcuts",
+    "actions": [
+      {"id": "box-slot", "type": "arcade_box", "name": "Download Audio", "icon": "audio-x-generic",
+       "payload": {"toolId": "download-audio", "input": "clipboard-url", "preset": "best-audio"}},
+      {"id": "website", "type": "url", "name": "Docs", "icon": "internet-web-browser", "payload": {"url": "https://example.com"}},
+      {"id": "empty-3", "type": "none", "name": "Choose action", "icon": "applications-other", "payload": {}},
+      {"id": "empty-4", "type": "none", "name": "Choose action", "icon": "applications-other", "payload": {}}
+    ]
+  }],
+  "centerGestures": {
+    "clickIntervalMs": 280, "longPressMs": 500,
+    "doubleClick": {"name": "Image routine", "enabled": true, "actions": [
+      {"id": "box-gesture", "type": "arcade_box", "name": "Convert to WebP", "icon": "image-x-generic",
+       "payload": {"toolId": "arcade.image.convert", "input": "clipboard-image", "preset": "webp", "custom": {"quality": 80}}}
+    ]}
+  }
+}

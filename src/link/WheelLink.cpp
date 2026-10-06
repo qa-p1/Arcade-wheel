@@ -12,8 +12,9 @@ using namespace ArcadeLink;
 
 struct WheelLink::PresenceState { std::unique_ptr<Server> server; };
 
-WheelLink::WheelLink(QString version, QObject *parent)
-    : QObject(parent), m_version(std::move(version)), m_locations(Locations::discover()), m_presence(std::make_shared<PresenceState>())
+WheelLink::WheelLink(QString version, QObject *parent, bool background)
+    : QObject(parent), m_version(std::move(version)), m_startMode(background ? "background" : "foreground"),
+      m_locations(Locations::discover()), m_presence(std::make_shared<PresenceState>())
 {
 }
 
@@ -162,7 +163,7 @@ void WheelLink::invoke(const QJsonObject &request, const Responder &responder, c
         return;
     }
     const QJsonObject context = request.value(QStringLiteral("context")).toObject();
-    const QString source = appName(context.value(QStringLiteral("source")).toString(responder.peerId()));
+    const QString source = m_controller->peerDisplayName(context.value(QStringLiteral("source")).toString(responder.peerId()));
     // Nothing is saved until the user picks a slot and confirms in Settings.
     if (!m_controller->beginLinkAction(draft, source)) {
         respond(responder, [](const Responder &r) { r.fail(Error::make(QStringLiteral("busy"), QStringLiteral("another action is waiting to be placed"))); });
@@ -207,13 +208,15 @@ void WheelLink::apply(const QJsonObject &config)
     const auto state = m_presence;
     const auto loc = m_locations;
     const auto version = m_version;
-    QMetaObject::invokeMethod(m_ioWorker, [this, state, loc, version, manifest] {
+    const auto mode = m_startMode;
+    QMetaObject::invokeMethod(m_ioWorker, [this, state, loc, version, manifest, mode] {
         QString error;
         const bool changed = writeManifest(loc, manifest, &error);
         const bool enabled = manifest.value("settings").toObject().value("linkEnabled").toBool();
         if (enabled && !state->server) {
             state->server = std::make_unique<Server>(Ids::Wheel, version, loc);
             state->server->describe = [] { return WheelLink::actions(); };
+            state->server->status = [mode] { return QJsonObject{{"mode", mode}}; };
             state->server->invoke = [this](const QJsonObject &request, const Responder &r) {
                 QString error;
                 QVariantMap draft;

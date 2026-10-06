@@ -159,7 +159,7 @@ int main(int argc, char **argv)
         || QGuiApplication::platformName() == QStringLiteral("minimal");
     std::unique_ptr<WheelLink> link;
     if (!smokeTest && (!headless || !qEnvironmentVariableIsEmpty("ARCADE_HOME"))) {
-        link = std::make_unique<WheelLink>(QStringLiteral(ARCADE_VERSION));
+        link = std::make_unique<WheelLink>(QStringLiteral(ARCADE_VERSION), nullptr, command == QStringLiteral("--background"));
         link->setController(&controller);
         QObject::connect(link.get(), &WheelLink::diagnosticsChanged, &controller, &WheelController::setLinkDiagnostics);
         QTimer::singleShot(0, link.get(), [&] { link->apply(QJsonObject::fromVariantMap(controller.config())); });

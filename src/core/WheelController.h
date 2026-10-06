@@ -60,7 +60,7 @@ public:
     QVariantList arcadeActions() const { return m_dispatcher.arcade().tools(); }
     QVariantList linkJobs() const { return m_linkJobs; }
     QVariantList connectedApps() const { return m_dispatcher.arcade().connectedApps(); }
-    QString peerDisplayName(const QString &app) const;
+    Q_INVOKABLE QString peerDisplayName(const QString &app) const;
     QVariantMap linkDiagnostics() const;
     void setLinkDiagnostics(const QString &endpoint, const QString &error);
     QString triggerStatus() const { return m_triggerStatus; }

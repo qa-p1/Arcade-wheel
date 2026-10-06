@@ -39,11 +39,25 @@ Popup {
         const search = arcadeSearch.text.toLowerCase()
         return (row.appName + " " + row.title + " " + row.id).toLowerCase().indexOf(search) >= 0
     })
-    property var arcadeModes: {
-        const row = controller.arcadeActions.find(function(row) { return picker.sameArcade(row) })
-        let modes = row ? row.inputModes.slice() : []
-        if (arcadePayload.input && modes.indexOf(arcadePayload.input) < 0) modes.push(arcadePayload.input)
-        return modes
+    property var selectedArcade: controller.arcadeActions.find(function(row) { return picker.sameArcade(row) }) || ({})
+    property var arcadeModes: selectedArcade.inputModes || []
+    function inputTitle(mode) {
+        return ({none: "None", clipboard: "Clipboard", "lens-selection": "Lens selection", "file-selection": "File selection"})[mode] || mode
+    }
+    function arcadeSummary() {
+        if (!arcadePayload.app) return "Choose an action"
+        const app = selectedArcade.appName || controller.peerDisplayName(arcadePayload.app)
+        const title = selectedArcade.title || nameField.text || "Saved action"
+        return app + " · " + (arcadePayload.options && arcadePayload.options.pipeline ? "Pipeline · " : "") + title
+    }
+    function effectSummary() {
+        const names = {"sends-to-device": "↗ Sends to your devices", "writes-files": "Writes files", "opens-ui": "Opens a window",
+                       "clipboard": "Uses the clipboard", "overwrites-files": "Overwrites files", "deletes-files": "Deletes files",
+                       "launch-apps": "Launches apps", "executes-commands": "Runs commands", "window-control": "Controls windows",
+                       "persists": "Saves settings", "network": "Uses the network", "uploads-content": "↗ Uploads content"}
+        const effects = selectedArcade.effects || []
+        return ["sends-to-device", "uploads-content", "network", "opens-ui", "launch-apps", "writes-files", "overwrites-files", "deletes-files", "clipboard", "executes-commands", "window-control", "persists"]
+            .filter(function(effect) { return effects.indexOf(effect) >= 0 }).map(function(effect) { return names[effect] }).join(" · ")
     }
     function arcadeSlot() { return {type: "arcade", payload: arcadePayload} }
     function chooseArcade(row) {
@@ -375,13 +389,16 @@ Popup {
                     visible: picker.selectedType === "arcade"
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.maximumHeight: implicitHeight
                     spacing: 7
                     TextField { id: arcadeSearch; Layout.fillWidth: true; placeholderText: "Search Arcade actions" }
                     ListView {
                         id: arcadeList
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.minimumHeight: 100
+                        Layout.preferredHeight: Math.min(contentHeight, 160)
+                        Layout.minimumHeight: Math.min(contentHeight, 38)
+                        Layout.maximumHeight: Math.min(contentHeight, 160)
                         clip: true
                         model: picker.arcadeRows
                         section.property: "appName"
@@ -400,13 +417,21 @@ Popup {
                         }
                     }
                     Text {
-                        Layout.fillWidth: true; color: "#9AA3B2"; font.pixelSize: 11; elide: Text.ElideRight
-                        text: (picker.arcadePayload.app || "") + " · " + (picker.arcadePayload.action || "Choose an action")
+                        Layout.fillWidth: true; color: "#C9BFD9"; font.pixelSize: 12; wrapMode: Text.WordWrap
+                        text: picker.arcadeSummary()
                     }
+                    Text {
+                        visible: text.length > 0
+                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#9AA3B2"; font.pixelSize: 11
+                        text: picker.effectSummary()
+                    }
+                    Text { text: "Input"; color: "#a8b8cb"; font.pixelSize: 12 }
                     ComboBox {
                         Layout.fillWidth: true
-                        model: picker.arcadeModes
+                        model: picker.arcadeModes.map(function(mode) { return picker.inputTitle(mode) })
                         currentIndex: picker.arcadeModes.indexOf(picker.arcadePayload.input || "none")
+                        enabled: picker.arcadeModes.length > 0
+                        displayText: currentIndex < 0 ? "Choose input" : currentText
                         onActivated: function(index) {
                             let payload = JSON.parse(JSON.stringify(picker.arcadePayload))
                             payload.input = picker.arcadeModes[index]
@@ -416,10 +441,6 @@ Popup {
                     Text {
                         Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#e3aab5"; font.pixelSize: 11
                         text: picker.arcadePayload.action ? controller.actionUnavailableReason(picker.arcadeSlot()) : ""
-                    }
-                    Text {
-                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#9AA3B2"; font.pixelSize: 11
-                        text: picker.arcadePayload.options && picker.arcadePayload.options.pipeline ? "Pipeline: " + picker.arcadePayload.options.pipeline : ""
                     }
                 }
                 ColumnLayout {

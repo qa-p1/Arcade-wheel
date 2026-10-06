@@ -435,7 +435,9 @@ QJsonObject ArcadeLinkProvider::manifestFor(const QString &id) const
 QString ArcadeLinkProvider::referenceReason(const QString &id, const QJsonObject &payload) const
 {
     const QString name = appName(id);
-    if (!m_enabled || m_disabledPeers.contains(id)) return standardMessage("denied", name, "disabled");
+    // Switched off here, not in the peer: say where to turn it back on.
+    if (!m_enabled) return QStringLiteral("Connections to other Arcade apps are off in Connected apps.");
+    if (m_disabledPeers.contains(id)) return QStringLiteral("%1 is turned off in Connected apps.").arg(name);
     const auto manifest = manifestFor(id);
     if (manifest.isEmpty()) return standardMessage("not_installed", name);
     if (!manifest.value("settings").toObject().value("linkEnabled").toBool(true)) return standardMessage("denied", name, "disabled");

@@ -113,9 +113,10 @@ private slots:
         QTRY_VERIFY(provider.unavailableReason(image).isEmpty());
         provider.apply({{"enabled", true}, {"disabledPeers", QJsonArray{Ids::Box}}});
         for (const auto &row : provider.tools()) QVERIFY(row.toMap().value("app").toString() != Ids::Box);
-        QCOMPARE(provider.unavailableReason(image), QStringLiteral("Arcade Box has connections to other Arcade apps turned off."));
+        QCOMPARE(provider.unavailableReason(image), QStringLiteral("Arcade Box is turned off in Connected apps."));
         provider.apply({{"enabled", false}});
         QVERIFY(provider.tools().isEmpty());
+        QCOMPARE(provider.unavailableReason(image), QStringLiteral("Connections to other Arcade apps are off in Connected apps."));
         provider.apply({{"enabled", true}});
         QTRY_VERIFY(!provider.tools().isEmpty());
         auto mismatched = image; auto payload = mismatched.value("payload").toObject();

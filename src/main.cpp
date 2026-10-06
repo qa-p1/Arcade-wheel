@@ -161,6 +161,7 @@ int main(int argc, char **argv)
     if (!smokeTest && (!headless || !qEnvironmentVariableIsEmpty("ARCADE_HOME"))) {
         link = std::make_unique<WheelLink>(QStringLiteral(ARCADE_VERSION));
         link->setController(&controller);
+        QObject::connect(link.get(), &WheelLink::diagnosticsChanged, &controller, &WheelController::setLinkDiagnostics);
         QTimer::singleShot(0, link.get(), [&] { link->apply(QJsonObject::fromVariantMap(controller.config())); });
         QObject::connect(&controller, &WheelController::configChanged, link.get(),
                          [&] { link->apply(QJsonObject::fromVariantMap(controller.config())); });

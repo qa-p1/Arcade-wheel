@@ -27,6 +27,8 @@ class WheelController final : public QObject {
     Q_PROPERTY(QVariantList applications READ applications NOTIFY applicationsChanged)
     Q_PROPERTY(QVariantList arcadeActions READ arcadeActions NOTIFY providersChanged)
     Q_PROPERTY(QVariantList linkJobs READ linkJobs NOTIFY linkJobsChanged)
+    Q_PROPERTY(QVariantList connectedApps READ connectedApps NOTIFY providersChanged)
+    Q_PROPERTY(QVariantMap linkDiagnostics READ linkDiagnostics NOTIFY linkDiagnosticsChanged)
     Q_PROPERTY(QString triggerStatus READ triggerStatus NOTIFY triggerStatusChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
     Q_PROPERTY(QString configPath READ configPath CONSTANT)
@@ -55,6 +57,9 @@ public:
     QVariantList applications() const;
     QVariantList arcadeActions() const { return m_dispatcher.arcade().tools(); }
     QVariantList linkJobs() const { return m_linkJobs; }
+    QVariantList connectedApps() const { return m_dispatcher.arcade().connectedApps(); }
+    QVariantMap linkDiagnostics() const;
+    void setLinkDiagnostics(const QString &endpoint, const QString &error);
     QString triggerStatus() const { return m_triggerStatus; }
     QString lastError() const { return m_lastError; }
     QString configPath() const { return m_store.path(); }
@@ -100,6 +105,8 @@ public:
     Q_INVOKABLE QString actionUnavailableReason(const QVariantMap &action) const;
     Q_INVOKABLE void refreshApplications();
     Q_INVOKABLE void refreshProviders();
+    Q_INVOKABLE void setPeerEnabled(const QString &app, bool enabled);
+    Q_INVOKABLE void getArcadeApp(const QString &app);
     Q_INVOKABLE void cancelLinkJob(const QString &job);
     Q_INVOKABLE void dismissLinkJobs();
     Q_INVOKABLE QVariantMap arcadeActionInfo(const QVariantMap &action) const;
@@ -122,6 +129,7 @@ signals:
     void applicationsChanged();
     void providersChanged();
     void linkJobsChanged();
+    void linkDiagnosticsChanged();
     void linkActivityRequested();
     void triggerStatusChanged();
     void lastErrorChanged();
@@ -185,6 +193,8 @@ private:
     QString m_shortcutConflict;
     QString m_triggerStatus;
     QString m_lastError;
+    QString m_linkEndpointState = QStringLiteral("Starting");
+    QString m_linkLastError;
     QVariantList m_linkJobs;
     QVariantMap m_linkDraft;
     QString m_linkSource;

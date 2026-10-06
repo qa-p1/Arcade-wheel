@@ -80,6 +80,7 @@ qt_add_resources(arcade-wheel arcade_qml PREFIX "/" FILES
     qml/settings/Settings.qml
     qml/settings/ActionPicker.qml
     qml/settings/LinkActivity.qml
+    qml/settings/ConnectedAppsPage.qml
     qml/settings/CenterGesturesPage.qml
     qml/components/UiButton.qml
     qml/components/SettingSlider.qml

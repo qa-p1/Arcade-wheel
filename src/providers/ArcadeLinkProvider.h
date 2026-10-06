@@ -33,6 +33,7 @@ public:
     void refreshClipboard();
     QObject *ioWorker() const { return m_worker; }
     void cancel(const QString &job);
+    bool requestInstall(const QString &app);
     QVariantList connectedApps() const;
     QString shortcutOwner(const QString &accelerator) const;
     QJsonObject manifestFor(const QString &app) const;
@@ -40,6 +41,7 @@ public:
 
 signals:
     void changed();
+    void openFailed(const QString &error);
     void jobStarted(const QString &job, const QString &app, const QString &title, const QString &preview, bool outbound);
     void jobProgress(const QString &job, double fraction, const QString &message);
     void jobFinished(const QString &job, const QJsonObject &result, const QString &error);

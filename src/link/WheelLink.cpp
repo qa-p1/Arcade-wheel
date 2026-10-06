@@ -129,6 +129,14 @@ void WheelLink::setController(WheelController *controller)
 
 void WheelLink::invoke(const QJsonObject &request, const Responder &responder, const QVariantMap &draft, const QString &draftError)
 {
+    if (m_controller && !m_controller->config().value("link").toMap().value("enabled", true).toBool()) {
+        respond(responder, [](const Responder &r) { r.fail(Error::make("denied", {}, "disabled")); });
+        return;
+    }
+    if (request.value("version").toInt(1) != 1) {
+        respond(responder, [](const Responder &r) { r.fail(Error::make("version_mismatch", {})); });
+        return;
+    }
     const QString action = request.value(QStringLiteral("action")).toString();
     if (!m_controller) {
         respond(responder, [](const Responder &r) { r.fail(Error::make(QStringLiteral("not_running"), QStringLiteral("Arcade Wheel isn't ready"))); });
@@ -227,7 +235,7 @@ void WheelLink::apply(const QJsonObject &config)
         } else if (!enabled) state->server.reset();
         else if (changed) state->server->notifyChanged();
         const bool live = state->server && state->server->listening();
-        QMetaObject::invokeMethod(this, [this, live, error] { m_listening.store(live); m_lastError = error; });
+        QMetaObject::invokeMethod(this, [this, live, error] { m_listening.store(live); m_lastError = error; emit diagnosticsChanged(live ? QStringLiteral("Listening") : QStringLiteral("Not listening"), error); });
     });
     if (!config.value("link").toObject().value("enabled").toBool(true) && m_controller)
         m_controller->finishLinkAction(false);

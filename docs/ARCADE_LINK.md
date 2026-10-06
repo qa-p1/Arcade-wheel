@@ -86,7 +86,14 @@ given an explicit `ARCADE_HOME`.
 
 `link.enabled` is the master switch. Off publishes an installed manifest with
 no actions, closes Wheel's listener and hides all peer entries.
-`link.disabledPeers` hides one peer's actions in Wheel only.
+`link.disabledPeers` hides one peer's actions in Wheel only. Settings →
+Connected apps shows every peer and Arcade Tools with its monochrome glyph,
+state and “Use with Arcade Wheel” toggle. Missing apps have one short pitch
+and Get. Get invokes `tools.install` with `options.app` in an available Arcade
+Tools, launching it if needed; otherwise it opens that app's releases URL
+through `QDesktopServices`. Nothing is opened
+automatically. Diagnostics expands the registry path, Wheel's listener state,
+peer endpoint states and the last errors.
 
 ```sh
 arcade-wheel --arcade-manifest  # print only; never writes defaults

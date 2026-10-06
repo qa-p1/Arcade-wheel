@@ -3,6 +3,8 @@
 #include "link/WheelLink.h"
 
 #include <QSignalSpy>
+#include <QFile>
+#include <QFileInfo>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QtTest>
@@ -73,6 +75,40 @@ private slots:
             if (value.toObject().value("id").toString() == "wheel.add_action")
                 offered = value.toObject().value("accepts").toArray().contains("structured/arcade-action");
         QVERIFY(offered);
+    }
+
+    void masterSwitchStopsPresenceAndPersistsToggles()
+    {
+        QTemporaryDir dir;
+        const auto previous = qgetenv("ARCADE_HOME");
+        qputenv("ARCADE_HOME", dir.filePath("arcade").toUtf8());
+        {
+            LinkBackend backend;
+            WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+            controller.initialize();
+            WheelLink link("9.9"); link.setController(&controller);
+            connect(&controller, &WheelController::configChanged, &link, [&] { link.apply(QJsonObject::fromVariantMap(controller.config())); });
+            link.apply(QJsonObject::fromVariantMap(controller.config()));
+            QTRY_VERIFY(link.listening());
+            controller.setPeerEnabled(Ids::Box, false);
+            QCOMPARE(controller.config().value("link").toMap().value("disabledPeers").toList(), QVariantList{Ids::Box});
+            controller.updateSetting("link", "enabled", false);
+            QTRY_VERIFY(!link.listening());
+            QTRY_VERIFY(!QFileInfo::exists(link.locations().endpointPath(Ids::Wheel)));
+            QFile manifestFile(link.locations().manifestPath(Ids::Wheel));
+            QVERIFY(manifestFile.open(QIODevice::ReadOnly));
+            auto manifest = QJsonDocument::fromJson(manifestFile.readAll()).object();
+            QVERIFY(!manifest.value("settings").toObject().value("linkEnabled").toBool());
+            QVERIFY(manifest.value("actions").toArray().isEmpty());
+            auto stored = ConfigStore(dir.filePath("config.json")).load({});
+            QVERIFY(!stored.value("link").toObject().value("enabled").toBool());
+            QCOMPARE(stored.value("link").toObject().value("disabledPeers").toArray(), QJsonArray{Ids::Box});
+            controller.setPeerEnabled(Ids::Box, true);
+            controller.updateSetting("link", "enabled", true);
+            QTRY_VERIFY(link.listening());
+            QCOMPARE(controller.config().value("link").toMap().value("disabledPeers").toList(), QVariantList{});
+        }
+        qputenv("ARCADE_HOME", previous);
     }
 
     void addActionWaitsForTheUser()

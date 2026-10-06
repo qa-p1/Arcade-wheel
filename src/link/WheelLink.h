@@ -37,6 +37,9 @@ public:
     QString lastError() const { return m_lastError; }
     const ArcadeLink::Locations &locations() const { return m_locations; }
 
+signals:
+    void diagnosticsChanged(const QString &endpoint, const QString &error);
+
 private:
     void invoke(const QJsonObject &request, const ArcadeLink::Responder &responder, const QVariantMap &draft, const QString &draftError);
     QString m_version;

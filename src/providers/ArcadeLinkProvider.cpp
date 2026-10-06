@@ -501,6 +501,24 @@ void ArcadeLinkProvider::cancel(const QString &job)
     if (m_jobs.contains(job)) m_jobs[job].cancel->store(true);
 }
 
+bool ArcadeLinkProvider::requestInstall(const QString &app)
+{
+    const auto manifest = manifestFor(Ids::Tools);
+    if (!referenceReason(Ids::Tools, {{"action", "tools.install"}, {"version", 1}}).isEmpty()) return false;
+    QMetaObject::invokeMethod(m_worker, [this, manifest, app, loc = m_locations] {
+        Error error; QJsonObject result;
+        const QJsonObject request{{"action", "tools.install"}, {"version", 1},
+            {"inputs", QJsonArray{textContent("text/plain", app)}}, {"options", QJsonObject{{"app", app}}},
+            {"context", QJsonObject{{"source", Ids::Wheel}, {"interactive", true}, {"reason", "user-click"}}}};
+        WheelInvoke::run(loc, manifest, request, &result, &error, {}, nullptr, LaunchTimeoutMs);
+        if (error.isError()) {
+            const auto message = error.userMessage(appName(Ids::Tools));
+            QMetaObject::invokeMethod(this, [this, message] { emit openFailed(message); });
+        }
+    });
+    return true;
+}
+
 QVariantList ArcadeLinkProvider::connectedApps() const
 {
     QVariantList rows;

@@ -4,6 +4,7 @@
 #include "link/WheelInvoke.h"
 
 #include <QCursor>
+#include <QDesktopServices>
 #include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonValue>
@@ -39,6 +40,7 @@ WheelController::WheelController(PlatformBackend *backend, QObject *parent, QStr
     : QObject(parent), m_backend(backend), m_store(std::move(configPath)), m_dispatcher(backend)
 {
     auto &arcade = m_dispatcher.arcade();
+    connect(&arcade, &ArcadeLinkProvider::openFailed, this, [this](const QString &error) { reportError(error); emit actionFailed(error); });
     connect(&arcade, &ArcadeLinkProvider::changed, this, [this] {
         emit providersChanged(); emit currentDeckChanged();
     });
@@ -654,6 +656,33 @@ void WheelController::refreshApplications()
 void WheelController::refreshProviders()
 {
     m_dispatcher.arcade().refresh();
+}
+
+void WheelController::setPeerEnabled(const QString &app, bool enabled)
+{
+    if (!ArcadeLink::Ids::apps().contains(app) && app != ArcadeLink::Ids::Tools) return;
+    auto peers = m_config.value("link").toObject().value("disabledPeers").toArray();
+    for (int i = peers.size() - 1; i >= 0; --i) if (peers.at(i).toString() == app) peers.removeAt(i);
+    if (!enabled) peers.append(app);
+    updateSetting("link", "disabledPeers", peers.toVariantList());
+}
+
+void WheelController::getArcadeApp(const QString &app)
+{
+    if (!ArcadeLink::Ids::apps().contains(app) && app != ArcadeLink::Ids::Tools) return;
+    if (!m_dispatcher.arcade().requestInstall(app))
+        QDesktopServices::openUrl(QUrl(ArcadeLink::releasesUrl(app)));
+}
+
+QVariantMap WheelController::linkDiagnostics() const
+{
+    return {{"registry", m_dispatcher.arcade().locations().registry}, {"endpoint", m_linkEndpointState}, {"lastError", m_linkLastError}};
+}
+
+void WheelController::setLinkDiagnostics(const QString &endpoint, const QString &error)
+{
+    m_linkEndpointState = endpoint; m_linkLastError = error;
+    emit linkDiagnosticsChanged();
 }
 
 void WheelController::cancelLinkJob(const QString &job) { m_dispatcher.arcade().cancel(job); }

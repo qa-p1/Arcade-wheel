@@ -511,7 +511,7 @@ QVariantList ArcadeLinkProvider::tools() const
     for (const auto &value : m_manifests) {
         const auto manifest = value.toObject();
         const auto id = manifest.value("id").toString();
-        if (id == Ids::Wheel || m_disabledPeers.contains(id)) continue;
+        if (id == Ids::Wheel || id == Ids::Tools || m_disabledPeers.contains(id)) continue;
         for (const auto &value : manifest.value("actions").toArray()) {
             auto action = value.toObject();
             if (id == Ids::Box && (action.value("id").toString() == "box.pipeline.run" || action.value("id").toString() == "box.pipelines")) continue;
@@ -642,6 +642,7 @@ QVariantList ArcadeLinkProvider::connectedApps() const
         if (id == Ids::Wheel) continue;
         const auto manifest = manifestFor(id);
         const bool installed = !manifest.isEmpty();
+        if (id == Ids::Tools && installed) continue; // Its row only offers Get Arcade Tools.
         const auto state = m_states.value(id).toString();
         rows.append(QVariantMap{{"id", id}, {"name", appName(id)}, {"pitch", appPitch(id)},
             {"glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(id)},

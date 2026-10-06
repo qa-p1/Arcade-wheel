@@ -194,6 +194,8 @@ private slots:
         MockPeer tools; QVERIFY(tools.start(Ids::Tools, writeFixture(*root, json), log));
         ArcadeLinkProvider provider; provider.apply({{"enabled", true}});
         QTRY_VERIFY_WITH_TIMEOUT(!provider.manifestFor(Ids::Tools).isEmpty(), 5000);
+        QVERIFY(provider.tools().isEmpty()); // Tools manages installation, not Wheel actions.
+        for (const auto &row : provider.connectedApps()) QVERIFY(row.toMap().value("id") != Ids::Tools);
         QSignalSpy errors(&provider, &ArcadeLinkProvider::openFailed);
         QVERIFY(provider.requestInstall(Ids::Lens));
         QTRY_COMPARE_WITH_TIMEOUT(invocations(log).size(), 1, 5000);

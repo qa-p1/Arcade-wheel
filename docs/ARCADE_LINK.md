@@ -143,7 +143,16 @@ cmake --build build -j3
 python3 ../../Rust/Arcade-link/tools/e2e.py run -- env QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 python3 ../../Rust/Arcade-link/tools/e2e.py --only wheel
 python3 ../../Rust/Arcade-link/tools/e2e.py --only failure
+python3 ../../Rust/Arcade-link/tools/e2e.py run -- python3 tests/verify-wheel.py
+python3 ../../Rust/Arcade-link/tools/e2e.py run -- python3 tests/verify-wheel.py --with-peers
 ```
+
+The last two commands launch the normal `build/arcade-wheel --background`,
+first alone and then with the four real action peers. They verify fresh and
+schema-3 configs, saved actions and shortcuts, background status, the wheel
+and Settings. Screenshots are saved to `ARCADE_E2E_SHOTS` when set, or the
+isolated session's temporary root. All child processes have their own sessions;
+the check terminates only PIDs it started.
 
 The real Xvfb tests check wheel.show, Settings confirm/cancel/close, a saved
 Box text pipeline with a clipboard slot, and Look's ordinary file preview. The

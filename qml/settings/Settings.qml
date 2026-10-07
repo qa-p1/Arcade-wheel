@@ -94,7 +94,7 @@ Rectangle {
                         }
                         RowLayout {
                             Layout.fillWidth: true
-                            Text { text: "Hold to open"; color: "#777484"; font.pixelSize: 10; Layout.fillWidth: true }
+                            Text { text: "Hold to open"; color: "#777484"; font.pixelSize: 10; Layout.fillWidth: true; Layout.minimumWidth: 0; wrapMode: Text.WordWrap }
                             Rectangle {
                                 implicitWidth: shortcutLabel.implicitWidth+14; height: 23; radius: 5; color: "#292833"; border.color: "#35333f"
                                 Text { id: shortcutLabel; anchors.centerIn: parent; text: controller.config.trigger.shortcut; font.pixelSize: 10; color: "#c1bace" }

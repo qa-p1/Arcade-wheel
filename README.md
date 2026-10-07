@@ -48,6 +48,12 @@ Builds currently have no publisher certificate: Windows installers are unsigned 
 - **Plain JSON config**, saved atomically, with versioned migrations and import/export.
 - **Quiet UI.** The wheel shows action icons, a center label, and deck dots. Nothing else.
 
+## Works with other Arcade apps
+
+Search actions from Arcade Box, Lens, Look and Clipboard in the action picker. Bind a tool, preset or saved Box pipeline to a slot, using the clipboard, a Lens selection, or a supported file-manager selection as input. The picker shows the action's effects, including ↗ for actions that send content out.
+
+**Settings → Connected apps** controls discovery and individual peers. Wheel works on its own; missing or disabled peers leave saved slots intact with a reason. Other apps can offer an action through `wheel.add_action`, which opens a draft and requires a chosen slot and confirmation. `wheel.show` opens the wheel. See [Arcade Link actions and platform support](docs/ARCADE_LINK.md).
+
 ## Requirements
 
 - CMake 3.25+ and a C++20 compiler
@@ -130,8 +136,6 @@ The configuration is a versioned JSON file. Its path is shown on the **General**
 
 Commands run as a program plus arguments, not through a shell. Use `sh -c '…'` explicitly if you need shell syntax.
 
-Arcade Wheel optionally discovers Box, Lens, Look and Clipboard through [Arcade Link](docs/ARCADE_LINK.md). Search their actions in the picker, bind a tool or pipeline, and supply the clipboard or a Lens selection. Registry updates and jobs run off the UI thread; unavailable saved slots retain their reason. Wheel works on its own without any peers.
-
 ## Platform notes
 
 - **Wayland:** global press and release events come from the XDG GlobalShortcuts portal. LayerShellQt provides the overlay layer.
@@ -146,11 +150,11 @@ Arcade Wheel optionally discovers Box, Lens, Look and Clipboard through [Arcade 
 src/core/        WheelController (interaction state machine), WheelLogic (selection math)
 src/config/      ConfigStore: defaults, migration, validation, atomic save, import/export
 src/actions/     ActionDispatcher: built-in action routing
-src/providers/   ActionProvider interface and the Arcade Box provider
+src/providers/   ActionProvider interface and asynchronous Arcade Link discovery/jobs
 src/platform/    Linux, Windows, and macOS desktop integration backends
 qml/             Wheel overlay, settings UI, shared components
 tests/           Qt Test suites (run with ctest)
-docs/            Architecture, manual release checks, Arcade Box bridge
+docs/            Architecture, manual release checks, Arcade Link actions
 ```
 
 See [architecture](docs/ARCHITECTURE.md) and [manual release checks](docs/MANUAL_TESTING.md) for more detail.

@@ -18,6 +18,9 @@ pipeline's own input types and effects. `app.changed` or a new endpoint
 refreshes the cache; opening or searching the picker performs no IPC. A removed
 pipeline keeps its saved slot and shows an unavailable reason. The optimized
 screenshot flow uses input `none` and carries the pipeline's ↗ badge.
+The Input selector uses readable labels and lists only modes the action and
+selection resolver support on this platform. The detail area shows the app,
+action or pipeline name, and effects rather than protocol IDs.
 
 Schema 4 stores `type: "arcade"` and a payload:
 
@@ -75,6 +78,19 @@ unavailable, with their reason visible. Nothing arriving over Link silently
 changes a deck. Commands become direct executable invocations, never shell
 strings. Failed saves leave the caller's request pending.
 
+For example, these calls use the debug CLI against a running Wheel:
+
+```sh
+arcade-link invoke wheel wheel.show
+arcade-link invoke wheel wheel.add_action --text '/usr/bin/printf "Hello"' --hint command
+```
+
+Wheel advertises both actions at version 1. Its `app.status` callback includes
+`status.mode: "background"` when started with `--background`, and
+`status.mode: "foreground"` for Settings/default launches. Arcade Tools uses
+the initial launch mode when relaunching after an update. Opening Settings
+later does not change that mode.
+
 ## Discovery and execution
 
 Registry reads, endpoint authentication, subscriptions, manifest writes and
@@ -84,8 +100,9 @@ editor or recording a shortcut reads the cache only. There is no idle timer
 or polling. Bounded waits occur only during a user-requested invocation,
 startup authentication or cancellation of a pending add request.
 
-The Qt v1 module is unchanged in `src/link/ArcadeLink.{h,cpp}` and pinned by
-`VENDORED.json`; `packaging/check-link-vendor.py` checks its checksums.
+The Qt v1 module is unchanged in `src/link/ArcadeLink.{h,cpp}` and pinned to
+Arcade-link commit `539fa91` by `VENDORED.json`. The vendor check compares its
+checksums with that commit, alongside the vectors and release generator.
 `WheelInvoke` supplies bounded jobs and one-shot deadlines around that pinned
 protocol. `ARCADE_HOME` redirects registry, endpoints and handoff storage.
 Smoke-test/offscreen instances never publish to the real registry unless
@@ -98,11 +115,14 @@ no actions, closes Wheel's listener and hides all peer entries.
 `link.disabledPeers` hides one peer's actions in Wheel only. Settings →
 Connected apps shows every peer with its monochrome glyph,
 state and “Use with Arcade Wheel” toggle for installed action peers. Arcade
-Tools appears only when its Get option is useful, with no peer toggle. Missing apps have one short pitch
+Tools appears only when its Get option is useful, with no peer toggle.
+Missing apps have one short pitch
 and Get. Get invokes `tools.install` with `options.app` in an available Arcade
 Tools, launching it if needed; otherwise it opens that app's releases URL
 through `QDesktopServices`. Nothing is opened
-automatically. Diagnostics expands the registry path, Wheel's listener state,
+automatically. A local peer switch reports “Arcade Box is turned off in
+Connected apps.”; the local master switch reports “Connections to other
+Arcade apps are off in Connected apps.” Diagnostics expands the registry path, Wheel's listener state,
 peer endpoint states and the last errors.
 
 The shortcut recorder compares recorded keys with effective shortcuts in the
@@ -119,17 +139,22 @@ arcade-wheel --version
 Use the isolated runner for every app or GUI test:
 
 ```sh
-cmake --build build
+cmake --build build -j3
 python3 ../../Rust/Arcade-link/tools/e2e.py run -- env QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
 python3 ../../Rust/Arcade-link/tools/e2e.py --only wheel
+python3 ../../Rust/Arcade-link/tools/e2e.py --only failure
 ```
 
-The real Xvfb test checks wheel.show and Settings confirm/cancel/close. The
+The real Xvfb tests check wheel.show, Settings confirm/cancel/close, a saved
+Box text pipeline with a clipboard slot, and Look's ordinary file preview. The
 provider suite runs `arcade-link mock` using copied Box/Lens fixtures; the CLI
 must be on PATH (otherwise those cases explicitly skip). It covers standalone
 absence, late peers, toggles, migration, pipeline options, selection chaining,
 progress, UI responsiveness, cancellation, size limits, peer crash, timeout,
 Private mode and secret errors.
+The failure group verifies crash, cancel, busy/forced quit, broken registry
+entries and stale endpoint recovery, including killing and restarting real
+Wheel. Windows/macOS packaging and runtime checks have not been run here.
 
 | Feature | Linux X11 | Linux Wayland | Windows | macOS |
 |---|---|---|---|---|

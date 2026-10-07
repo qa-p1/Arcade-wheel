@@ -2,18 +2,20 @@
 """Check the vendored Arcade Link files against src/link/VENDORED.json.
 
 Wheel vendors the Qt implementation of Arcade Link (src/link/ArcadeLink.*)
-and its conformance vectors (tests/link-vectors/). VENDORED.json pins the
+its conformance vectors (tests/link-vectors/) and the release generator.
+VENDORED.json pins the
 Arcade-link version they came from and their SHA-256 sums.
 
     python3 packaging/check-link-vendor.py            # files match the pins
     python3 packaging/check-link-vendor.py --update   # re-pin after copying
     python3 packaging/check-link-vendor.py --source ../../Rust/Arcade-link
-                                                      # also compare with a checkout
+                                                      # compare at the pinned commit
 """
 
 import argparse
 import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,6 +24,7 @@ PIN = ROOT / "src/link/VENDORED.json"
 FILES = {
     "src/link/ArcadeLink.h": "qt/ArcadeLink.h",
     "src/link/ArcadeLink.cpp": "qt/ArcadeLink.cpp",
+    "scripts/arcade-release.py": "tools/arcade-release.py",
 }
 FILES.update({f"tests/link-vectors/{p.name}": f"spec/vectors/{p.name}" for p in sorted((ROOT / "tests/link-vectors").glob("*.json"))})
 
@@ -43,13 +46,17 @@ def main() -> int:
         print(f"pinned {len(current)} files")
         return 0
     pin = json.loads(PIN.read_text())
+    revision = pin.get("commit", "")
     problems = [f"{n}: changed since it was vendored" for n, h in current.items() if pin["files"].get(n) != h]
     problems += [f"{n}: pinned but missing" for n in pin["files"] if n not in current]
     if args.source:
+        if len(revision) != 40 or any(c not in "0123456789abcdef" for c in revision):
+            problems.append("VENDORED.json must pin a full Arcade-link commit")
         for name, upstream in FILES.items():
-            src = args.source / upstream
-            if not src.exists() or sha(src) != current[name]:
-                problems.append(f"{name}: differs from {src}")
+            source = subprocess.run(["git", "-C", str(args.source), "show", f"{revision}:{upstream}"],
+                                    capture_output=True)
+            if source.returncode or hashlib.sha256(source.stdout).hexdigest() != current[name]:
+                problems.append(f"{name}: differs from {upstream} at {revision}")
     for problem in problems:
         print(problem, file=sys.stderr)
     if not problems:

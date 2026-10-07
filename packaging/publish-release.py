@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
 """Publish the complete, verified package set from a successful CI run."""
 import argparse
-import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
+import sys
 import tempfile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+GENERATOR = ROOT / "scripts/arcade-release.py"
+spec = importlib.util.spec_from_file_location("arcade_release", GENERATOR)
+generator = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(generator)
 
 
 def project_version(path):
@@ -31,26 +40,66 @@ def release_tag(version, ref, run_number):
     raise ValueError("Only main and a version tag matching CMakeLists.txt may publish")
 
 
-def verified_assets(directory, version):
+def package_names(version):
     prefix = f"ArcadeWheel-{version}-"
-    filenames = [prefix + suffix for suffix in (
+    return [prefix + suffix for suffix in (
         "Windows-x64-Setup.exe", "Windows-x64.zip", "Linux-x86_64.AppImage",
         "macOS-arm64.dmg", "macOS-x86_64.dmg")]
-    expected = set(filenames + [name + ".sha256" for name in filenames])
+
+
+def verified_bundle(directory, version, release_version=None, complete=False):
+    required = set(package_names(version))
     actual = {path.name for path in directory.iterdir()}
+    filenames = sorted(required if complete else actual & required)
+    expected = set(filenames) | {"SHA256SUMS.txt", "arcade-release.json"}
     if actual != expected:
         raise ValueError(f"Incomplete or unexpected release assets: missing={sorted(expected - actual)}, "
                          f"unexpected={sorted(actual - expected)}")
+    if not filenames:
+        raise ValueError("No packages in release bundle")
     for name in filenames:
         package = directory / name
-        checksum = directory / (name + ".sha256")
         if not package.is_file() or package.stat().st_size == 0:
             raise ValueError(f"Empty or invalid package: {name}")
-        with package.open("rb") as stream:
-            digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        if checksum.read_text(encoding="utf-8-sig").strip() != f"{digest}  {name}":
-            raise ValueError(f"Checksum mismatch: {name}")
+    manifest = json.loads((directory / "arcade-release.json").read_text(encoding="utf-8-sig"))
+    wanted, sums = generator.build("arcade.wheel", release_version or version, "stable",
+                                   manifest.get("notes", ""), directory, "inno")
+    if (directory / "SHA256SUMS.txt").read_text(encoding="utf-8-sig") != sums:
+        raise ValueError("Checksum mismatch in SHA256SUMS.txt")
+    if manifest != wanted:
+        raise ValueError("Release manifest mismatch (identity, version, platforms, hashes or installer flags)")
     return [directory / name for name in sorted(expected)]
+
+
+def verified_assets(directory, version, release_version=None):
+    return verified_bundle(directory, version, release_version, complete=True)
+
+
+def collect_assets(bundles, directory, version):
+    """Verify each CI artifact before copying its packages into one release set."""
+    packages = {}
+    for bundle in sorted(bundles.iterdir()):
+        if not bundle.is_dir():
+            raise ValueError(f"Unexpected artifact: {bundle.name}")
+        for path in verified_bundle(bundle, version):
+            if path.name in generator.OUTPUTS:
+                continue
+            if path.name in packages:
+                raise ValueError(f"Duplicate package: {path.name}")
+            packages[path.name] = path
+    if set(packages) != set(package_names(version)):
+        raise ValueError("Incomplete platform artifacts; all five packages are required")
+    if directory.exists() and any(directory.iterdir()):
+        raise ValueError("The combined release directory must be empty")
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, path in packages.items():
+        shutil.copyfile(path, directory / name)
+
+
+def write_metadata(directory, version, notes):
+    subprocess.run([sys.executable, str(GENERATOR), "--id", "arcade.wheel", "--version", version,
+                    "--channel", "stable", "--notes", notes, "--windows-installer", "inno",
+                    str(directory)], check=True)
 
 
 def gh(*arguments):
@@ -109,7 +158,8 @@ def publish(repository, version, tag, commit, assets, run_url, run_number):
         "- **Windows x64:** run `Windows-x64-Setup.exe`, or extract the entire portable ZIP.\n"
         "- **Linux x86_64:** make the AppImage executable and launch it.\n"
         "- **macOS 13+:** open the DMG matching your processor and drag the app to Applications.\n\n"
-        "Qt and the application runtime are bundled. SHA-256 checksums accompany each package.\n\n"
+        "Qt and the application runtime are bundled. Verify downloads with `SHA256SUMS.txt`; "
+        "`arcade-release.json` supplies Arcade Tools with package hashes and installer details.\n\n"
         "Windows packages are unsigned; macOS packages are ad-hoc signed, without notarization.\n"
     )
     with tempfile.TemporaryDirectory(prefix="arcade-release-") as temporary:
@@ -145,6 +195,7 @@ def publish(repository, version, tag, commit, assets, run_url, run_number):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifacts", type=Path, required=True)
+    parser.add_argument("--bundles", type=Path, help="Separate downloaded CI artifact directories")
     parser.add_argument("--commit", required=True)
     parser.add_argument("--ref", required=True)
     parser.add_argument("--run-number", type=int, required=True)
@@ -152,8 +203,12 @@ def main():
     args = parser.parse_args()
     version = project_version(Path(__file__).resolve().parents[1] / "CMakeLists.txt")
     tag = release_tag(version, args.ref, args.run_number)
-    assets = verified_assets(args.artifacts, version)
-    url = publish(os.environ["GH_REPO"], version, tag, args.commit,
+    repository = os.environ["GH_REPO"]
+    if args.bundles:
+        collect_assets(args.bundles, args.artifacts, version)
+        write_metadata(args.artifacts, tag[1:], f"https://github.com/{repository}/releases/tag/{tag}")
+    assets = verified_assets(args.artifacts, version, tag[1:])
+    url = publish(repository, version, tag, args.commit,
                   assets, args.run_url, args.run_number)
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary, "a") as stream:

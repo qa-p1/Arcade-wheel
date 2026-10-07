@@ -39,5 +39,7 @@ python3 "$repo/packaging/smoke-test.py" "$app/Contents/MacOS/arcade-wheel"
 ln -s /Applications "$stage/Applications"
 filename="ArcadeWheel-$version-macOS-$architecture.dmg"
 hdiutil create -volname 'Arcade Wheel' -srcfolder "$stage" -ov -format UDZO "$output/$filename"
-(cd "$output" && shasum -a 256 "$filename" > "$filename.sha256")
+python3 "$repo/scripts/arcade-release.py" --id arcade.wheel --version "$version" \
+    --channel stable --windows-installer inno \
+    --notes "https://github.com/qa-p1/Arcade-wheel/releases/tag/v$version" "$output"
 printf 'Created %s\n' "$output/$filename"

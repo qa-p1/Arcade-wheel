@@ -1,7 +1,9 @@
 """Release publication must never expose partial, unverified packages."""
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -22,8 +24,7 @@ class ReleaseTests(unittest.TestCase):
             name = f"ArcadeWheel-0.2.0-{suffix}"
             data = name.encode()
             (self.directory / name).write_bytes(data)
-            (self.directory / (name + ".sha256")).write_text(
-                f"{hashlib.sha256(data).hexdigest()}  {name}\n")
+        release.write_metadata(self.directory, "0.2.0", "https://example.com/release")
         self.commit = "a" * 40
         self.tag = "v0.2.0+build.15"
 
@@ -45,7 +46,7 @@ class ReleaseTests(unittest.TestCase):
                 release.release_tag("0.2.0", ref, 15)
 
     def test_all_five_packages_and_checksums_are_required(self):
-        self.assertEqual(len(release.verified_assets(self.directory, "0.2.0")), 10)
+        self.assertEqual(len(release.verified_assets(self.directory, "0.2.0")), 7)
         (self.directory / "ArcadeWheel-0.2.0-macOS-arm64.dmg").unlink()
         with self.assertRaisesRegex(ValueError, "missing"):
             release.verified_assets(self.directory, "0.2.0")
@@ -54,6 +55,87 @@ class ReleaseTests(unittest.TestCase):
         (self.directory / "ArcadeWheel-0.2.0-Windows-x64-Setup.exe").write_bytes(b"corrupt")
         with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
             release.verified_assets(self.directory, "0.2.0")
+
+    def bundles(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        for platform in ("Windows-x64", "Linux-x86_64", "macOS-arm64", "macOS-x86_64"):
+            bundle = root / platform
+            bundle.mkdir()
+            for path in self.directory.glob(f"ArcadeWheel-0.2.0-{platform}*"):
+                shutil.copyfile(path, bundle / path.name)
+            release.write_metadata(bundle, "0.2.0", "https://example.com/release")
+        return root
+
+    def test_manifest_and_checksums_cover_installer_and_portable_downloads(self):
+        release.write_metadata(self.directory, self.tag[1:], "https://example.com/release")
+        release.verified_assets(self.directory, "0.2.0", self.tag[1:])
+        manifest = json.loads((self.directory / "arcade-release.json").read_text())
+        self.assertEqual(manifest["version"], "0.2.0+build.15")
+        self.assertEqual(manifest["id"], "arcade.wheel")
+        self.assertEqual(manifest["linkProtocol"], [1])
+        self.assertEqual(len(manifest["assets"]), 4)
+        windows = next(asset for asset in manifest["assets"] if asset["os"] == "windows")
+        self.assertEqual(windows["kind"], "inno")
+        self.assertEqual(windows["silent"], ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER"])
+        self.assertEqual({(a["os"], a["arch"]) for a in manifest["assets"]},
+                         {("windows", "x64"), ("linux", "x64"), ("macos", "arm64"), ("macos", "x64")})
+        lines = (self.directory / "SHA256SUMS.txt").read_text().splitlines()
+        self.assertEqual(len(lines), 5)
+        for line in lines:
+            digest, name = line.split("  ", 1)
+            self.assertEqual(digest, hashlib.sha256((self.directory / name).read_bytes()).hexdigest())
+        self.assertTrue(any(line.endswith("Windows-x64.zip") for line in lines))
+        self.assertFalse(any(asset["file"].endswith(".zip") for asset in manifest["assets"]))
+
+    def test_incorrect_identity_and_installer_flags_are_rejected(self):
+        path = self.directory / "arcade-release.json"
+        original = json.loads(path.read_text())
+        for change in ("identity", "installer"):
+            manifest = json.loads(json.dumps(original))
+            if change == "identity":
+                manifest["id"] = "arcade.look"
+            else:
+                windows = next(asset for asset in manifest["assets"] if asset["os"] == "windows")
+                windows["silent"] = ["/S"]
+            path.write_text(json.dumps(manifest))
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, "manifest mismatch"):
+                release.verified_assets(self.directory, "0.2.0")
+
+    def test_legacy_sidecars_are_rejected(self):
+        (self.directory / "old.AppImage.sha256").write_text("obsolete")
+        with self.assertRaisesRegex(ValueError, "unexpected"):
+            release.verified_assets(self.directory, "0.2.0")
+
+    def test_bundle_merge_verifies_then_generates_one_complete_manifest(self):
+        bundles = self.bundles()
+        output = bundles.parent / (bundles.name + "-combined")
+        self.addCleanup(shutil.rmtree, output, ignore_errors=True)
+        release.collect_assets(bundles, output, "0.2.0")
+        release.write_metadata(output, self.tag[1:], "https://example.com/release")
+        self.assertEqual(len(release.verified_assets(output, "0.2.0", self.tag[1:])), 7)
+
+    def test_corrupt_bundle_is_rejected_before_rehashing_or_copying(self):
+        bundles = self.bundles()
+        next((bundles / "Windows-x64").glob("*.exe")).write_bytes(b"corrupt")
+        output = bundles / "combined"
+        with self.assertRaisesRegex(ValueError, "Checksum mismatch"):
+            release.collect_assets(bundles, output, "0.2.0")
+        self.assertFalse(output.exists())
+
+    def test_missing_and_duplicate_bundles_are_rejected(self):
+        bundles = self.bundles()
+        arm = bundles / "macOS-arm64"
+        parked = bundles.parent / (bundles.name + "-parked")
+        self.addCleanup(shutil.rmtree, parked, ignore_errors=True)
+        arm.rename(parked)
+        with self.assertRaisesRegex(ValueError, "all five packages"):
+            release.collect_assets(bundles, bundles / "combined", "0.2.0")
+        parked.rename(arm)
+        shutil.copytree(bundles / "Windows-x64", bundles / "duplicate")
+        with self.assertRaisesRegex(ValueError, "Duplicate package"):
+            release.collect_assets(bundles, bundles / "combined", "0.2.0")
 
     def test_upload_finishes_before_stable_publication(self):
         published = {"draft": False, "prerelease": False, "html_url": "https://example.com/release"}

@@ -67,5 +67,7 @@ export OUTPUT="$output/ArcadeWheel-$version-Linux-x86_64.AppImage"
     --icon-file "$repo/assets/arcade-wheel.svg" --plugin qt --output appimage
 test -s "$OUTPUT"
 python3 "$repo/packaging/smoke-test.py" "$OUTPUT"
-(cd "$output" && sha256sum "$(basename "$OUTPUT")" > "$(basename "$OUTPUT").sha256")
+python3 "$repo/scripts/arcade-release.py" --id arcade.wheel --version "$version" \
+    --channel stable --windows-installer inno \
+    --notes "https://github.com/qa-p1/Arcade-wheel/releases/tag/v$version" "$output"
 printf 'Created %s\n' "$OUTPUT"

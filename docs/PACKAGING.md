@@ -4,7 +4,7 @@ The [workflow](../.github/workflows/ci.yml) builds a Release configuration, runs
 
 ## Triggers and downloads
 
-- Every successful push to `main` publishes a **stable GitHub Release** with the Windows setup EXE and portable ZIP, Linux AppImage, both macOS DMGs, and all five checksums. CI artifacts are also retained for 30 days; release downloads do not have that artifact expiry.
+- Every successful push to `main` publishes a **stable GitHub Release** with the Windows setup EXE and portable ZIP, Linux AppImage, both macOS DMGs, one `SHA256SUMS.txt`, and `arcade-release.json`. CI artifacts are also retained for 30 days; release downloads do not have that artifact expiry.
 - Pull requests targeting `main` run the same checks and packaging. Superseded PR runs are cancelled.
 - **Run workflow** starts a manual build; successful runs on `main` also publish a stable release.
 - Main releases use `vX.Y.Z+build.N`, where `X.Y.Z` is the version in `CMakeLists.txt` and `N` is the GitHub Actions run number. Build metadata gives each run a unique tag without modifying source files or creating a commit loop. These releases are explicitly marked stable, not prereleases. Installer filenames and the installed application's version retain `X.Y.Z`.
@@ -12,6 +12,15 @@ The [workflow](../.github/workflows/ci.yml) builds a Release configuration, runs
 - Pull requests, failed jobs, and cancelled runs never publish releases. A rerun preserves an already published release. Interrupted uploads leave a draft and can be retried. A slower build of an older commit cannot replace a newer release as **Latest**.
 
 Use [Releases](https://github.com/qa-p1/Arcade-wheel/releases) for direct installer downloads. Release notes link to the exact tested commit and CI run and include GitHub-generated change notes. All five packages are checksum-verified before upload, and the complete upload is checked before the draft is published. Alternatively, choose an Actions run and download its platform **Artifacts**; GitHub wraps these in ZIPs.
+
+Each platform artifact includes its own checksum list and manifest. The release job downloads these into separate directories, verifies every original package, then combines the five packages and regenerates one manifest and checksum list. Corrupt, missing or duplicate packages stop publication. The manifest uses the full release version, including `+build.N`, and describes the four installable packages; the portable ZIP is also checksummed. Windows entries use Inno's `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER` flags.
+
+The metadata generator is vendored unchanged from Arcade-link commit `539fa91`; see `scripts/VENDORED`. CI compares it, the Qt module and the conformance vectors with the pinned commit in `src/link/VENDORED.json`. The owner must publish that Arcade-link commit to `qa-p1/Arcade-link` before enabling this workflow on GitHub. A local source comparison needs no network:
+
+```sh
+python3 packaging/check-link-vendor.py --source ../../Rust/Arcade-link
+python3 -m unittest discover -s tests -p 'test_release.py' -v
+```
 
 No repository secrets are needed for unsigned builds. Build jobs have read-only repository permissions; only the release job gets `contents: write`. The built-in `GITHUB_TOKEN` publishes releases and creates tags without triggering another CI run. GitHub Actions must be enabled. Actions and downloaded Linux packaging tools/dependency sources are pinned to revisions or checksums. Qt is fixed at 6.8.3; upgrade Qt and rebuild LayerShellQt together because the latter uses Qt's private API.
 
@@ -69,10 +78,10 @@ Windows code signing and Apple Developer ID signing/notarization need the publis
 Verify a downloaded file against its accompanying checksum:
 
 ```sh
-sha256sum -c ArcadeWheel-0.2.0-Linux-x86_64.AppImage.sha256
-shasum -a 256 -c ArcadeWheel-0.2.0-macOS-arm64.dmg.sha256
+sha256sum --ignore-missing -c SHA256SUMS.txt
+shasum -a 256 -c SHA256SUMS.txt
 ```
 
-On Windows, use `Get-FileHash .\ArcadeWheel-0.2.0-Windows-x64-Setup.exe -Algorithm SHA256` and compare with the `.sha256` file.
+On Windows, use `Get-FileHash .\ArcadeWheel-0.2.0-Windows-x64-Setup.exe -Algorithm SHA256` and compare with its line in `SHA256SUMS.txt`. On macOS, entries for packages you did not download will report missing files; check the downloaded DMG's result.
 
 The dependency deployment follows [Qt's Windows deployment](https://doc.qt.io/qt-6/windows-deployment.html), [Qt's macOS deployment](https://doc.qt.io/qt-6/macos-deployment.html), and the [linuxdeploy Qt plugin](https://github.com/linuxdeploy/linuxdeploy-plugin-qt) documentation.

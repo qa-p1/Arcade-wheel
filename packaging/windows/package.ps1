@@ -108,11 +108,10 @@ try {
     }
     Move-Item -LiteralPath $temporaryArchivePath -Destination $archivePath -Force
 
-    Get-ChildItem -LiteralPath $outputPath -File | Where-Object { $_.Name -in @("$packageName.zip", "$packageName-Setup.exe") } |
-        ForEach-Object {
-            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            [System.IO.File]::WriteAllText($_.FullName + ".sha256", "$hash  $($_.Name)`n")
-        }
+    & python (Join-Path $repositoryRoot "scripts\arcade-release.py") --id arcade.wheel `
+        --version $Version --channel stable --windows-installer inno `
+        --notes "https://github.com/qa-p1/Arcade-wheel/releases/tag/v$Version" $outputPath
+    if ($LASTEXITCODE -ne 0) { throw "Release metadata generation failed." }
 
     Write-Host "Created $archivePath"
 }

@@ -7,6 +7,8 @@
 #include "platform/macos/MacOSBackend.h"
 #else
 #include "platform/linux/LinuxBackend.h"
+#include <QDBusConnection>
+#include <QDBusServiceWatcher>
 #endif
 
 #include <QApplication>
@@ -258,13 +260,23 @@ int main(int argc, char **argv)
                                    .value(QStringLiteral("showNotifications"), true).toBool())
             tray.showMessage(QStringLiteral("Arcade Wheel"), message, QSystemTrayIcon::Warning, 3000);
     });
-    if (QSystemTrayIcon::isSystemTrayAvailable()) {
-        tray.setContextMenu(&menu);
+    tray.setContextMenu(&menu);
+    QObject::connect(&tray, &QSystemTrayIcon::activated, &app, [&](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) showSettings();
+    });
+    if (QSystemTrayIcon::isSystemTrayAvailable()) tray.show();
+#ifdef Q_OS_LINUX
+    // At login Wheel often starts before the panel that hosts tray icons, and
+    // panels restart. Show (or re-register) the icon whenever the tray host
+    // appears; this waits on D-Bus, so it costs nothing while idle.
+    auto *trayHost = new QDBusServiceWatcher(QStringLiteral("org.kde.StatusNotifierWatcher"),
+                                             QDBusConnection::sessionBus(),
+                                             QDBusServiceWatcher::WatchForRegistration, &app);
+    QObject::connect(trayHost, &QDBusServiceWatcher::serviceRegistered, &app, [&] {
+        tray.hide();
         tray.show();
-        QObject::connect(&tray, &QSystemTrayIcon::activated, &app, [&](QSystemTrayIcon::ActivationReason reason) {
-            if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) showSettings();
-        });
-    }
+    });
+#endif
 
     const auto handleCommand = [&](const QString &raw) {
         const QString cmd = raw.trimmed();

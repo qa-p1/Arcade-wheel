@@ -83,7 +83,8 @@ def stop(process):
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             process.kill()
-            process.wait(timeout=5)
+            # A heavily loaded host can take longer to reap a killed peer.
+            process.wait(timeout=30)
 
 
 def main():
@@ -184,13 +185,19 @@ def main():
             if legacy:
                 assert json.loads(config.read_text())["decks"][0]["actions"][0]["id"] == "box-slot"
 
-        print(json.dumps({"peers": list(PEERS) if args.with_peers else [], "freshConfig": "passed",
-                          "schema3Migration": "passed", "backgroundMode": "passed", "screenshots": screenshots}, indent=2))
+        result = {"peers": list(PEERS) if args.with_peers else [], "freshConfig": "passed",
+                  "schema3Migration": "passed", "backgroundMode": "passed", "screenshots": screenshots}
     finally:
+        errors = []
         for process in reversed(processes):
-            stop(process)
+            try:
+                stop(process)
+            except subprocess.TimeoutExpired:
+                errors.append(str(process.pid))
         for log in logs:
             log.close()
+        assert not errors, "Started PIDs did not exit after SIGKILL: " + ", ".join(errors)
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

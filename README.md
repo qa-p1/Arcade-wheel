@@ -157,7 +157,7 @@ tests/           Qt Test suites (run with ctest)
 docs/            Architecture, manual release checks, Arcade Link actions
 ```
 
-See [architecture](docs/ARCHITECTURE.md) and [manual release checks](docs/MANUAL_TESTING.md) for more detail.
+See [architecture](docs/ARCHITECTURE.md), [manual release checks](docs/MANUAL_TESTING.md) and the [current status](docs/STATUS.md) for more detail.
 
 ## Contributing
 

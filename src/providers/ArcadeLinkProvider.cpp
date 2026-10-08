@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QFile>
 #include <QGuiApplication>
+#include <QJsonDocument>
 #include <QMimeData>
 #include <QTimer>
 #include <QUuid>

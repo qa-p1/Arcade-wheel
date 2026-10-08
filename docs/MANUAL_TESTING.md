@@ -1,6 +1,6 @@
 # Manual release checks
 
-Automated tests (`ctest`) cover config migration and round-trips, angular selection, the dead zone, deck scrolling, invalid action handling, the trigger lifecycle, and center gesture recognition, plus shortcut validation for the Windows and macOS backends and login entries on Linux. Before a release, exercise the actual desktop path on the target OS:
+Automated tests (`ctest`, 9 suites) cover config migration and round-trips, angular selection, the dead zone, deck scrolling, invalid action handling, the trigger lifecycle, center gesture recognition, the Arcade Link conformance vectors, the Link provider and `wheel.*` actions, shortcut validation for the Windows and macOS backends and login entries on Linux. Arcade Link's isolated runner adds the cross-app checks (see [Arcade Link](ARCADE_LINK.md)). Before a release, exercise the actual desktop path on the target OS:
 
 1. Set a shortcut, approve the desktop portal if prompted, then press, hold, move, and release. Verify execution starts as the overlay disappears.
 2. Return to the center before release and verify nothing executes. Try rapid repeated invocations and a configured hold threshold.

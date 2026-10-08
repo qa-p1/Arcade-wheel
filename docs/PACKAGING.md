@@ -15,7 +15,7 @@ Use [Releases](https://github.com/qa-p1/Arcade-wheel/releases) for direct instal
 
 Each platform artifact includes its own checksum list and manifest. The release job downloads these into separate directories, verifies every original package, then combines the five packages and regenerates one manifest and checksum list. Corrupt, missing or duplicate packages stop publication. The manifest uses the full release version, including `+build.N`, and describes the four installable packages; the portable ZIP is also checksummed. Windows entries use Inno's `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER` flags.
 
-The metadata generator is vendored unchanged from Arcade-link commit `539fa91`; see `scripts/VENDORED`. CI compares it, the Qt module and the conformance vectors with the pinned commit in `src/link/VENDORED.json`. The owner must publish that Arcade-link commit to `qa-p1/Arcade-link` before enabling this workflow on GitHub. A local source comparison needs no network:
+The metadata generator is vendored unchanged from Arcade Link `v0.1.0` (commit `337b85f`); see `scripts/VENDORED`. CI checks out that tag and compares it, the Qt module and the conformance vectors with the commit pinned in `src/link/VENDORED.json`. A local source comparison needs no network:
 
 ```sh
 python3 packaging/check-link-vendor.py --source ../../Rust/Arcade-link

@@ -101,8 +101,9 @@ or polling. Bounded waits occur only during a user-requested invocation,
 startup authentication or cancellation of a pending add request.
 
 The Qt v1 module is unchanged in `src/link/ArcadeLink.{h,cpp}` and pinned to
-Arcade-link commit `539fa91` by `VENDORED.json`. The vendor check compares its
-checksums with that commit, alongside the vectors and release generator.
+Arcade Link `v0.1.0` (commit `337b85f`) by `VENDORED.json`. The vendor check
+compares its checksums with that commit, alongside the vectors and release
+generator.
 `WheelInvoke` supplies bounded jobs and one-shot deadlines around that pinned
 protocol. `ARCADE_HOME` redirects registry, endpoints and handoff storage.
 Smoke-test/offscreen instances never publish to the real registry unless
@@ -163,15 +164,15 @@ progress, UI responsiveness, cancellation, size limits, peer crash, timeout,
 Private mode and secret errors.
 The failure group verifies crash, cancel, busy/forced quit, broken registry
 entries and stale endpoint recovery, including killing and restarting real
-Wheel. Windows/macOS packaging and runtime checks have not been run here.
+Wheel. Windows and macOS are built, tested with ctest and packaged (with a
+package smoke test) in CI; they have not been run interactively.
 
 | Feature | Linux X11 | Linux Wayland | Windows | macOS |
 |---|---|---|---|---|
-| Registry / resident and one-shot calls | Real isolated runs | Not run | Not run | Not run |
-| Settings placement | Real Xvfb run | Not run | Not run | Not run |
+| Registry / resident and one-shot calls | Real isolated runs | Used daily on Hyprland; not in the isolated runner | CI build and ctest; not run interactively | CI build and ctest; not run interactively |
+| Settings placement | Real Xvfb run | Used daily on Hyprland | Not run | Not run |
 | Lens selection | Mock run; real capture owned by Lens | Not run | Not run | Not run |
 | File selection input | Mock run; hidden for real Look | Hidden | Not run | Not run |
 
-Only Linux has been built on this machine. Platform-neutral Qt paths and
-Windows/macOS branches are code-reviewed; cross-platform compilation and real
-runs remain required before release.
+Status as of 2026-10-08. Interactive Windows and macOS runs remain required
+before relying on those platforms.

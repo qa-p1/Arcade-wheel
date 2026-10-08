@@ -17,7 +17,7 @@ concurrency:
 
 env:
   QT_VERSION: '6.8.3'
-  ARCADE_LINK_REVISION: '7af8d81e3322517539b9396569c48851302c95d6'
+  ARCADE_LINK_REVISION: 'v0.1.0'
 
 jobs:
   build:

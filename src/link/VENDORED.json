@@ -1,5 +1,5 @@
 {
-  "arcadeLink": "7af8d81 (protocol 1)",
+  "arcadeLink": "v0.1.0 (protocol 1)",
   "files": {
     "src/link/ArcadeLink.h": "67be8387c41466e835b70e3f1d76a60da422e4d3dbe78376e7264fb2065acf73",
     "src/link/ArcadeLink.cpp": "7866fafa320a237d5495e8c44de6a0c17f72524ec7e9140eee912fcfd9b15e20",
@@ -10,6 +10,6 @@
     "tests/link-vectors/manifest.json": "a37b4f217629a790cfd8f2e0e0f7d76423374336eddbc350a6220ffff1e19347",
     "tests/link-vectors/wire.json": "abe417d8142eecda655f9f94303b0f681c4a86bfd84a9ff0adaa1944183c20c5"
   },
-  "commit": "7af8d81e3322517539b9396569c48851302c95d6",
+  "commit": "337b85fe85fca3e68ec472a6337aa9ebd77fc7ef",
   "repository": "https://github.com/qa-p1/Arcade-link"
 }

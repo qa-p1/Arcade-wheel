@@ -90,7 +90,7 @@ arcade-wheel --settings     # start in the background and open Settings (the def
 arcade-wheel --background   # start in the background with no window
 ```
 
-Closing Settings leaves the wheel running. A tray menu appears when the desktop provides a system tray. The default shortcut is **F8**, and the desktop may ask you to approve it the first time.
+Closing Settings leaves the wheel running. When the desktop has a system tray, the tray icon opens Settings on click. Its menu is the one every Arcade app has: **Open Wheel**, **Open Settings**, **Restart Arcade Wheel** and, below a separator, **Quit Arcade Wheel**. The default shortcut is **F8**, and the desktop may ask you to approve it the first time.
 
 - **Hold** the shortcut. The wheel opens in the middle of the screen the pointer is on, and the pointer jumps to its center.
 - **Move** toward an action. It highlights and its name appears in the center.

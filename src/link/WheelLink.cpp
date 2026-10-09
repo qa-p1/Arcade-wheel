@@ -1,3 +1,4 @@
+#include "link/AppMetadata.h"
 #include "link/WheelLink.h"
 
 #include "core/WheelController.h"
@@ -57,7 +58,7 @@ QVariantMap WheelLink::draftFor(const QJsonObject &content, QString *error)
         const auto action = data.value(QStringLiteral("action")).toString();
         const auto input = data.value(QStringLiteral("input")).toString(QStringLiteral("none"));
         const QStringList inputs{QStringLiteral("none"), QStringLiteral("clipboard"), QStringLiteral("lens-selection"), QStringLiteral("file-selection")};
-        if (!Ids::apps().contains(app) || action.isEmpty() || data.value(QStringLiteral("version")).toInt(0) < 1
+        if (!ShelfMetadata::apps().contains(app) || action.isEmpty() || data.value(QStringLiteral("version")).toInt(0) < 1
             || data.value(QStringLiteral("title")).toString().isEmpty() || !inputs.contains(input)
             || (data.contains(QStringLiteral("options")) && !data.value(QStringLiteral("options")).isObject())) {
             if (error) *error = QStringLiteral("The Arcade action reference is incomplete or invalid");
@@ -186,7 +187,7 @@ QJsonObject WheelLink::manifest(const QJsonObject &config, const QString &versio
     for (int p : supportedProtocols()) protocol.append(p);
     return {{QStringLiteral("schema"), 1},
             {QStringLiteral("id"), Ids::Wheel},
-            {QStringLiteral("name"), appName(Ids::Wheel)},
+            {QStringLiteral("name"), ShelfMetadata::appName(Ids::Wheel)},
             {QStringLiteral("version"), version},
             {QStringLiteral("link"), QJsonObject{{QStringLiteral("protocol"), protocol}}},
             {QStringLiteral("executable"), executablePath()},

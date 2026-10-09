@@ -1,3 +1,4 @@
+#include "link/AppMetadata.h"
 #include "providers/ArcadeLinkProvider.h"
 #include "link/WheelInvoke.h"
 
@@ -103,7 +104,7 @@ private:
         peer.pipelinesDirty = id == Ids::Box;
         peers.insert(id, peer);
         connect(deadline, &QTimer::timeout, this, [this, id] {
-            errors.insert(id, standardMessage("timeout", appName(id)));
+            errors.insert(id, standardMessage("timeout", ShelfMetadata::appName(id)));
             remove(id); publish();
         });
         connect(socket, &QLocalSocket::connected, this, [this, id] {
@@ -113,12 +114,12 @@ private:
         });
         connect(socket, &QLocalSocket::disconnected, this, [this, id] {
             if (!peers.contains(id)) return;
-            errors.insert(id, standardMessage("not_running", appName(id)));
+            errors.insert(id, standardMessage("not_running", ShelfMetadata::appName(id)));
             remove(id); publish();
         });
         connect(socket, &QLocalSocket::errorOccurred, this, [this, id](QLocalSocket::LocalSocketError) {
             if (!peers.contains(id)) return;
-            errors.insert(id, standardMessage("not_running", appName(id)));
+            errors.insert(id, standardMessage("not_running", ShelfMetadata::appName(id)));
             remove(id); publish();
         });
         connect(socket, &QLocalSocket::readyRead, this, [this, id] {
@@ -130,14 +131,14 @@ private:
                 const auto line = p.buffer.left(nl + 1); p.buffer.remove(0, nl + 1);
                 QJsonObject message;
                 if (classify(line, &message) == Kind::Invalid || message.contains("error")) {
-                    errors.insert(id, message.contains("error") ? Error::fromJson(message.value("error").toObject()).userMessage(appName(id))
-                                                               : standardMessage("internal", appName(id), "invalid response"));
+                    errors.insert(id, message.contains("error") ? Error::fromJson(message.value("error").toObject()).userMessage(ShelfMetadata::appName(id))
+                                                               : standardMessage("internal", ShelfMetadata::appName(id), "invalid response"));
                     remove(id); publish(); return;
                 }
                 const auto result = message.value("result").toObject();
                 if (message.value("id").toInt() == 1) {
                     if (result.value("protocol").toInt() != 1) {
-                        errors.insert(id, standardMessage("version_mismatch", appName(id)));
+                        errors.insert(id, standardMessage("version_mismatch", ShelfMetadata::appName(id)));
                         remove(id); publish(); return;
                     }
                     p.authed = true; p.deadline->stop(); errors.remove(id);
@@ -154,7 +155,7 @@ private:
                 }
             }
             if (p.buffer.size() > MaxLineBytes) {
-                errors.insert(id, standardMessage("internal", appName(id), "response exceeds the protocol limit"));
+                errors.insert(id, standardMessage("internal", ShelfMetadata::appName(id), "response exceeds the protocol limit"));
                 remove(id); publish();
             }
         });
@@ -220,7 +221,7 @@ private:
             QMetaObject::invokeMethod(this, [this, generation, values, error] {
                 if (generation != pipelineGeneration) return;
                 pipelines = values; pipelinesLoaded = !error.isError();
-                if (error.isError()) errors.insert(Ids::Box, error.userMessage(appName(Ids::Box)));
+                if (error.isError()) errors.insert(Ids::Box, error.userMessage(ShelfMetadata::appName(Ids::Box)));
                 else errors.remove(Ids::Box);
                 publish();
             });
@@ -435,7 +436,7 @@ QJsonObject ArcadeLinkProvider::manifestFor(const QString &id) const
 
 QString ArcadeLinkProvider::referenceReason(const QString &id, const QJsonObject &payload) const
 {
-    const QString name = appName(id);
+    const QString name = ShelfMetadata::appName(id);
     // Switched off here, not in the peer: say where to turn it back on.
     if (!m_enabled) return QStringLiteral("Connections to other Arcade apps are off in Connected apps.");
     if (m_disabledPeers.contains(id)) return QStringLiteral("%1 is turned off in Connected apps.").arg(name);
@@ -451,14 +452,14 @@ QString ArcadeLinkProvider::referenceReason(const QString &id, const QJsonObject
 
 QString ArcadeLinkProvider::unavailableReason() const
 {
-    return m_enabled ? QStringLiteral("No Arcade actions are available") : standardMessage("denied", appName(Ids::Wheel), "disabled");
+    return m_enabled ? QStringLiteral("No Arcade actions are available") : standardMessage("denied", ShelfMetadata::appName(Ids::Wheel), "disabled");
 }
 
 QString ArcadeLinkProvider::unavailableReason(const QJsonObject &slot) const
 {
     const auto payload = slot.value("payload").toObject();
     const auto id = payload.value("app").toString();
-    const auto name = appName(id);
+    const auto name = ShelfMetadata::appName(id);
     const auto reason = referenceReason(id, payload);
     if (!reason.isEmpty()) return reason;
     const auto action = WheelInvoke::actionFor(manifestFor(id), payload);
@@ -486,7 +487,7 @@ QString ArcadeLinkProvider::unavailableReason(const QJsonObject &slot) const
     if (mode != "lens-selection" && mode != "file-selection") return standardMessage("unsupported_input", name);
     for (const auto &type : resolver.value("produces").toArray())
         if (selectionCompatible(accepts, type.toString())) return {};
-    return standardMessage("unavailable", appName(resolverApp), "the selection resolver doesn't return content for this action");
+    return standardMessage("unavailable", ShelfMetadata::appName(resolverApp), "the selection resolver doesn't return content for this action");
 }
 
 QStringList ArcadeLinkProvider::inputModes(const QJsonObject &action) const
@@ -521,7 +522,7 @@ QVariantList ArcadeLinkProvider::tools() const
             if (!actionUsable(manifest, action)) continue;
             const auto modes = inputModes(action);
             if (modes.isEmpty()) continue;
-            action.insert("app", id); action.insert("appName", appName(id));
+            action.insert("app", id); action.insert("appName", ShelfMetadata::appName(id));
             action.insert("version", action.value("version").toInt(1));
             action.insert("inputModes", QJsonArray::fromStringList(modes));
             action.insert("input", modes.first());
@@ -537,7 +538,7 @@ QVariantList ArcadeLinkProvider::tools() const
             if (action.isEmpty() || !actionUsable(manifest, action)) continue;
             const auto modes = inputModes(action);
             if (modes.isEmpty()) continue;
-            action.insert("app", id); action.insert("appName", appName(id));
+            action.insert("app", id); action.insert("appName", ShelfMetadata::appName(id));
             action.insert("version", action.value("version").toInt(1));
             action.insert("inputModes", QJsonArray::fromStringList(modes)); action.insert("input", modes.first());
             action.insert("outbound", outbound(action));
@@ -600,7 +601,7 @@ bool ArcadeLinkProvider::execute(const QJsonObject &slot, QString *error)
             WheelInvoke::run(loc, manifest, request, &result, &failure, progress, cancel.get(), timeout);
         }
         for (const auto &dir : owned) QDir(dir).removeRecursively();
-        const auto message = failure.isError() ? failure.userMessage(appName(failingApp)) : QString();
+        const auto message = failure.isError() ? failure.userMessage(ShelfMetadata::appName(failingApp)) : QString();
         QMetaObject::invokeMethod(this, [this, jobId, result, message] {
             emit jobFinished(jobId, result, message);
             refresh();
@@ -629,7 +630,7 @@ bool ArcadeLinkProvider::requestInstall(const QString &app)
             {"context", QJsonObject{{"source", Ids::Wheel}, {"interactive", true}, {"reason", "user-click"}}}};
         WheelInvoke::run(loc, manifest, request, &result, &error, {}, nullptr, LaunchTimeoutMs);
         if (error.isError()) {
-            const auto message = error.userMessage(appName(Ids::Tools));
+            const auto message = error.userMessage(ShelfMetadata::appName(Ids::Tools));
             QMetaObject::invokeMethod(this, [this, message] { emit openFailed(message); });
         }
     });
@@ -639,7 +640,7 @@ bool ArcadeLinkProvider::requestInstall(const QString &app)
 QVariantList ArcadeLinkProvider::connectedApps() const
 {
     QVariantList rows;
-    auto ids = Ids::apps();
+    auto ids = ShelfMetadata::apps();
     if (!ids.contains(Ids::Tools)) ids.append(Ids::Tools);
     for (const auto &id : ids) {
         if (id == Ids::Wheel) continue;
@@ -647,7 +648,7 @@ QVariantList ArcadeLinkProvider::connectedApps() const
         const bool installed = !manifest.isEmpty();
         if (id == Ids::Tools && installed) continue; // Its row only offers Get Arcade Tools.
         const auto state = m_states.value(id).toString();
-        rows.append(QVariantMap{{"id", id}, {"name", appName(id)}, {"pitch", appPitch(id)},
+        rows.append(QVariantMap{{"id", id}, {"name", ShelfMetadata::appName(id)}, {"pitch", ShelfMetadata::appPitch(id)},
             {"glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(id)},
             {"state", state == "Running" ? "Running · v" + manifest.value("version").toString() : installed ? "Installed" : "Not installed"},
             {"installed", installed}, {"enabled", !m_disabledPeers.contains(id)},
@@ -666,7 +667,7 @@ QString ArcadeLinkProvider::shortcutOwner(const QString &accelerator) const
         if (manifest.value("id").toString() == Ids::Wheel) continue;
         for (const auto &shortcut : manifest.value("shortcuts").toArray())
             if (normalizeAccelerator(shortcut.toObject().value("accelerator").toString()) == normalized)
-                return appName(manifest.value("id").toString());
+                return ShelfMetadata::appName(manifest.value("id").toString());
     }
     return {};
 }

@@ -91,7 +91,12 @@ private slots:
         QTRY_VERIFY(changed.count() >= 2);
         QVERIFY(provider.tools().isEmpty());
         QCOMPARE(provider.unavailableReason(slot(Ids::Box, "box.open")), QStringLiteral("Arcade Box isn't installed."));
-        QCOMPARE(provider.connectedApps().size(), 5);
+        QCOMPARE(provider.connectedApps().size(), 6);
+        bool shelfListed = false;
+        for (const auto &row : provider.connectedApps())
+            if (row.toMap().value("id").toString() == "arcade.shelf")
+                shelfListed = row.toMap().value("name").toString() == "Arcade Shelf";
+        QVERIFY(shelfListed);
         for (const auto &row : provider.connectedApps()) QCOMPARE(row.toMap().value("state").toString(), QStringLiteral("Not installed"));
         QVERIFY(provider.shortcutOwner("F8").isEmpty());
     }

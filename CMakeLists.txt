@@ -90,6 +90,7 @@ qt_add_resources(arcade-wheel arcade_qml PREFIX "/" FILES
     assets/arcade/arcade.look.svg
     assets/arcade/arcade.wheel.svg
     assets/arcade/arcade.clipboard.svg
+    assets/arcade/arcade.shelf.svg
     assets/arcade/arcade.tools.svg
     assets/arcade/tokens.json
     assets/arcade-wheel.svg

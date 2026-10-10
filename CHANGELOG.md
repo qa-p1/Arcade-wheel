@@ -6,9 +6,10 @@ All notable changes to Arcade Wheel are documented here.
 
 ### Added
 
-- **Arcade Link.** Wheel joins the other Arcade apps through the vendored Qt module (Arcade Link `v0.1.0`): it publishes a manifest and listens for `wheel.show` and `wheel.add_action`. An added action always opens a draft in Settings and needs a chosen slot and confirmation.
+- **Arcade Link.** Wheel joins the other Arcade apps through the vendored Qt module (Arcade Link `v0.2.0`): it publishes a manifest and listens for `wheel.show` and `wheel.add_action`. An added action always opens a draft in Settings and needs a chosen slot and confirmation.
 - **Arcade actions in the picker.** Box tools, presets and saved pipelines, and Lens, Look and Clipboard actions can be bound to slots, with the clipboard, a Lens selection or a file-manager selection as input. The picker shows each action's effects, with ↗ for actions that send content out. Missing or disabled peers leave saved slots in place with a reason.
 - **Connected apps** settings: a master switch, per-app toggles, Get links (through Arcade Tools when installed) and diagnostics.
+- **Arcade Shelf and Arcade Find** (Arcade Link `v0.2.0`): both appear in Connected apps with their glyphs, accents and Get links, and their actions can be bound to slots (`shelf.show` for a collection, `shelf.add` with a selection, `find.show` with clipboard text or a file selection).
 - **Release metadata.** Releases include `arcade-release.json` and one combined `SHA256SUMS.txt` for Arcade Tools.
 
 ### Fixed

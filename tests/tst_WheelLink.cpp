@@ -102,6 +102,40 @@ private slots:
         QVERIFY(offered);
     }
 
+    void shelfActionPreservesNamedCollectionAndInputMode()
+    {
+        QString error;
+        QJsonObject data{{"app", "arcade.shelf"}, {"action", "shelf.show"}, {"version", 1},
+            {"title", "Open Research Shelf"}, {"input", "none"}, {"options", QJsonObject{{"shelf", "research"}}}};
+        auto draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error);
+        QVERIFY2(!draft.isEmpty(), qPrintable(error));
+        auto payload = QJsonObject::fromVariantMap(draft.value("payload").toMap());
+        QCOMPARE(payload.value("app").toString(), QStringLiteral("arcade.shelf"));
+        QCOMPARE(payload.value("options").toObject().value("shelf").toString(), QStringLiteral("research"));
+        data.insert("action", "shelf.add"); data.insert("input", "file-selection");
+        draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error);
+        QVERIFY(!draft.isEmpty());
+        payload = QJsonObject::fromVariantMap(draft.value("payload").toMap());
+        QCOMPARE(payload.value("input").toString(), QStringLiteral("file-selection"));
+        data.insert("app", "shell.invalid");
+        QVERIFY(WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error).isEmpty());
+    }
+
+    void findShowAcceptsClipboardAndFileSelection()
+    {
+        QString error;
+        QJsonObject data{{"app", "arcade.find"}, {"action", "find.show"}, {"version", 1},
+            {"title", "Search in Find"}, {"input", "clipboard"}};
+        auto draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error);
+        QVERIFY2(!draft.isEmpty(), qPrintable(error));
+        auto payload = QJsonObject::fromVariantMap(draft.value("payload").toMap());
+        QCOMPARE(payload.value("app").toString(), QStringLiteral("arcade.find"));
+        QCOMPARE(payload.value("input").toString(), QStringLiteral("clipboard"));
+        data.insert("input", "file-selection");
+        draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error);
+        QVERIFY(!draft.isEmpty());
+    }
+
     void masterSwitchStopsPresenceAndPersistsToggles()
     {
         QTemporaryDir dir;

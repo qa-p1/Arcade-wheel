@@ -101,7 +101,7 @@ or polling. Bounded waits occur only during a user-requested invocation,
 startup authentication or cancellation of a pending add request.
 
 The Qt v1 module is unchanged in `src/link/ArcadeLink.{h,cpp}` and pinned to
-Arcade Link `v0.1.0` (commit `337b85f`) by `VENDORED.json`. The vendor check
+Arcade Link `v0.2.0` (commit `bedee71`) by `VENDORED.json`. The vendor check
 compares its checksums with that commit, alongside the vectors and release
 generator.
 `WheelInvoke` supplies bounded jobs and one-shot deadlines around that pinned

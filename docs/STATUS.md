@@ -1,7 +1,8 @@
 # Arcade Wheel: status
 
 Verified 2026-10-08 on branch `arcade/link` (version 0.2.0, Qt Link module
-vendored from Arcade Link `v0.1.0`). This page records what is implemented
+vendored from Arcade Link `v0.1.0`); Link module re-vendored from `v0.2.0`
+(adds Shelf and Find) on 2026-10-10. This page records what is implemented
 and how it was checked; the other documents describe how it works.
 
 ## Implemented
@@ -22,7 +23,7 @@ and how it was checked; the other documents describe how it works.
 | Check | Result |
 |---|---|
 | `ctest` | 9 of 9 suites pass |
-| `packaging/check-link-vendor.py --source …` | the 8 vendored files match `v0.1.0` |
+| `packaging/check-link-vendor.py --source …` | the 8 vendored files match `v0.2.0` |
 | CI (Linux AppImage, Windows setup, macOS arm64 and x86_64 DMGs, each built, tested and smoke-tested) | passing at `3333434` |
 | Arcade Link e2e, `wheel` group and cross-app flows | all passing (74/74 ecosystem checks) |
 | Benchmark against the 2026-10-05 baseline | startup 146.9 → 136.6 ms, warm invoke 38.6 → 35.2 ms, idle RSS 114 → 115 MiB, idle CPU 0 |

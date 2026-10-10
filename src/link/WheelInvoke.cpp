@@ -1,3 +1,4 @@
+#include "link/AppMetadata.h"
 #include "link/WheelInvoke.h"
 
 #include <QElapsedTimer>
@@ -250,7 +251,7 @@ bool WheelInvoke::run(const Locations &locations, const QJsonObject &manifest, c
         return oneShot(manifest, request, result, error, progress, cancel, timeoutMs);
     QStringList args;
     for (const auto &arg : launch.value("background").toArray()) args << arg.toString();
-    if (progress) progress(-1, QStringLiteral("Starting %1…").arg(appName(app)));
+    if (progress) progress(-1, QStringLiteral("Starting %1…").arg(AppMetadata::appName(app)));
     if (!QProcess::startDetached(manifest.value("executable").toString(), args)) {
         *error = Error::make("launch_failed", {}); return false;
     }

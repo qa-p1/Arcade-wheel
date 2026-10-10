@@ -661,7 +661,7 @@ void WheelController::refreshProviders()
 
 void WheelController::setPeerEnabled(const QString &app, bool enabled)
 {
-    if (!ShelfMetadata::apps().contains(app) && app != ArcadeLink::Ids::Tools) return;
+    if (!AppMetadata::apps().contains(app) && app != ArcadeLink::Ids::Tools) return;
     auto peers = m_config.value("link").toObject().value("disabledPeers").toArray();
     for (int i = peers.size() - 1; i >= 0; --i) if (peers.at(i).toString() == app) peers.removeAt(i);
     if (!enabled) peers.append(app);
@@ -670,9 +670,9 @@ void WheelController::setPeerEnabled(const QString &app, bool enabled)
 
 void WheelController::getArcadeApp(const QString &app)
 {
-    if (!ShelfMetadata::apps().contains(app) && app != ArcadeLink::Ids::Tools) return;
+    if (!AppMetadata::apps().contains(app) && app != ArcadeLink::Ids::Tools) return;
     if (!m_dispatcher.arcade().requestInstall(app))
-        QDesktopServices::openUrl(QUrl(ShelfMetadata::releasesUrl(app)));
+        QDesktopServices::openUrl(QUrl(AppMetadata::releasesUrl(app)));
 }
 
 QVariantMap WheelController::linkDiagnostics() const
@@ -682,7 +682,7 @@ QVariantMap WheelController::linkDiagnostics() const
 
 QString WheelController::peerDisplayName(const QString &app) const
 {
-    return m_dispatcher.arcade().manifestFor(app).value("name").toString(ShelfMetadata::appName(app));
+    return m_dispatcher.arcade().manifestFor(app).value("name").toString(AppMetadata::appName(app));
 }
 
 void WheelController::setLinkDiagnostics(const QString &endpoint, const QString &error)

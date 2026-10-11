@@ -3,7 +3,6 @@
   "files": {
     "src/link/ArcadeLink.h": "0936144ecb8db6f441c9ab4a03113051ce2cd28d9cb0be7ee201da8204a0545c",
     "src/link/ArcadeLink.cpp": "d9991a124c1701d7a3acdec73e7a86a72a114f35e54fb4cc9e5f0e1b68411f78",
-    "scripts/arcade-release.py": "52042f7a9ecac497e69b5e6a73b4fa9541c27cf725f80016466202ab076f6ae0",
     "tests/link-vectors/accelerators.json": "3b0499e4bee055940043f76ce41733e9d07f79e12363618ddcd474db67aeb9c3",
     "tests/link-vectors/content.json": "bc1b0b7e7c637dabdcc689e330cf07b99fc0ef8e06bfdfbeb7ec5d8c5e1ccc2a",
     "tests/link-vectors/errors.json": "c75dc5a3bab681566d9706c0c5b15caf236d9c16e364d145dbe6a1f330a354c1",

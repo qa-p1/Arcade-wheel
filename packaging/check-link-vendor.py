@@ -24,7 +24,6 @@ PIN = ROOT / "src/link/VENDORED.json"
 FILES = {
     "src/link/ArcadeLink.h": "qt/ArcadeLink.h",
     "src/link/ArcadeLink.cpp": "qt/ArcadeLink.cpp",
-    "scripts/arcade-release.py": "tools/arcade-release.py",
 }
 FILES.update({f"tests/link-vectors/{p.name}": f"spec/vectors/{p.name}" for p in sorted((ROOT / "tests/link-vectors").glob("*.json"))})
 

@@ -1,5 +1,6 @@
 #include <gio/gdesktopappinfo.h>
 #include "LinuxBackend.h"
+#include "install/AppInstaller.h"
 
 #include <QCoreApplication>
 #include <QCursor>
@@ -515,6 +516,17 @@ bool LinuxBackend::ensureDesktopIdentity(QString *error)
     if (auto *entry = g_desktop_app_info_new(fileName.toUtf8().constData())) {
         g_object_unref(entry);
         return true;
+    }
+    AppInstaller::Engine::Environment environment;
+    QJsonObject receipt;
+    if (AppInstaller::Engine::Environment::discover(&environment, error)
+        && environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt, error) && !receipt.isEmpty())
+        return AppInstaller::repairDesktop(AppInstaller::Engine(environment), error);
+    // Running a download once must not silently install a launcher. Keep
+    // the historical durable desktop identity only for manual/dev builds.
+    if (AppInstaller::Engine::Runtime::discover().isAppImage()) {
+        *error = QStringLiteral("Install Arcade Wheel to register its portal shortcut, or bind arcade-wheel --show in your desktop's keyboard settings.");
+        return false;
     }
     // Installed packages supply this file. A build launched from its checkout
     // needs the same durable identity before Registry.Register can succeed.
@@ -1312,6 +1324,15 @@ bool LinuxBackend::performSystemAction(const QString &id, QString *error)
 
 bool LinuxBackend::setStartOnLogin(bool enabled, QString *error)
 {
+    AppInstaller::Engine::Environment environment;
+    QJsonObject receipt;
+    if (!AppInstaller::Engine::Environment::discover(&environment, error)
+        || !environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt, error)) return false;
+    if (!receipt.isEmpty()) return AppInstaller::setStartOnLogin(AppInstaller::Engine(environment), enabled, error);
+    if (AppInstaller::Engine::Runtime::discover().isAppImage()) {
+        if (error) *error = QStringLiteral("Install Arcade Wheel before enabling start at login.");
+        return false;
+    }
     const QString path = autostartDesktopFile();
     if (path.isEmpty()) {
         if (error) *error = QStringLiteral("The XDG config directory is unavailable.");
@@ -1400,6 +1421,14 @@ bool LinuxBackend::setStartOnLogin(bool enabled, QString *error)
 bool LinuxBackend::startOnLogin() const
 {
     return QFileInfo::exists(autostartDesktopFile());
+}
+
+QJsonObject LinuxBackend::shortcutRegistration() const
+{
+    if (m_bindingInstalled) return {{"applied", true}, {"via", "hyprland-runtime"}};
+    if (m_triggerSupported) return {{"applied", true}, {"via", "portal"}};
+    return {{"applied", false}, {"via", "manual"},
+            {"hint", "Bind arcade-wheel --show in Settings → Keyboard. Wheel saved the requested trigger; portal approval may still be pending."}};
 }
 
 QString LinuxBackend::autostartDesktopFile() const

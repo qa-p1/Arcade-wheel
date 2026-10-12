@@ -9,6 +9,7 @@ public:
     explicit MacOSBackend(QObject *parent = nullptr);
     ~MacOSBackend() override;
     QString name() const override;
+    QJsonObject shortcutRegistration() const override;
     void configureTrigger(const QJsonObject &trigger) override;
     void setShortcutRecording(bool recording) override;
     QString shortcutValidationError(const QString &shortcut) const override;

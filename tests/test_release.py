@@ -75,10 +75,15 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(manifest["version"], "0.2.0+build.15")
         self.assertEqual(manifest["id"], "arcade.wheel")
         self.assertEqual(manifest["linkProtocol"], [1])
-        self.assertEqual(len(manifest["assets"]), 4)
-        windows = next(asset for asset in manifest["assets"] if asset["os"] == "windows")
-        self.assertEqual(windows["kind"], "inno")
+        self.assertEqual(len(manifest["assets"]), 5)
+        windows = next(asset for asset in manifest["assets"] if asset["kind"] == "inno")
         self.assertEqual(windows["silent"], ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER"])
+        portable = next(asset for asset in manifest["assets"] if asset["kind"] == "portable")
+        self.assertEqual(portable["file"], "ArcadeWheel-0.2.0-Windows-x64.zip")
+        self.assertEqual({asset["file"] for asset in manifest["assets"] if asset["os"] == "windows"},
+                         {"ArcadeWheel-0.2.0-Windows-x64-Setup.exe", "ArcadeWheel-0.2.0-Windows-x64.zip"})
+        self.assertTrue(all(asset["installArgs"] == ["--install", "--silent"]
+                            for asset in manifest["assets"] if asset["kind"] in ("appimage", "dmg")))
         self.assertEqual({(a["os"], a["arch"]) for a in manifest["assets"]},
                          {("windows", "x64"), ("linux", "x64"), ("macos", "arm64"), ("macos", "x64")})
         lines = (self.directory / "SHA256SUMS.txt").read_text().splitlines()
@@ -87,7 +92,8 @@ class ReleaseTests(unittest.TestCase):
             digest, name = line.split("  ", 1)
             self.assertEqual(digest, hashlib.sha256((self.directory / name).read_bytes()).hexdigest())
         self.assertTrue(any(line.endswith("Windows-x64.zip") for line in lines))
-        self.assertFalse(any(asset["file"].endswith(".zip") for asset in manifest["assets"]))
+        self.assertTrue(any(asset["file"].endswith(".zip") and asset["kind"] == "portable"
+                            for asset in manifest["assets"]))
 
     def test_incorrect_identity_and_installer_flags_are_rejected(self):
         path = self.directory / "arcade-release.json"

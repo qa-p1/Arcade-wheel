@@ -485,9 +485,13 @@ Rectangle {
                 Text { text: controller.configPath; color: "#8d809e"; font.pixelSize: 12; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true }
                 RowLayout {
                     spacing: 9
-                    UiButton { text: "Import JSON"; onClicked: importDialog.open() }
-                    UiButton { text: "Export JSON"; onClicked: exportDialog.open() }
+                    UiButton { text: "Import portable JSON"; onClicked: importDialog.open() }
+                    UiButton { text: "Export portable JSON"; onClicked: exportDialog.open() }
                     UiButton { text: "Reset defaults"; destructive: true; onClicked: resetDialog.open() }
+                }
+                Text {
+                    text: "Portable exports include decks and slots. Credential, token, secret, and device identity fields are omitted. Imports save a private backup beside the current configuration first."
+                    color: "#8d809e"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
                 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: "#302938" }
                 RowLayout {

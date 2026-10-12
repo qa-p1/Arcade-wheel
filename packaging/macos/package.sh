@@ -39,6 +39,15 @@ python3 "$repo/packaging/smoke-test.py" "$app/Contents/MacOS/arcade-wheel"
 ln -s /Applications "$stage/Applications"
 filename="ArcadeWheel-$version-macOS-$architecture.dmg"
 hdiutil create -volname 'Arcade Wheel' -srcfolder "$stage" -ov -format UDZO "$output/$filename"
+# Inspect the actual DMG and a copy made from it, entirely in the staging
+# directory. Native install/move/receipt helpers are exercised by CTest.
+mount="$stage/dmg-mounted"
+mkdir -p "$mount"
+hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$output/$filename"
+trap 'hdiutil detach "$mount" >/dev/null 2>&1 || true; rm -rf -- "$stage"' EXIT
+ditto "$mount/Arcade Wheel.app" "$stage/dmg-copy/Arcade Wheel.app"
+hdiutil detach "$mount"
+python3 "$repo/packaging/smoke-test.py" "$stage/dmg-copy/Arcade Wheel.app/Contents/MacOS/arcade-wheel"
 python3 "$repo/scripts/arcade-release.py" --id arcade.wheel --version "$version" \
     --channel stable --windows-installer inno \
     --notes "https://github.com/qa-p1/Arcade-wheel/releases/tag/v$version" "$output"

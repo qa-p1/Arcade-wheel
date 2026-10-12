@@ -1,8 +1,7 @@
 #pragma once
 #include "link/ArcadeLink.h"
 
-// The Arcade apps Wheel knows, from the vendored Link module (v0.2.0 lists
-// Shelf and Find). One place for callers to ask.
+// The Arcade apps Wheel knows, from the released Link module.
 namespace AppMetadata {
 inline const QString Shelf = ArcadeLink::Ids::Shelf;
 inline const QString Find = ArcadeLink::Ids::Find;

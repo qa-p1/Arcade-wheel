@@ -1,6 +1,7 @@
 #include "config/ConfigStore.h"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QTemporaryDir>
@@ -235,6 +236,96 @@ private slots:
         QCOMPARE(imported, original);
         QCOMPARE(imported.value(QStringLiteral("general")).toObject()
                      .value(QStringLiteral("startOnLogin")).toBool(), true);
+    }
+
+    void portableExportOmitsSecretsAndDeviceIdentity()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        ConfigStore store(directory.filePath(QStringLiteral("config.json")));
+        QJsonObject config = ConfigStore::defaults();
+        auto decks = config.value(QStringLiteral("decks")).toArray();
+        auto deck = decks.first().toObject();
+        auto actions = deck.value(QStringLiteral("actions")).toArray();
+        auto action = actions.first().toObject();
+        action.insert(QStringLiteral("payload"), QJsonObject{
+            {QStringLiteral("command"), QStringLiteral("safe-command")},
+            {QStringLiteral("apiToken"), QStringLiteral("never-export-this")},
+            {QStringLiteral("options"), QJsonObject{
+                {QStringLiteral("client_secret"), QStringLiteral("also-private")},
+                {QStringLiteral("device_id"), QStringLiteral("device-123")},
+                {QStringLiteral("deviceIdentityHash"), QStringLiteral("device-hash")},
+                {QStringLiteral("device_fingerprint"), QStringLiteral("device-fingerprint")},
+                {QStringLiteral("keep"), true}}}});
+        actions[0] = action;
+        deck.insert(QStringLiteral("actions"), actions);
+        decks[0] = deck;
+        config.insert(QStringLiteral("decks"), decks);
+
+        const QString path = directory.filePath(QStringLiteral("portable.json"));
+        QString error;
+        QVERIFY2(store.exportTo(config, path, &error), qPrintable(error));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const QByteArray bytes = file.readAll();
+        QVERIFY(!bytes.contains("never-export-this"));
+        QVERIFY(!bytes.contains("also-private"));
+        QVERIFY(!bytes.contains("device-123"));
+        QVERIFY(!bytes.contains("device-hash"));
+        QVERIFY(!bytes.contains("device-fingerprint"));
+        QVERIFY(bytes.contains("safe-command"));
+
+        QJsonObject imported;
+        QVERIFY2(store.importFrom(path, &imported, &error), qPrintable(error));
+        const auto importedPayload = imported.value(QStringLiteral("decks")).toArray().first().toObject()
+            .value(QStringLiteral("actions")).toArray().first().toObject().value(QStringLiteral("payload")).toObject();
+        QVERIFY(!importedPayload.contains(QStringLiteral("apiToken")));
+        const auto nested = importedPayload.value(QStringLiteral("options")).toObject();
+        QVERIFY(!nested.contains(QStringLiteral("client_secret")));
+        QVERIFY(!nested.contains(QStringLiteral("device_id")));
+        QVERIFY(!nested.contains(QStringLiteral("deviceIdentityHash")));
+        QVERIFY(!nested.contains(QStringLiteral("device_fingerprint")));
+        QVERIFY(nested.value(QStringLiteral("keep")).toBool());
+    }
+
+    void backupCurrentWritesAnAtomicPrivateCopy()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString path = directory.filePath(QStringLiteral("config.json"));
+        ConfigStore store(path);
+        const QJsonObject config = ConfigStore::defaults();
+        QVERIFY(store.save(config));
+
+        QString backupPath;
+        QString error;
+        QVERIFY2(store.backupCurrent(&backupPath, &error), qPrintable(error));
+        QVERIFY(QFileInfo::exists(backupPath));
+        QFile backup(backupPath);
+        QVERIFY(backup.open(QIODevice::ReadOnly));
+        QCOMPARE(QJsonDocument::fromJson(backup.readAll()).object(), config);
+#ifdef Q_OS_UNIX
+        const auto permissions = QFile::permissions(backupPath);
+        QVERIFY(permissions.testFlag(QFileDevice::ReadOwner));
+        QVERIFY(permissions.testFlag(QFileDevice::WriteOwner));
+        QVERIFY(!permissions.testFlag(QFileDevice::ReadGroup));
+        QVERIFY(!permissions.testFlag(QFileDevice::ReadOther));
+#endif
+    }
+
+    void portableSettingsAllowlistAndInvalidSchema()
+    {
+        QTemporaryDir directory; QVERIFY(directory.isValid());
+        ConfigStore store(directory.filePath("config.json"));
+        auto config = ConfigStore::defaults();
+        config.insert("privateSession", QJsonObject{{"opaque", "private-value"}});
+        auto general = config.value("general").toObject(); general.insert("account", "private-account"); config.insert("general", general);
+        const auto portable = ConfigStore::portable(config);
+        QVERIFY(!portable.contains("privateSession")); QVERIFY(!portable.value("general").toObject().contains("account"));
+        auto newer = config; newer.insert("schemaVersion", ConfigStore::SchemaVersion + 1);
+        QFile file(directory.filePath("newer.json")); QVERIFY(file.open(QIODevice::WriteOnly)); file.write(QJsonDocument(newer).toJson()); file.close();
+        QJsonObject imported; QString error;
+        QVERIFY(!store.importFrom(file.fileName(), &imported, &error)); QVERIFY(error.contains("Unsupported"));
     }
 
     void loadPersistsMigrationSoIdsAreStable()

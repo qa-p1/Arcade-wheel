@@ -1,0 +1,9 @@
+{
+  "id": "arcade.wheel",
+  "shortcuts": [
+    {
+      "id": "trigger",
+      "accelerator": "F8"
+    }
+  ]
+}

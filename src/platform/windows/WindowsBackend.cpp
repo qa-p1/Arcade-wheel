@@ -545,6 +545,12 @@ QString WindowsBackend::name() const
     return QStringLiteral("Windows");
 }
 
+QJsonObject WindowsBackend::shortcutRegistration() const
+{
+    return {{"applied", m_hookThreadId != 0}, {"via", "native"},
+            {"hint", "Could not register the global keyboard trigger. Choose another shortcut."}};
+}
+
 QString WindowsBackend::shortcutValidationError(const QString &shortcut) const
 {
     return parseTrigger(QJsonObject{{QStringLiteral("shortcut"), shortcut}}).error;

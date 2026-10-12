@@ -77,6 +77,7 @@ public:
     bool performSystemAction(const QString &id, QString *error) override;
     bool setStartOnLogin(bool enabled, QString *error) override;
     bool startOnLogin() const override;
+    QJsonObject shortcutRegistration() const override;
 
 private slots:
     void onPortalOwnerChanged(const QString &service,

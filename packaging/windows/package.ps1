@@ -73,6 +73,11 @@ try {
     Copy-Item -LiteralPath $executable -Destination $stagedExecutable
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "README.md") -Destination $stagePath
     Copy-Item -LiteralPath (Join-Path $repositoryRoot "LICENSE") -Destination $stagePath
+    New-Item -ItemType Directory -Path (Join-Path $stagePath "docs") -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot "docs\user") -Destination (Join-Path $stagePath "docs") -Recurse
+    foreach ($requiredDoc in @("docs\user\index.md", "docs\user\images\settings.png")) {
+        if (-not (Test-Path -LiteralPath (Join-Path $stagePath $requiredDoc))) { throw "Missing user guide: $requiredDoc" }
+    }
 
     Write-Host "Deploying Qt runtime and QML imports with $($deployTool.Source)..."
     & $deployTool.Source $qtBuildMode --no-compiler-runtime --no-translations --include-plugins qoffscreen `

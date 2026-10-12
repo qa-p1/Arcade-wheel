@@ -39,6 +39,20 @@ No repository secrets are needed for unsigned builds. Build jobs have read-only 
 
 The app generates defaults on first launch, discovers installed applications, and stores settings in the user's configuration directory. Installation and updates do not replace saved settings. Start at login is opt-in. Linux and macOS first-run integration runs before the UI and uses receipts for repair and removal. AppImage autostart points at the permanent installed image, never APPDIR; LinuxBackend routes installed launcher/autostart maintenance through the shared engine. Manual/dev builds retain their existing durable portal identity. macOS native login-item behavior is unchanged.
 
+Every package carries `docs/user/`, including shortcut data and the Settings
+screenshot. Windows Settings uses the same Startup shortcut as the installer;
+it updates the receipt when login startup changes and removes the legacy Run
+entry to prevent duplicate launches. Uninstall removes Wheel's Link manifest
+only after the shared helper confirms receipt ownership, so removing an older
+copy preserves a successor's shared integration.
+
+CI checks the installed Windows executable outside the checkout, including
+login toggles and removal of an older copy after an update to another directory.
+Both macOS jobs copy the mounted DMG's bundle outside the checkout and test
+silent installation, portable settings, repair after moving the bundle, and
+receipt/CLI removal in a private `ARCADE_HOME`. These checks are automated CI
+runs, not interactive desktop verification.
+
 ## Local packaging
 
 Build and run CTest first. Each script writes to `dist/` by default, creates checksums, and fails if the packaged UI cannot load. Python 3 is required for the smoke test.

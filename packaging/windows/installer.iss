@@ -8,6 +8,7 @@
 #define ARCADE_INSTALLER_ID "{{ABFB989A-1FB7-46D0-B917-F670DF82CB69}"
 #define ARCADE_HOMEPAGE "https://github.com/qa-p1/Arcade-catalog"
 #define ARCADE_START_AT_LOGIN_DEFAULT 0
+#define ARCADE_CUSTOM_EVENTS
 #include "arcade.iss"
 
 ; Invoked by package.ps1 after Qt and the app-local MSVC runtime are deployed.
@@ -36,3 +37,55 @@ Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs c
 
 [Run]
 Filename: "{app}\{#ARCADE_EXE}"; Description: "Open Arcade Wheel"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+Filename: "{app}\{#ARCADE_EXE}"; Parameters: "--quit"; Flags: runhidden; RunOnceId: "QuitArcadeWheel"; Check: WheelOwnsIntegration
+
+[UninstallDelete]
+Type: files; Name: "{code:WheelArcadeRoot}\apps\arcade.wheel.json"; Check: WheelOwnsIntegration
+
+[Code]
+var
+  WheelIntegrationOwned: Boolean;
+
+function WheelArcadeRoot(Param: String): String;
+begin
+  Result := GetEnv('ARCADE_HOME');
+  if Result = '' then Result := ExpandConstant('{localappdata}\Arcade');
+end;
+
+function WheelOwnsIntegration: Boolean;
+begin
+  Result := WheelIntegrationOwned;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then begin
+    ArcadeIntegration(True);
+    // Startup shortcuts replace the historical app-owned Run value.
+    RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'ArcadeWheel');
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Receipt: String;
+  HadReceipt: Boolean;
+begin
+  if CurUninstallStep = usUninstall then begin
+    Receipt := WheelArcadeRoot('') + '\installs\arcade.wheel.json';
+    HadReceipt := FileExists(Receipt);
+    // Exit 10 leaves a successor's receipt in place. Extra Wheel files may
+    // be removed only when the shared helper proves this copy owned it.
+    ArcadeIntegration(False);
+    WheelIntegrationOwned := HadReceipt and not FileExists(Receipt);
+    if WheelIntegrationOwned then
+      RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'ArcadeWheel');
+  end;
+end;
+
+function GetCustomSetupExitCode: Integer;
+begin
+  if ArcadeIntegrationFailed then Result := 1 else Result := 0;
+end;

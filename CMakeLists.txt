@@ -104,6 +104,7 @@ qt_add_resources(arcade-wheel arcade_qml PREFIX "/" FILES
 
 install(TARGETS arcade-wheel RUNTIME DESTINATION bin BUNDLE DESTINATION .)
 install(FILES LICENSE README.md DESTINATION share/doc/arcade-wheel)
+install(DIRECTORY docs/user/ DESTINATION share/doc/arcade-wheel/docs/user)
 if(UNIX AND NOT APPLE)
     install(FILES packaging/linux/com.arcadewheel.ArcadeWheel.desktop DESTINATION share/applications)
     install(FILES assets/arcade-wheel.svg DESTINATION share/icons/hicolor/scalable/apps)

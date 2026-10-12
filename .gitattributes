@@ -1,0 +1,16 @@
+# Released Link assets are checksum-pinned and must retain their exact bytes.
+src/link/qt/** -text
+src/link/spec/** -text
+src/link/fixtures/** -text
+src/link/assets/strings/** -text
+src/link/tools/** -text
+src/link/Cargo.toml -text
+src/link/SPEC.md -text
+scripts/arcade-release.py -text
+scripts/validate_shortcuts.py -text
+packaging/windows/arcade.iss -text
+packaging/windows/arcade.nsh -text
+packaging/windows/arcade-integration.ps1 -text
+
+# The generated shortcut table is compared byte-for-byte in CI.
+docs/user/shortcuts.md text eol=lf

@@ -20,6 +20,7 @@ env:
   ARCADE_LINK_REVISION: 'v0.3.0'
   CARGO_BUILD_JOBS: '2'
   CMAKE_BUILD_PARALLEL_LEVEL: '2'
+  PYTHONUTF8: '1'
 
 jobs:
   build:
@@ -125,6 +126,12 @@ jobs:
         if: runner.os == 'Linux'
         run: python3 packaging/check-vendored-tools.py --source .arcade-link-upstream
 
+      - name: Verify vendored bytes on native checkouts
+        if: runner.os != 'Linux'
+        run: |
+          python packaging/check-link-vendor.py
+          python packaging/check-vendored-tools.py
+
       - name: Validate shortcut data and generated Markdown
         if: runner.os == 'Linux'
         run: |
@@ -219,12 +226,30 @@ jobs:
           if ($receipt.id -ne 'arcade.wheel' -or $receipt.method -ne 'windows-installer' -or $receipt.path -ne $expectedExecutable) { throw 'Installer receipt has unexpected identity or path' }
           $pathValue = [string][Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment').GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
           if (-not (@($pathValue.Split(';') | Where-Object { $_.TrimEnd('\','/') -ieq (Join-Path $arcadeRoot 'bin').TrimEnd('\','/') }).Count -gt 0)) { throw 'Installer did not add its shim directory to user PATH' }
+          python packaging/check-native-install.py windows "$destination/arcade-wheel.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Installed Windows lifecycle checks failed' }
+          # Updating into another directory must preserve the successor's
+          # shared receipt, shortcuts, manifest and CLI when the old copy is removed.
+          $oldDestination = $destination
+          $destination = Join-Path $env:RUNNER_TEMP 'Arcade Wheel Successor'
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/MERGETASKS=arcade_startup', "/DIR=`"$destination`"" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Successor installer failed: $($process.ExitCode)" }
+          python packaging/check-native-install.py windows "$destination/arcade-wheel.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Successor lifecycle checks failed' }
+          $process = Start-Process -FilePath "$oldDestination/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Old uninstaller failed: $($process.ExitCode)" }
+          if (Test-Path "$oldDestination/arcade-wheel.exe") { throw 'Old uninstaller left the executable behind' }
+          $receipt = Get-Content -Raw -Encoding utf8 $receiptPath | ConvertFrom-Json
+          $expectedExecutable = [IO.Path]::GetFullPath((Join-Path $destination 'arcade-wheel.exe'))
+          if ($receipt.path -ne $expectedExecutable -or -not (Test-Path $shim) -or -not (Test-Path $startup) -or -not (Test-Path "$arcadeRoot/apps/arcade.wheel.json")) { throw 'Old uninstaller removed successor integration' }
+          if (-not (Test-Path $receipt.integration.desktopEntry)) { throw 'Old uninstaller removed the successor launcher' }
           $process = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Uninstaller failed: $($process.ExitCode)" }
           if (Test-Path "$destination/arcade-wheel.exe") { throw 'Uninstaller left the executable behind' }
           if (Test-Path $receiptPath) { throw 'Uninstaller left the Arcade receipt behind' }
           if (Test-Path $shim) { throw 'Uninstaller left the CLI shim behind' }
           if (Test-Path $startup) { throw 'Uninstaller left the login shortcut behind' }
+          if (Test-Path "$arcadeRoot/apps/arcade.wheel.json") { throw 'Uninstaller left the Arcade Link manifest behind' }
           $pathValue = [string][Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment').GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
           if (@($pathValue.Split(';') | Where-Object { $_.TrimEnd('\','/') -ieq (Join-Path $arcadeRoot 'bin').TrimEnd('\','/') }).Count -gt 0) { throw 'Uninstaller left its shim directory on user PATH' }
 

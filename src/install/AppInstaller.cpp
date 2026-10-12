@@ -425,6 +425,16 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
         if (removeData) for (const auto &path : opts.dataFolders) if (!path.isEmpty() && !QDir(path).removeRecursively()) { error = QStringLiteral("Could not remove Wheel data."); return false; }
         return true;
 #else
+#ifdef Q_OS_MACOS
+        // The shared receipt names the .app directory, while Wheel's CLI
+        // symlink targets the executable inside it. Remove only that owned
+        // link; preserve replacements made outside Wheel.
+        if (!detection.receipt.isEmpty() && !validateNativeReceiptPaths(detection.receipt, &error)) return false;
+        const QString cli = detection.receipt.value("integration").toObject().value("cli").toString();
+        const QFileInfo link(cli);
+        if (!cli.isEmpty() && link.isSymLink() && link.symLinkTarget() == launchPath(detection.receipt)
+            && !QFile::remove(cli)) { error = QStringLiteral("Could not remove Wheel's CLI symlink."); return false; }
+#endif
         return engine.uninstall(Ids::Wheel, opts, nullptr, &error);
 #endif
     });

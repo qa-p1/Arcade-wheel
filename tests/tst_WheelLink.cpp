@@ -58,13 +58,13 @@ private slots:
         trigger.insert(QStringLiteral("shortcut"), QStringLiteral("Alt+Control+Space"));
         config.insert(QStringLiteral("trigger"), trigger);
         manifest = WheelLink::manifest(config, QStringLiteral("0.3.0"));
-        QCOMPARE(manifest.value(QStringLiteral("shortcuts")).toArray().first().toObject()
-                     .value(QStringLiteral("accelerator")).toString(), 
 #ifdef Q_OS_MACOS
-                     QStringLiteral("Alt+Super+Space"));
+        const QString expected = QStringLiteral("Alt+Super+Space");
 #else
-                     QStringLiteral("Ctrl+Alt+Space"));
+        const QString expected = QStringLiteral("Ctrl+Alt+Space");
 #endif
+        QCOMPARE(manifest.value(QStringLiteral("shortcuts")).toArray().first().toObject()
+                     .value(QStringLiteral("accelerator")).toString(), expected);
     }
 
     void statusReportsTheOriginalLaunchMode_data()

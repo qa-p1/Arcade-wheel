@@ -9,9 +9,11 @@
 #define ARCADE_HOMEPAGE "https://github.com/qa-p1/Arcade-catalog"
 #define ARCADE_START_AT_LOGIN_DEFAULT 0
 #define ARCADE_CUSTOM_EVENTS
+; Invoked by package.ps1 after Qt and the app-local MSVC runtime are deployed.
+; arcade.iss ends inside [Code], so no ";" comments may follow the include
+; before the next section header.
 #include "arcade.iss"
 
-; Invoked by package.ps1 after Qt and the app-local MSVC runtime are deployed.
 #ifndef StageDir
   #error StageDir is required
 #endif

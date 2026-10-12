@@ -198,8 +198,9 @@ int main(int argc, char **argv)
             } else request = command.toUtf8() + '\n';
             existing.write(request);
             existing.waitForBytesWritten(300);
-            if (existing.waitForReadyRead(1000)) {
-                const QByteArray reply = existing.readAll();
+            QByteArray reply;
+            while (!reply.contains('\n') && existing.waitForReadyRead(1000)) reply += existing.readAll();
+            if (!reply.isEmpty()) {
                 if (command == QStringLiteral("--status")) QTextStream(stdout) << reply;
                 else if (command == QStringLiteral("--settings-import")) {
                     if (reply.startsWith("OK")) {
@@ -212,6 +213,12 @@ int main(int argc, char **argv)
             }
             if (command == QStringLiteral("--settings-import")) {
                 QTextStream(stderr) << "Arcade Wheel did not confirm the settings import.\n";
+                return 1;
+            }
+            // A resident that is still starting accepts the connection before
+            // its event loop answers; report that instead of an empty success.
+            if (command == QStringLiteral("--status") && reply.isEmpty()) {
+                QTextStream(stderr) << "Arcade Wheel did not answer.\n";
                 return 1;
             }
             return 0;

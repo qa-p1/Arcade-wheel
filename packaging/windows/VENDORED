@@ -1,8 +1,9 @@
-Arcade Link shared Windows Inno installer and per-user integration helper.
+Arcade Link v0.3.0 shared assets.
 Repository: https://github.com/qa-p1/Arcade-link
-Commit: b583bbf3b1e774d5bffcb95d441613a0eea3c948
-License: MIT (see LICENSE in this repository).
+Commit: 33650a87b6999fbd553ac678cc7bde7a308cb852
+License: MIT OR Apache-2.0 (declared by the released Link bundle).
 
 SHA-256:
-8a3419c09b0f0a4ca16cac91420512d4ed450ed968e65011421dfc5a46ee2ae8  packaging/windows/arcade.iss
-e66ddb7411cffd67ef04d7e736db5c319e1ae5084f5daaa592218f21f0d4bb59  packaging/windows/arcade-integration.ps1
+fe152028ff674fdacdef4aed8970bb0a7afeb2dd67d2a3af075d7d95683bf96b  packaging/windows/arcade.iss
+1f548b420bc08b479d6c65801a208aa67dc80fef851b5e2a49696d307562831e  packaging/windows/arcade.nsh
+2b2a8b699dc1e6c81c02bb9ad9be1ddf2f8a5447541eb1dfe886056aa5dc4fd6  packaging/windows/arcade-integration.ps1

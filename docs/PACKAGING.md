@@ -13,12 +13,19 @@ The [workflow](../.github/workflows/ci.yml) builds a Release configuration, runs
 
 Use [Releases](https://github.com/qa-p1/Arcade-wheel/releases) for direct installer downloads. Release notes link to the exact tested commit and CI run and include GitHub-generated change notes. All five packages are checksum-verified before upload, and the complete upload is checked before the draft is published. Alternatively, choose an Actions run and download its platform **Artifacts**; GitHub wraps these in ZIPs.
 
-Each platform artifact includes its own checksum list and manifest. The release job downloads these into separate directories, verifies every original package, then combines the five packages and regenerates one manifest and checksum list. Corrupt, missing or duplicate packages stop publication. The manifest uses the full release version, including `+build.N`, and describes the four installable packages; the portable ZIP is also checksummed. Windows entries use Inno's `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER` flags.
+Each platform artifact includes its own checksum list and manifest. The release job downloads these into separate directories, verifies every original package, then combines the five packages and regenerates one manifest and checksum list. Corrupt, missing or duplicate packages stop publication. The manifest uses the full release version, including `+build.N`; it marks the Windows ZIP as `portable` and records `--install --silent` for AppImage and DMG assets. Windows installer entries use Inno's `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER` flags.
 
-The metadata generator is vendored unchanged from Arcade Link `v0.2.0` (commit `bedee71`); see `scripts/VENDORED`. CI checks out that tag and compares it, the Qt module and the conformance vectors with the commit pinned in `src/link/VENDORED.json`. A local source comparison needs no network:
+The Qt bundle, conformance vectors, embedded install strings, release generator,
+shortcut validator and Windows Inno/NSIS integration are all vendored from
+Arcade Link `v0.3.0`, commit `33650a87`. The bundle follows the vendoring tool's
+layout under `src/link/`, with hashes in `src/link/VENDORED.json`;
+`scripts/VENDORED` and `packaging/windows/VENDORED` pin the shared copies.
+Local checks need no network:
 
 ```sh
 python3 packaging/check-link-vendor.py --source ../../Rust/Arcade-link
+python3 packaging/check-vendored-tools.py
+python3 scripts/validate_shortcuts.py docs/user/shortcuts.json --manifest tests/fixtures/wheel-shortcut-manifest.json
 python3 -m unittest discover -s tests -p 'test_release.py' -v
 ```
 
@@ -26,11 +33,11 @@ No repository secrets are needed for unsigned builds. Build jobs have read-only 
 
 ## What is bundled
 
-- **Windows:** the Qt runtime, discovered QML imports, Qt plugins, and app-local Microsoft Visual C++ runtime DLLs. Inno Setup installs under `%LOCALAPPDATA%\Programs\Arcade Wheel`, adds a Start menu shortcut and an optional desktop shortcut, and provides an uninstaller. No administrator rights or separate runtime setup are needed. The portable ZIP contains the same application files.
+- **Windows:** the Qt runtime, discovered QML imports, Qt plugins, and app-local Microsoft Visual C++ runtime DLLs. The shared Inno integration installs under `%LOCALAPPDATA%\Programs\Arcade Wheel`, adds a Start menu shortcut and optional desktop/start-at-login shortcuts, writes an Arcade install receipt and CLI shim, and adds `%LOCALAPPDATA%\Arcade\bin` to the user PATH. No administrator rights or separate runtime setup are needed. The portable ZIP contains the same app files without installation integration.
 - **Linux:** Qt/QML, Wayland platform and integration plugins, LayerShellQt and its shell plugin, plus dependencies discovered by linuxdeploy. The official image is built on Ubuntu 22.04 to establish the compatibility baseline. System graphics drivers, glibc, the compositor, session D-Bus, and a suitable GlobalShortcuts portal remain host requirements.
 - **macOS:** a relocatable `.app`, Qt frameworks, QML and native plugins deployed by `macdeployqt`, inside a compressed DMG with an Applications shortcut. Native builds are made separately for Intel and Apple Silicon. The minimum macOS version is 13.
 
-The app generates defaults on first launch, discovers installed applications, and stores settings in the user's configuration directory. Installation and updates do not replace saved settings. Login startup is opt-in. AppImage login entries reference the permanent `.AppImage` file, never its temporary mount; macOS login registration requires the app to be installed in Applications.
+The app generates defaults on first launch, discovers installed applications, and stores settings in the user's configuration directory. Installation and updates do not replace saved settings. Start at login is opt-in. Linux and macOS first-run integration runs before the UI and uses receipts for repair and removal. AppImage autostart points at the permanent installed image, never APPDIR; LinuxBackend routes installed launcher/autostart maintenance through the shared engine. Manual/dev builds retain their existing durable portal identity. macOS native login-item behavior is unchanged.
 
 ## Local packaging
 

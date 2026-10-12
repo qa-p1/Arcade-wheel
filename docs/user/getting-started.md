@@ -16,17 +16,21 @@ Download the current build from [Arcade Wheel releases](https://github.com/qa-p1
 
 ### Linux
 
-Download the Arcade Wheel AppImage and run it. On first run, Wheel asks **“Install Arcade Wheel?”** Choose **Install** to add it to the app launcher, place it in `~/Applications/Arcade/`, add the `arcade-wheel` command in `~/.local/bin`, and optionally start Wheel at login. Choose **Just run it once** to use Wheel without installing it.
+Download the Arcade Wheel AppImage, make it executable and run it. Before Settings opens, choose **Install** to put Wheel in `~/Applications/Arcade/Arcade-Wheel.AppImage`, add its launcher and icons, and create the `~/.local/bin/arcade-wheel` command. **Start at login** is optional and off by default; **Remove the downloaded file** is on by default. You can also choose **Just run it once** or **Don't ask again for this file**. A changed download is treated as a new file.
 
-If `~/.local/bin` is not on your `PATH`, Wheel shows the exact line to add for your shell. To remove the installation, run `arcade-wheel --uninstall`, use the launcher's **Uninstall** action, or remove Wheel in Arcade Tools. Your settings stay unless you choose to remove them. Wheel's Wayland overlay also needs a compositor that supports the layer-shell integration; global shortcuts use the desktop's GlobalShortcuts portal.
+An older installed copy offers **Update** and keeps your settings. An equal or newer copy offers **Open installed**. Tools-managed updates go through Tools when it is installed. If your command folder is not on PATH, the dialog shows the exact line for your shell; Wheel never edits shell profiles.
+
+For scripted installation use `./ArcadeWheel.AppImage --install --silent --no-launch`. To repair launchers or a moved AppImage, run the installed or moved copy with `--repair`. To remove Wheel, use `arcade-wheel --uninstall` or the launcher's **Uninstall** action. Settings stay unless you pass `--remove-data`. `--integration-status` prints the receipt, entries and PATH status without changing them. Development builds and background/Link launches never prompt.
+
+Wheel's Wayland overlay needs a compositor that supports the layer-shell integration; global shortcuts use the desktop's GlobalShortcuts portal.
 
 ### Windows
 
-Run the per-user installer; no administrator account is needed. It adds a Start menu entry, offers an optional desktop shortcut and start-at-login setting, and puts `arcade-wheel` on `PATH`. If SmartScreen appears, choose **More info → Run anyway**. Uninstall from **Settings → Apps** or Arcade Tools.
+Run the per-user installer; no administrator account is needed. It adds a Start menu entry, a PATH command and an install receipt, and offers optional desktop and start-at-login shortcuts. If SmartScreen appears, choose **More info → Run anyway**. Uninstall from **Settings → Apps**. The CLI `--uninstall` uses the native uninstaller recorded in the install receipt. The extra ZIP download is portable and does not install integration.
 
 ### macOS
 
-Open the disk image and drag Arcade Wheel to Applications. If you run it from the disk image or Downloads, Wheel offers to move itself to Applications. The app is not notarized; the first time, Control-click or right-click it and choose **Open**.
+Open the disk image and drag Arcade Wheel to Applications. When started from Downloads, a mounted disk image or a translocated location, Wheel offers **Move to Applications** before opening Settings. It copies to `/Applications` when writable, otherwise `~/Applications`, preserves quarantine and relaunches from that copy. It writes an install receipt and creates a CLI symlink when `~/.local/bin` is already on PATH; otherwise it offers the exact command. Wheel keeps its native login-item behavior. The app is not notarized; the first time, Control-click or right-click it and choose **Open**.
 
 ## First run
 

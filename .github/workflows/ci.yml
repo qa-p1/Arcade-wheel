@@ -17,7 +17,9 @@ concurrency:
 
 env:
   QT_VERSION: '6.8.3'
-  ARCADE_LINK_REVISION: 'v0.2.0'
+  ARCADE_LINK_REVISION: 'v0.3.0'
+  CARGO_BUILD_JOBS: '2'
+  CMAKE_BUILD_PARALLEL_LEVEL: '2'
 
 jobs:
   build:
@@ -63,7 +65,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libglib2.0-dev dbus libwayland-dev wayland-protocols libxkbcommon-dev libgl1-mesa-dev libegl1-mesa-dev libfuse2 desktop-file-utils
+          sudo apt-get install -y ninja-build libglib2.0-dev dbus libwayland-dev wayland-protocols libxkbcommon-dev libgl1-mesa-dev libegl1-mesa-dev libfuse2 desktop-file-utils xvfb xdotool
 
       - name: Install Qt
         uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
@@ -100,13 +102,7 @@ jobs:
           -DCMAKE_OSX_ARCHITECTURES="$TARGET_ARCH" -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
 
       - name: Build
-        run: cmake --build build --config Release --parallel 3
-
-      - name: Test
-        env:
-          QT_QPA_PLATFORM: offscreen
-          QT_QUICK_BACKEND: software
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 120
+        run: cmake --build build --config Release --parallel 2
 
       - name: Test release publication rules
         if: runner.os == 'Linux'
@@ -121,9 +117,50 @@ jobs:
           path: .arcade-link-upstream
           persist-credentials: false
 
-      - name: Compare the vendored Qt module, vectors and generator with the pinned source
+      - name: Compare the vendored Qt module and vectors with the pinned source
         if: runner.os == 'Linux'
         run: python3 packaging/check-link-vendor.py --source .arcade-link-upstream
+
+      - name: Compare vendored packaging and shortcut tools with the pinned source
+        if: runner.os == 'Linux'
+        run: python3 packaging/check-vendored-tools.py --source .arcade-link-upstream
+
+      - name: Validate shortcut data and generated Markdown
+        if: runner.os == 'Linux'
+        run: |
+          python3 scripts/validate_shortcuts.py docs/user/shortcuts.json \
+            --manifest tests/fixtures/wheel-shortcut-manifest.json
+          python3 scripts/validate_shortcuts.py docs/user/shortcuts.json \
+            --manifest tests/fixtures/wheel-shortcut-manifest.json --markdown > "$RUNNER_TEMP/shortcuts.md"
+          diff -u docs/user/shortcuts.md "$RUNNER_TEMP/shortcuts.md"
+
+      - name: Check documentation links
+        if: runner.os == 'Linux'
+        run: python3 packaging/check-docs.py
+
+      - name: Build the released Link CLI for interop and isolated lifecycle checks
+        if: runner.os == 'Linux'
+        env:
+          RUSTUP_TOOLCHAIN: '1.88.0'
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          cargo build --manifest-path .arcade-link-upstream/Cargo.toml -p arcade-link-cli --locked
+
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          ARCADE_LINK_CLI: ${{ runner.os == 'Linux' && format('{0}/.arcade-link-upstream/target/debug/arcade-link', github.workspace) || '' }}
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 120
+
+      - name: Wheel hub lifecycle in Link's isolated session
+        if: runner.os == 'Linux'
+        env:
+          RUSTUP_TOOLCHAIN: '1.88.0'
+        run: >-
+          python3 .arcade-link-upstream/tools/e2e.py run --
+          python3 tests/hub-lifecycle.py "$PWD/build/arcade-wheel"
+          "$PWD/.arcade-link-upstream/target/debug/arcade-link"
 
       - name: Check release tag matches the app version
         if: startsWith(github.ref, 'refs/tags/v')
@@ -166,13 +203,30 @@ jobs:
         run: |
           $installer = Get-Item dist/*-Setup.exe
           $destination = Join-Path $env:RUNNER_TEMP 'Arcade Wheel Installed'
-          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$destination`"" -Wait -PassThru
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/MERGETASKS=arcade_startup', "/DIR=`"$destination`"" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
           python packaging/smoke-test.py "$destination/arcade-wheel.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Installed app smoke test failed' }
+          $arcadeRoot = Join-Path $env:LOCALAPPDATA 'Arcade'
+          $receiptPath = Join-Path $arcadeRoot 'installs/arcade.wheel.json'
+          $shim = Join-Path $arcadeRoot 'bin/arcade-wheel.cmd'
+          $startup = Join-Path $env:APPDATA 'Microsoft/Windows/Start Menu/Programs/Startup/Arcade Wheel.lnk'
+          if (-not (Test-Path $receiptPath)) { throw 'Installer did not write the Arcade receipt' }
+          if (-not (Test-Path $shim)) { throw 'Installer did not write the CLI shim' }
+          if (-not (Test-Path $startup)) { throw 'Silent task selection did not create the login shortcut' }
+          $receipt = Get-Content -Raw $receiptPath | ConvertFrom-Json
+          $expectedExecutable = [IO.Path]::GetFullPath((Join-Path $destination 'arcade-wheel.exe'))
+          if ($receipt.id -ne 'arcade.wheel' -or $receipt.method -ne 'windows-installer' -or $receipt.path -ne $expectedExecutable) { throw 'Installer receipt has unexpected identity or path' }
+          $pathValue = [string][Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment').GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          if (-not (@($pathValue.Split(';') | Where-Object { $_.TrimEnd('\','/') -ieq (Join-Path $arcadeRoot 'bin').TrimEnd('\','/') }).Count -gt 0)) { throw 'Installer did not add its shim directory to user PATH' }
           $process = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Uninstaller failed: $($process.ExitCode)" }
           if (Test-Path "$destination/arcade-wheel.exe") { throw 'Uninstaller left the executable behind' }
+          if (Test-Path $receiptPath) { throw 'Uninstaller left the Arcade receipt behind' }
+          if (Test-Path $shim) { throw 'Uninstaller left the CLI shim behind' }
+          if (Test-Path $startup) { throw 'Uninstaller left the login shortcut behind' }
+          $pathValue = [string][Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment').GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+          if (@($pathValue.Split(';') | Where-Object { $_.TrimEnd('\','/') -ieq (Join-Path $arcadeRoot 'bin').TrimEnd('\','/') }).Count -gt 0) { throw 'Uninstaller left its shim directory on user PATH' }
 
       - name: Package and smoke-test macOS DMG
         if: runner.os == 'macOS'

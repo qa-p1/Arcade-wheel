@@ -54,9 +54,15 @@ arcade-wheel --cancel       # close the wheel
 arcade-wheel --status       # print status as JSON
 arcade-wheel --restart      # restart the running instance
 arcade-wheel --quit         # quit the running instance
+arcade-wheel --menu         # print Wheel's app-specific tray items as JSON
+arcade-wheel --settings-export portable.json
+arcade-wheel --settings-import portable.json
+arcade-wheel --integration-status
 ```
 
-`--press` and `--release` simulate the trigger; `--release` can run the selected action. Closing Settings leaves Wheel running. A tray icon opens Settings on click and offers Open Wheel, Open Settings, Restart Arcade Wheel and Quit Arcade Wheel.
+`--press` and `--release` simulate the trigger; `--release` can run the selected action. Portable settings include decks and slots, omit credential, token, secret and device-identity fields, and save a private backup before import. Closing Settings leaves Wheel running. A tray icon opens Settings on click and offers Show Wheel, Open Settings, Restart Arcade Wheel and Quit Arcade Wheel.
+
+Linux AppImages and macOS bundles support `--install [--silent] [--no-launch] [--channel stable|nightly]`. Use `--uninstall [--silent] [--remove-data]` to remove receipt-owned integration, `--repair` to repair entries, and `--integration-status` for receipt, entry and PATH diagnostics. Windows installation uses the per-user setup EXE; the CLI delegates uninstall to its native uninstaller. Start at login is optional. See the [installation guide](docs/user/getting-started.md).
 
 ### Configuration
 
@@ -80,6 +86,8 @@ src/config/      ConfigStore: defaults, migration, validation, atomic save, impo
 src/actions/     ActionDispatcher: built-in action routing
 src/providers/   ActionProvider interface and asynchronous Arcade Link discovery/jobs
 src/platform/    Linux, Windows, and macOS desktop integration backends
+src/install/     Qt first-run dialog and installation CLI
+src/link/qt/     Commit-pinned Arcade Link v0.3.0 modules
 qml/             Wheel overlay, settings UI, shared components
 tests/           Qt Test suites (run with ctest)
 docs/            Architecture, manual release checks, Arcade Link actions
@@ -98,4 +106,4 @@ Issues and pull requests are welcome. Please:
 
 ### License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE) and the [vendored dependency inventory](docs/VENDORED.md).

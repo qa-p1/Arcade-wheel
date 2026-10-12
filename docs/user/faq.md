@@ -25,3 +25,11 @@ No. A command action starts a program directly with its arguments. If you need s
 ## Which platforms have been exercised interactively?
 
 Linux Wayland is used daily on Hyprland, and the project has Linux Xvfb checks. Windows and macOS are built, tested and packaged in CI, but have **not been run interactively on real Windows or macOS desktops**. Other Wayland desktops also need more real-desktop checking. See [project status](../STATUS.md).
+
+## Can I keep using Wheel without Tools?
+
+Yes. Tools hosts only the tray. Wheel's actions and settings stay in Wheel. If Tools quits or crashes, Wheel restores its own tray immediately; during a declared Tools restart it waits up to five seconds to avoid flashing icons. Turning off connections also restores Wheel's tray.
+
+## What goes into a settings backup?
+
+Preferences, decks, slots and center gestures. Credential, token, secret and device-identity fields are omitted. Commands and paths you save as actions remain part of those slots. Import saves a private copy of your current configuration first.

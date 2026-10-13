@@ -1,7 +1,7 @@
 ---
 title: Fix common Arcade Wheel issues
 order: 6
-since: 0.2.0
+since: 0.3.0
 ---
 
 # Fix common Arcade Wheel issues

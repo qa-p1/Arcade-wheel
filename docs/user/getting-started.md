@@ -1,7 +1,7 @@
 ---
 title: Install and start Arcade Wheel
 order: 2
-since: 0.2.0
+since: 0.3.0
 ---
 
 # Install and start Arcade Wheel

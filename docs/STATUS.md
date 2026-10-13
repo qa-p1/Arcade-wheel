@@ -1,6 +1,6 @@
 # Arcade Wheel: status
 
-Updated 2026-10-12 on branch `arcade/tools-hub` (Wheel 0.2.0, Arcade Link
+Updated 2026-10-12 on branch `arcade/tools-hub` (Wheel 0.3.0, Arcade Link
 v0.3.0, protocol 1). This records implementation and verification separately.
 
 ## Implemented

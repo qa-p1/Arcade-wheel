@@ -1,7 +1,7 @@
 ---
 title: Set up decks, actions and gestures
 order: 3
-since: 0.2.0
+since: 0.3.0
 ---
 
 # Set up decks, actions and gestures

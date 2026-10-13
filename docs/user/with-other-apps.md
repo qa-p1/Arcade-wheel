@@ -1,7 +1,7 @@
 ---
 title: Use Arcade Wheel with other apps
 order: 4
-since: 0.2.0
+since: 0.3.0
 ---
 
 # Use Arcade Wheel with other apps

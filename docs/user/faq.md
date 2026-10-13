@@ -1,7 +1,7 @@
 ---
 title: Arcade Wheel questions
 order: 5
-since: 0.2.0
+since: 0.3.0
 ---
 
 # Arcade Wheel questions

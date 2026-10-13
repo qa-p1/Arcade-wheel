@@ -40,25 +40,21 @@ Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs c
 [Run]
 Filename: "{app}\{#ARCADE_EXE}"; Description: "Open Arcade Wheel"; Flags: nowait postinstall skipifsilent
 
-[UninstallRun]
-Filename: "{app}\{#ARCADE_EXE}"; Parameters: "--quit"; Flags: runhidden; RunOnceId: "QuitArcadeWheel"; Check: WheelOwnsIntegration
-
-[UninstallDelete]
-Type: files; Name: "{code:WheelArcadeRoot}\apps\arcade.wheel.json"; Check: WheelOwnsIntegration
-
 [Code]
-var
-  WheelIntegrationOwned: Boolean;
-
-function WheelArcadeRoot(Param: String): String;
+function WheelArcadeRoot: String;
 begin
   Result := GetEnv('ARCADE_HOME');
   if Result = '' then Result := ExpandConstant('{localappdata}\Arcade');
 end;
 
-function WheelOwnsIntegration: Boolean;
+procedure QuitRunningWheel;
+var
+  Exe: String;
+  ExitCode: Integer;
 begin
-  Result := WheelIntegrationOwned;
+  Exe := ExpandConstant('{app}\{#ARCADE_EXE}');
+  if FileExists(Exe) then
+    Exec(Exe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -76,14 +72,18 @@ var
   HadReceipt: Boolean;
 begin
   if CurUninstallStep = usUninstall then begin
-    Receipt := WheelArcadeRoot('') + '\installs\arcade.wheel.json';
+    Receipt := WheelArcadeRoot + '\installs\arcade.wheel.json';
     HadReceipt := FileExists(Receipt);
     // Exit 10 leaves a successor's receipt in place. Extra Wheel files may
     // be removed only when the shared helper proves this copy owned it.
+    // [UninstallRun]/[UninstallDelete] Check functions run during setup,
+    // before ownership is known, so this cleanup lives here instead.
     ArcadeIntegration(False);
-    WheelIntegrationOwned := HadReceipt and not FileExists(Receipt);
-    if WheelIntegrationOwned then
+    if HadReceipt and not FileExists(Receipt) then begin
+      QuitRunningWheel;
+      DeleteFile(WheelArcadeRoot + '\apps\arcade.wheel.json');
       RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'ArcadeWheel');
+    end;
   end;
 end;
 

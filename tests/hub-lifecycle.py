@@ -47,6 +47,18 @@ def wait_for(executable, predicate, timeout=10):
             return last
     raise AssertionError(f"status timeout: {last}")
 
+def describe(timeout=10):
+    # The tray state arrives over Wheel's own socket; its Link endpoint can
+    # register a moment later, so wait for the registry like Tools does.
+    deadline = time.monotonic() + timeout
+    while True:
+        result = run(link_cli, "call", "wheel", "describe", check=False)
+        if result.returncode == 0 or time.monotonic() > deadline:
+            if result.returncode:
+                raise AssertionError(f"describe: {result.returncode}\n{result.stdout}\n{result.stderr}")
+            return json.loads(result.stdout)
+        time.sleep(0.1)
+
 def spawn_host():
     host = subprocess.Popen([str(link_cli), "tray", "host"], env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -109,7 +121,7 @@ try:
         host = spawn_host()
         process = start(installed)
         wait_for(installed, lambda s: s.get("tray") == "hosted")
-        methods = json.loads(run(link_cli, "call", "wheel", "describe").stdout)["methods"]
+        methods = describe()["methods"]
         assert all(method in methods for method in ["app.settings", "app.restart", "app.menu", "app.menu.invoke",
             "app.shortcuts.set", "app.settings.export", "app.settings.import"])
         assert json.loads(run(link_cli, "call", "wheel", "app.menu").stdout)["items"][0]["id"] == "show-wheel"

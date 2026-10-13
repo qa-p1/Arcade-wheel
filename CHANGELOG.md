@@ -2,7 +2,7 @@
 
 All notable changes to Arcade Wheel are documented here.
 
-## Unreleased (branch `arcade/tools-hub`)
+## Unreleased
 
 ### Arcade Tools hub support
 

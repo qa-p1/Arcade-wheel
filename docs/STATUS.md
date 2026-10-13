@@ -1,7 +1,6 @@
 # Arcade Wheel: status
 
-Updated 2026-10-12 on branch `arcade/tools-hub` (Wheel 0.3.0, Arcade Link
-v0.3.0, protocol 1). This records implementation and verification separately.
+Updated 2026-10-13 (Wheel 0.3.0, Arcade Link v0.3.0, protocol 1). This records implementation and verification separately.
 
 ## Implemented
 
@@ -35,11 +34,13 @@ v0.3.0, protocol 1). This records implementation and verification separately.
 
 | Check | Result |
 |---|---|
-| Qt debug build and complete offscreen CTest suite | Final verification in progress |
-| Portable settings, methods, tray and shared install/shortcut vectors | Final verification in progress |
-| Link vendor, Windows/release assets, shortcuts and docs checks | Final verification in progress |
-| Isolated Wheel process lifecycle through Link tools/e2e.py | Final verification in progress; executable copies simulate AppImage runtime paths |
-| Linux, Windows, macOS packaging and native installer checks | GitHub Actions verification in progress; CI only |
+| Qt build and complete CTest suite | Linux 16/16 (offscreen), Windows 15/15, macOS arm64 and x86_64 15/15 each, [CI run 38433936789](https://github.com/qa-p1/Arcade-wheel/actions/runs/38433936789) at `36f2e13` |
+| Python release and shortcut tests | 16/16 pass (Linux CI and local) |
+| Link vendor, release assets, shortcuts and docs checks | pass in the same run |
+| Isolated hub lifecycle through Link tools/e2e.py (Linux CI) | pass: self-install from a simulated AppImage, update with `previous`, repair after a move, uninstall keeping data, settings export/import, `app.restart`, tray hosted/own including the 1 s hand-back and restart grace |
+| Windows per-user Inno setup (CI only) | pass: silent install, manifest, docs, settings, login toggle, repair, successor installer, old uninstaller exit 10, uninstall removes receipt, shim, login shortcut, Link manifest and PATH entry |
+| macOS DMG, both architectures (CI only) | pass: install, manifest, docs, settings, moved-bundle repair and uninstall |
+| Linux AppImage packaging and smoke (CI only) | pass |
 
 This branch has not been installed into the owner's real profile. Native
 Windows/macOS behavior is exercised by CI, not a real desktop. Rust interop

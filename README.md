@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/arcade/arcade.wheel.svg" width="96" alt="Arcade Wheel logo">
+  <img src="assets/arcade-wheel.svg" width="112" alt="Arcade Wheel icon">
 </p>
 
 <h1 align="center">Arcade Wheel</h1>

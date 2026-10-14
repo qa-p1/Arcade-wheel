@@ -337,7 +337,24 @@ bool AppInstaller::setStartOnLogin(const Engine &engine, bool enabled, QString *
     opts.channel = d.receipt.value("channel").toString();
     opts.managedBy = d.receipt.value("managedBy").toString();
     opts.startAtLogin = enabled; opts.refreshCaches = false;
-    return engine.install(opts, nullptr, error);
+    QJsonObject installed;
+    if (!engine.install(opts, &installed, error)) return false;
+    // The pinned installer rebuilds receipts. Keep fields added by Tools or
+    // newer Link versions when changing only the login preference.
+    auto receipt = d.receipt;
+    auto integration = receipt.value("integration").toObject();
+    const auto updated = installed.value("integration").toObject();
+    for (auto it = updated.begin(); it != updated.end(); ++it) integration.insert(it.key(), it.value());
+    if (!enabled) {
+        const QString autostart = integration.value("autostart").toString();
+        if (!autostart.isEmpty() && QFileInfo::exists(autostart) && !QFile::remove(autostart)) {
+            *error = QStringLiteral("Could not remove Wheel's login entry."); return false;
+        }
+        integration.insert("autostart", QJsonValue::Null);
+    }
+    receipt.insert("integration", integration);
+    receipt.insert("updatedAt", nowRfc3339());
+    return engine.environment().receipts().write(receipt, error);
 #else
     Q_UNUSED(engine); Q_UNUSED(enabled); Q_UNUSED(error); return false;
 #endif
@@ -390,7 +407,7 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
     const bool ok = onWorker([&] {
         if (cmd == u"--integration-status") { receipt = engine.integrationStatus(Ids::Wheel, qEnvironmentVariable("SHELL"), &error); return error.isEmpty(); }
         if (cmd == u"--install") {
-            if (detection.receipt.value("managedBy").toString() == u"tools" && toolsAvailable(engine)) return handoff(engine, version, &error);
+            if (!silent && detection.receipt.value("managedBy").toString() == u"tools" && toolsAvailable(engine)) return handoff(engine, version, &error);
             return installCopy(engine, runtime, options, version, &receipt, &error);
         }
         if (cmd == u"--repair") {

@@ -165,8 +165,14 @@ try:
         wait_for(installed, lambda s: not s.get("running"))
         receipt_path = Path(env["ARCADE_HOME"]) / "installs/arcade.wheel.json"
         previous = json.loads(receipt_path.read_text()); previous["version"] = "0.1.0"
+        previous["managedBy"] = "tools"
         receipt_path.write_text(json.dumps(previous))
+        # Tools is present while it invokes a silent managed update. The tray
+        # mock has no tools.install action: any callback would fail the update.
+        host = spawn_host()
         updated = json.loads(run(mounted, "--install", "--silent", "--no-launch", environment=image_env).stdout)
+        assert updated["managedBy"] == "tools"
+        host.kill(); host.wait(timeout=5)
         assert updated["previous"]["version"] == "0.1.0"
         assert Path(updated["previous"]["path"]).exists()
         config = next(Path(env["XDG_CONFIG_HOME"]).rglob("config.json"))

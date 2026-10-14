@@ -96,6 +96,19 @@ private slots:
         QVERIFY(QFile::remove(integration.value("desktopEntry").toString()));
         QVERIFY2(engine.repair(AppInstaller::appInfo(), {}, nullptr, &error), qPrintable(error));
         QVERIFY(QFileInfo::exists(integration.value("desktopEntry").toString()));
+        receipt.insert("toolsExtension", QJsonObject{{"keep", true}});
+        auto extended = receipt.value("integration").toObject();
+        extended.insert("futureIntegration", "keep"); receipt.insert("integration", extended);
+        QVERIFY2(env.receipts().write(receipt, &error), qPrintable(error));
+        for (const bool enabled : {false, true, false, true}) {
+            QVERIFY2(AppInstaller::setStartOnLogin(engine, enabled, &error), qPrintable(error));
+            QJsonObject changed;
+            QVERIFY2(env.receipts().read(Ids::Wheel, &changed, &error), qPrintable(error));
+            QCOMPARE(changed.value("toolsExtension"), receipt.value("toolsExtension"));
+            QCOMPARE(changed.value("integration").toObject().value("futureIntegration"), QJsonValue("keep"));
+            QCOMPARE(QFileInfo::exists(integration.value("autostart").toString()), enabled);
+            QCOMPARE(changed.value("integration").toObject().value("autostart").isString(), enabled);
+        }
         AppInstaller::Engine::UninstallOptions uninstall;
         QVERIFY2(engine.uninstall(Ids::Wheel, uninstall, nullptr, &error), qPrintable(error));
         QVERIFY(!QFileInfo::exists(receipt.value("path").toString()));

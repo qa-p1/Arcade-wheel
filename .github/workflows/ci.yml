@@ -184,6 +184,14 @@ jobs:
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
           bash packaging/linux/package.sh build dist
 
+      - name: Packaged AppImage install and uninstall (isolated, CI only)
+        if: runner.os == 'Linux'
+        env:
+          RUSTUP_TOOLCHAIN: '1.88.0'
+        run: >-
+          python3 .arcade-link-upstream/tools/e2e.py run --
+          python3 tests/appimage-lifecycle.py dist/*.AppImage
+
       - name: Ensure Inno Setup is available
         if: runner.os == 'Windows'
         shell: pwsh
@@ -208,13 +216,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $env:ARCADE_HOME = Join-Path $env:RUNNER_TEMP 'wheel-install-arcade'
+          $env:ARCADE_WHEEL_INSTANCE = Join-Path $env:RUNNER_TEMP 'wheel-install-profile'
           $installer = Get-Item dist/*-Setup.exe
           $destination = Join-Path $env:RUNNER_TEMP 'Arcade Wheel Installed'
           $process = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/MERGETASKS=arcade_startup', "/DIR=`"$destination`"" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
           python packaging/smoke-test.py "$destination/arcade-wheel.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Installed app smoke test failed' }
-          $arcadeRoot = Join-Path $env:LOCALAPPDATA 'Arcade'
+          $arcadeRoot = $env:ARCADE_HOME
           $receiptPath = Join-Path $arcadeRoot 'installs/arcade.wheel.json'
           $shim = Join-Path $arcadeRoot 'bin/arcade-wheel.cmd'
           $startup = Join-Path $env:APPDATA 'Microsoft/Windows/Start Menu/Programs/Startup/Arcade Wheel.lnk'

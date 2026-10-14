@@ -1,4 +1,5 @@
 #include "core/IconImageProvider.h"
+#include "core/CommandReply.h"
 #include "core/WheelController.h"
 #include "link/WheelLink.h"
 #include "link/qt/ArcadeTrayHost.h"
@@ -198,8 +199,7 @@ int main(int argc, char **argv)
             } else request = command.toUtf8() + '\n';
             existing.write(request);
             existing.waitForBytesWritten(300);
-            QByteArray reply;
-            while (!reply.contains('\n') && existing.waitForReadyRead(1000)) reply += existing.readAll();
+            const QByteArray reply = WheelCommands::readReply(existing);
             if (!reply.isEmpty()) {
                 if (command == QStringLiteral("--status")) QTextStream(stdout) << reply;
                 else if (command == QStringLiteral("--settings-import")) {
@@ -406,7 +406,8 @@ int main(int argc, char **argv)
         else if (cmd == QStringLiteral("--settings") || cmd.isEmpty()) showSettings();
         else if (cmd == QStringLiteral("--settings-import")) {
             if (value.isEmpty() || !controller.importConfig(value)) return false;
-            showSettings();
+            // Confirm the saved import before the first Settings/QML load.
+            QTimer::singleShot(0, &app, showSettings);
         }
         return true;
     };
@@ -442,6 +443,7 @@ int main(int argc, char **argv)
                         socket->write((QStringLiteral("ERROR: ") + controller.lastError() + QLatin1Char('\n')).toUtf8());
                     else socket->write("OK\n");
                 }
+                socket->flush();
                 socket->disconnectFromServer();
             };
             QObject::connect(socket, &QLocalSocket::readyRead, &app, receive);

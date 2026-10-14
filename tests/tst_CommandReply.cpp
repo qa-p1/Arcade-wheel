@@ -67,7 +67,7 @@ private slots:
         QVERIFY(listening);
         client.connectToServer(name);
         QVERIFY(client.waitForConnected(1000));
-        if (buffered) QVERIFY(client.waitForReadyRead(1000));
+        if (buffered && !client.bytesAvailable()) QVERIFY(client.waitForReadyRead(1000));
         QCOMPARE(timeout ? WheelCommands::readReply(client, timeout) : WheelCommands::readReply(client), expected);
     }
 };

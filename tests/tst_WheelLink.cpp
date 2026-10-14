@@ -8,6 +8,7 @@
 #include <QTemporaryDir>
 #include <QThread>
 #include <QtTest>
+#include <QQuickView>
 
 using namespace ArcadeLink;
 
@@ -38,6 +39,34 @@ static void onWorker(F &&f)
 class WheelLinkTest final : public QObject {
     Q_OBJECT
 private slots:
+    void manifestPublishesCanonicalConfiguredHoldTriggerAndMenu()
+    {
+        auto config = ConfigStore::defaults();
+        auto trigger = config.value(QStringLiteral("trigger")).toObject();
+        trigger.insert(QStringLiteral("shortcut"), QStringLiteral("Tab"));
+        config.insert(QStringLiteral("trigger"), trigger);
+        auto manifest = WheelLink::manifest(config, QStringLiteral("0.3.0"));
+        auto shortcuts = manifest.value(QStringLiteral("shortcuts")).toArray();
+        QCOMPARE(shortcuts.size(), 1);
+        QCOMPARE(shortcuts.first().toObject().value(QStringLiteral("id")).toString(), QStringLiteral("trigger"));
+        QCOMPARE(shortcuts.first().toObject().value(QStringLiteral("accelerator")).toString(), QStringLiteral("Tab"));
+        QCOMPARE(manifest.value(QStringLiteral("menu")).toArray().first().toObject().value(QStringLiteral("id")).toString(),
+                 QStringLiteral("show-wheel"));
+        QCOMPARE(manifest.value(QStringLiteral("docs")).toObject().value(QStringLiteral("version")).toString(),
+                 QStringLiteral("0.3.0"));
+
+        trigger.insert(QStringLiteral("shortcut"), QStringLiteral("Alt+Control+Space"));
+        config.insert(QStringLiteral("trigger"), trigger);
+        manifest = WheelLink::manifest(config, QStringLiteral("0.3.0"));
+#ifdef Q_OS_MACOS
+        const QString expected = QStringLiteral("Alt+Super+Space");
+#else
+        const QString expected = QStringLiteral("Ctrl+Alt+Space");
+#endif
+        QCOMPARE(manifest.value(QStringLiteral("shortcuts")).toArray().first().toObject()
+                     .value(QStringLiteral("accelerator")).toString(), expected);
+    }
+
     void statusReportsTheOriginalLaunchMode_data()
     {
         QTest::addColumn<bool>("background");
@@ -63,6 +92,95 @@ private slots:
         }
         qputenv("ARCADE_HOME", previous);
     }
+    void hubMethodsRoundTripAndValidation()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const auto previous = qgetenv("ARCADE_HOME");
+        qputenv("ARCADE_HOME", dir.filePath("arcade").toUtf8());
+        {
+            LinkBackend backend; WheelController controller(&backend, nullptr, dir.filePath("config.json")); controller.initialize();
+            QQuickView overlay; controller.setOverlayView(&overlay);
+            WheelLink link("0.3.0"); link.setController(&controller);
+            connect(&controller, &WheelController::configChanged, &link, [&] { link.apply(QJsonObject::fromVariantMap(controller.config())); });
+            link.apply(QJsonObject::fromVariantMap(controller.config())); link.setTrayState("hosted");
+            QTRY_VERIFY(link.listening());
+            QSignalSpy settings(&controller, &WheelController::settingsRequested), restarted(&controller, &WheelController::restartRequested);
+            Error error; QJsonObject description, status, rebound, imported; QJsonArray menu, outputs;
+            onWorker([&] {
+                auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "0.3.0", 1000, &error);
+                if (!client) return;
+                description = client->describe(&error);
+                status = client->call("app.status", {}, &error).toObject();
+                menu = client->menu(&error);
+                if (!client->settings(&error)) return;
+                rebound = client->shortcutsSet("trigger", "Alt+Control+Space", &error);
+                if (error.isError()) return;
+                outputs = client->settingsExport(&error);
+                if (error.isError()) return;
+                imported = client->settingsImport(outputs, &error);
+                if (!error.isError()) client->restart({}, &error);
+            });
+            QVERIFY2(!error.isError(), qPrintable(error.message));
+            QCOMPARE(settings.count(), 1); QTRY_COMPARE(restarted.count(), 1);
+            const auto methods = description.value("methods").toArray();
+            for (const auto &method : {"app.settings", "app.restart", "app.menu", "app.menu.invoke", "app.shortcuts.set", "app.settings.export", "app.settings.import"})
+                QVERIFY2(methods.contains(QString::fromLatin1(method)), method);
+            QCOMPARE(menu, WheelLink::menuItems());
+            QCOMPARE(status.value("status").toObject().value("tray").toString(), QStringLiteral("hosted"));
+            QVERIFY(rebound.value("applied").toBool()); QCOMPARE(rebound.value("via").toString(), QStringLiteral("native"));
+            QVERIFY(imported.value("imported").toBool()); QVERIFY(!imported.value("restartRequired").toBool());
+            QCOMPARE(outputs.size(), 1); QVERIFY(QFileInfo::exists(outputs.first().toObject().value("path").toString()));
+            QVERIFY(!QDir(dir.path()).entryList({"config.json.backup-*.json"}, QDir::Files).isEmpty());
+            QTRY_VERIFY([&] {
+                QFile file(link.locations().manifestPath(Ids::Wheel));
+                if (!file.open(QIODevice::ReadOnly)) return false;
+                return QJsonDocument::fromJson(file.readAll()).object().value("shortcuts").toArray().first().toObject().value("accelerator").toString() == u"Ctrl+Alt+Space";
+            }());
+            const auto saved = controller.config();
+            onWorker([&] {
+                auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
+                if (client) client->shortcutsSet("trigger", "Ctrl+DefinitelyNotAKey", &error);
+            });
+            QCOMPARE(error.code, QStringLiteral("denied")); QCOMPARE(controller.config(), saved);
+            onWorker([&] {
+                auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
+                if (client) client->menuInvoke("missing", &error);
+            });
+            QCOMPARE(error.code, QStringLiteral("unavailable"));
+            onWorker([&] {
+                auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
+                if (client) client->menuInvoke("show-wheel", &error);
+            });
+            QVERIFY2(!error.isError(), qPrintable(error.message));
+            QVERIFY(controller.overlayVisible()); controller.cancelTrigger();
+            onWorker([&] {
+                auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
+                if (client) client->settingsImport({QJsonObject{{"type", "file/any"}, {"path", "relative.json"}}}, &error);
+            });
+            QCOMPARE(error.code, QStringLiteral("unsupported_input"));
+            QFile bad(dir.filePath("bad.json")); QVERIFY(bad.open(QIODevice::WriteOnly)); bad.write("{}"); bad.close();
+            onWorker([&] {
+                auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
+                if (client) client->settingsImport({QJsonObject{{"type", "file/any"}, {"path", bad.fileName()}}}, &error);
+            });
+            QCOMPARE(error.code, QStringLiteral("denied")); QCOMPARE(controller.config(), saved);
+            QString draftError;
+            QVERIFY(controller.beginLinkAction(WheelLink::draftFor(textContent("text/url", "https://example.com"), &draftError), "Test"));
+            onWorker([&] {
+                auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
+                if (client) client->restart({}, &error);
+            });
+            QCOMPARE(error.code, QStringLiteral("busy"));
+            onWorker([&] {
+                auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
+                if (client) client->restart("force", &error);
+            });
+            QVERIFY2(!error.isError(), qPrintable(error.message)); QTRY_COMPARE(restarted.count(), 2);
+            controller.finishLinkAction(false);
+        }
+        if (previous.isNull()) qunsetenv("ARCADE_HOME"); else qputenv("ARCADE_HOME", previous);
+    }
+
     void drafts()
     {
         QString error;

@@ -1,9 +1,6 @@
 # Arcade Wheel: status
 
-Verified 2026-10-08 on branch `arcade/link` (version 0.2.0, Qt Link module
-vendored from Arcade Link `v0.1.0`); Link module re-vendored from `v0.2.0`
-(adds Shelf and Find) on 2026-10-10. This page records what is implemented
-and how it was checked; the other documents describe how it works.
+Updated 2026-10-13 (Wheel 0.3.0, Arcade Link v0.3.0, protocol 1). This records implementation and verification separately.
 
 ## Implemented
 
@@ -17,18 +14,37 @@ and how it was checked; the other documents describe how it works.
   picker (tools, presets, saved Box pipelines, with clipboard, Lens selection
   or file-manager selection as input), `wheel.show` and `wheel.add_action`
   (always confirmed in Settings), the Connected apps page.
+- Portable JSON settings import/export with secret and device-identity fields
+  omitted, a private backup before import, and a CLI `--menu` listing for the
+  Wheel-specific tray action. The manifest carries the configured effective
+  trigger in canonical form under the `trigger` shortcut id.
+- Windows per-user Inno setup using the shared Link integration include for
+  the receipt, PATH shim and optional login shortcut. Linux AppImages use the
+  shared first-run self-installer and macOS bundles offer move-to-Applications.
+
+- All seven hub methods with feature detection, restart busy/force policy,
+  explicit shortcut registration results and live configuration updates.
+- Tools tray hosting with startup gating, exclusions, Link off, immediate
+  socket-close recovery, and a five-second restart grace; tray status and
+  menu/docs/log/install manifest metadata.
+- Install/update/open dialog with shared strings, exact-file dismissal,
+  background/dev suppression, Tools handoff, lifecycle CLI and PATH hints.
 
 ## Verification
 
 | Check | Result |
 |---|---|
-| `ctest` | 9 of 9 suites pass |
-| `packaging/check-link-vendor.py --source …` | the 8 vendored files match `v0.2.0` |
-| CI (Linux AppImage, Windows setup, macOS arm64 and x86_64 DMGs, each built, tested and smoke-tested) | passing at `3333434` |
-| Arcade Link e2e, `wheel` group and cross-app flows | all passing (74/74 ecosystem checks) |
-| Benchmark against the 2026-10-05 baseline | startup 146.9 → 136.6 ms, warm invoke 38.6 → 35.2 ms, idle RSS 114 → 115 MiB, idle CPU 0 |
+| Qt build and complete CTest suite | Linux 16/16 (offscreen), Windows 15/15, macOS arm64 and x86_64 15/15 each, [CI run 38433936789](https://github.com/qa-p1/Arcade-wheel/actions/runs/38433936789) at `36f2e13` |
+| Python release and shortcut tests | 16/16 pass (Linux CI and local) |
+| Link vendor, release assets, shortcuts and docs checks | pass in the same run |
+| Isolated hub lifecycle through Link tools/e2e.py (Linux CI) | pass: self-install from a simulated AppImage, update with `previous`, repair after a move, uninstall keeping data, settings export/import, `app.restart`, tray hosted/own including the 1 s hand-back and restart grace |
+| Windows per-user Inno setup (CI only) | pass: silent install, manifest, docs, settings, login toggle, repair, successor installer, old uninstaller exit 10, uninstall removes receipt, shim, login shortcut, Link manifest and PATH entry |
+| macOS DMG, both architectures (CI only) | pass: install, manifest, docs, settings, moved-bundle repair and uninstall |
+| Linux AppImage packaging and smoke (CI only) | pass |
 
-Wheel runs daily on the owner's Hyprland desktop.
+This branch has not been installed into the owner's real profile. Native
+Windows/macOS behavior is exercised by CI, not a real desktop. Rust interop
+checks require `ARCADE_LINK_CLI`; without it those cases report skips.
 
 ## Limits
 

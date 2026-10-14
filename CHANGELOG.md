@@ -2,7 +2,19 @@
 
 All notable changes to Arcade Wheel are documented here.
 
-## Unreleased (branch `arcade/link`)
+## 0.3.0 — Unreleased
+
+### Arcade Tools hub support
+
+- Keep Windows Settings and the installer on one receipt-owned login shortcut, guard Link manifest cleanup when uninstalling old copies, and remove the macOS executable symlink during bundle uninstall.
+- Bundle the complete user guide on every OS and check installed Windows/macOS copies, including moved-bundle repair and successor ownership. Preserve pinned vendor bytes during Windows checkouts.
+- Adopt Arcade Link v0.3.0 (protocol 1), including commit-pinned Qt install, tray, accelerator and shortcut modules, vectors, shared strings and Windows/release assets.
+- Add settings, restart, menu, shortcut rebind and portable settings transfer methods, advertised in `describe.methods`; manifests carry menu, docs, logs and install metadata.
+- Hide Wheel's tray while Tools hosts it, with a bounded startup gate, immediate crash/quit recovery, Link-off/exclusion handling and restart grace.
+- Add the shared first-run AppImage install/update/open flow, per-file dismissal, receipt-based install/uninstall/repair/status CLI, macOS move-to-Applications and Tools-managed update handoff. Start at login is optional; shell profiles and quarantine are preserved.
+- Use the shared per-user Windows installer for receipts, CLI shims, PATH, and optional login shortcuts; mark the ZIP portable in release metadata.
+- Export allowlisted portable settings without secrets or device identity; validate imports, save a private backup and apply live. File operations run on workers.
+- Publish the hold trigger in canonical notation and add Qt method/install/tray regression tests, isolated lifecycle checks, user documentation, and CI vendor/shortcut/doc validation.
 
 ### Added
 

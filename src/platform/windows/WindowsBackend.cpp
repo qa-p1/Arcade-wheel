@@ -1,4 +1,5 @@
 #include "WindowsBackend.h"
+#include "install/AppInstaller.h"
 
 #ifdef Q_OS_WIN
 
@@ -8,6 +9,8 @@
 #include <QCursor>
 #include <QDir>
 #include <QDirIterator>
+#include <QEventLoop>
+#include <QFile>
 #include <QFileInfo>
 #include <QHash>
 #include <QGuiApplication>
@@ -19,6 +22,8 @@
 #include <QSet>
 #include <QStandardPaths>
 #include <QStringList>
+#include <QThread>
+#include <QUuid>
 
 #include <powrprof.h>
 #include <shlobj.h>
@@ -40,6 +45,19 @@ namespace {
 constexpr wchar_t kStartMenuIdPrefix[] = L"win-startmenu:";
 constexpr wchar_t kRunKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 constexpr wchar_t kRunValue[] = L"ArcadeWheel";
+
+template <typename F> auto loginWorker(F work)
+{
+    decltype(work()) result{};
+    QEventLoop loop;
+    auto *worker = QThread::create([&] { result = work(); });
+    QObject::connect(worker, &QThread::finished, &loop, &QEventLoop::quit);
+    worker->start();
+    loop.exec();
+    worker->wait();
+    delete worker;
+    return result;
+}
 
 void assignError(QString *error, const QString &message)
 {
@@ -138,6 +156,98 @@ QString startMenuFolder(REFKNOWNFOLDERID folderId)
     const QString result = QString::fromWCharArray(path);
     CoTaskMemFree(path);
     return result;
+}
+
+bool samePath(const QString &first, const QString &second)
+{
+    return nativePath(first).compare(nativePath(second), Qt::CaseInsensitive) == 0;
+}
+
+bool createLoginShortcut(const QString &path, const QString &executable, QString *error)
+{
+    const HRESULT initialized = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    if (FAILED(initialized) && initialized != RPC_E_CHANGED_MODE) {
+        assignError(error, QStringLiteral("Could not initialize Windows shortcuts."));
+        return false;
+    }
+    IShellLinkW *link = nullptr;
+    IPersistFile *file = nullptr;
+    HRESULT result = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
+                                     IID_IShellLinkW, reinterpret_cast<void **>(&link));
+    const QString target = nativePath(executable);
+    const QString directory = nativePath(QFileInfo(executable).absolutePath());
+    const QString pending = path + QStringLiteral(".pending-%1.lnk").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    if (SUCCEEDED(result)) result = link->SetPath(reinterpret_cast<LPCWSTR>(target.utf16()));
+    if (SUCCEEDED(result)) result = link->SetArguments(L"--background");
+    if (SUCCEEDED(result)) result = link->SetWorkingDirectory(reinterpret_cast<LPCWSTR>(directory.utf16()));
+    if (SUCCEEDED(result)) result = link->QueryInterface(IID_IPersistFile, reinterpret_cast<void **>(&file));
+    if (SUCCEEDED(result)) result = file->Save(reinterpret_cast<LPCOLESTR>(pending.utf16()), TRUE);
+    if (file) file->Release();
+    if (link) link->Release();
+    if (SUCCEEDED(initialized)) CoUninitialize();
+    const bool saved = SUCCEEDED(result) && QFile::rename(pending, path);
+    if (!saved) {
+        QFile::remove(pending);
+        assignError(error, QStringLiteral("Could not create the Windows login shortcut: %1").arg(win32Error(static_cast<DWORD>(result))));
+    }
+    return saved;
+}
+
+bool installedLogin(AppInstaller::Engine::Environment environment, QJsonObject receipt,
+                    bool enabled, QString *error)
+{
+    if (!ArcadeLink::validateNativeReceiptPaths(receipt, error)) return false;
+    const QString executable = receipt.value(QStringLiteral("path")).toString();
+    if (!samePath(executable, QCoreApplication::applicationFilePath())) {
+        assignError(error, QStringLiteral("Change start at login from the installed copy of Arcade Wheel."));
+        return false;
+    }
+    const QString directory = startMenuFolder(FOLDERID_Startup);
+    if (directory.isEmpty()) {
+        assignError(error, QStringLiteral("The Windows Startup folder is unavailable."));
+        return false;
+    }
+    const QString path = QDir(directory).filePath(QStringLiteral("Arcade Wheel.lnk"));
+    auto integration = receipt.value(QStringLiteral("integration")).toObject();
+    const QString recorded = integration.value(QStringLiteral("autostart")).toString();
+    if (!recorded.isEmpty() && !samePath(recorded, path)) {
+        assignError(error, QStringLiteral("The receipt has an unexpected login shortcut; it was kept."));
+        return false;
+    }
+    const bool existed = QFileInfo::exists(path);
+    QString backup;
+    if (existed) {
+        ShortcutInfo shortcut;
+        if (!readShortcut(path, &shortcut) || !samePath(shortcut.target, executable)
+            || shortcut.arguments != QStringLiteral("--background")) {
+            assignError(error, QStringLiteral("The login shortcut was changed outside Wheel; it was kept."));
+            return false;
+        }
+        if (!enabled) {
+            const QString config = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+            backup = QDir(config).filePath(QStringLiteral("startup-shortcut.backup-%1.lnk").arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+            if (config.isEmpty() || !ArcadeLink::ensurePrivateDir(config) || !QFile::copy(path, backup) || !QFile::remove(path)) {
+                assignError(error, QStringLiteral("Could not back up and remove the login shortcut."));
+                return false;
+            }
+        }
+    } else if (enabled && (!QDir().mkpath(directory) || !createLoginShortcut(path, executable, error))) return false;
+
+    integration.insert(QStringLiteral("autostart"), enabled ? QJsonValue(path) : QJsonValue(QJsonValue::Null));
+    receipt.insert(QStringLiteral("integration"), integration);
+    receipt.insert(QStringLiteral("updatedAt"), ArcadeLink::nowRfc3339());
+    if (!environment.receipts().write(receipt, error)) {
+        if (!backup.isEmpty()) QFile::copy(backup, path);
+        if (enabled && !existed) QFile::remove(path);
+        return false;
+    }
+    // Remove the historical Run entry so the app starts exactly once.
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_SET_VALUE, &key) == ERROR_SUCCESS) {
+        RegDeleteValueW(key, kRunValue);
+        RegCloseKey(key);
+    }
+    return true;
 }
 
 UINT modifierVirtualKey(const QString &name)
@@ -545,6 +655,12 @@ QString WindowsBackend::name() const
     return QStringLiteral("Windows");
 }
 
+QJsonObject WindowsBackend::shortcutRegistration() const
+{
+    return {{"applied", m_hookThreadId != 0}, {"via", "native"},
+            {"hint", "Could not register the global keyboard trigger. Choose another shortcut."}};
+}
+
 QString WindowsBackend::shortcutValidationError(const QString &shortcut) const
 {
     return parseTrigger(QJsonObject{{QStringLiteral("shortcut"), shortcut}}).error;
@@ -811,6 +927,20 @@ bool WindowsBackend::performSystemAction(const QString &id, QString *error)
 
 bool WindowsBackend::setStartOnLogin(bool enabled, QString *error)
 {
+    if (QThread::currentThread() == thread()) {
+        const auto result = loginWorker([&] {
+            QString message;
+            const bool ok = setStartOnLogin(enabled, &message);
+            return std::make_pair(ok, message);
+        });
+        assignError(error, result.second);
+        return result.first;
+    }
+    AppInstaller::Engine::Environment environment;
+    QJsonObject receipt;
+    if (!AppInstaller::Engine::Environment::discover(&environment, error)
+        || !environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt, error)) return false;
+    if (!receipt.isEmpty()) return installedLogin(environment, receipt, enabled, error);
     if (enabled) {
         const QString executable = QFileInfo(QCoreApplication::applicationFilePath()).canonicalFilePath();
         const QString temporary = QFileInfo(QDir::tempPath()).canonicalFilePath();
@@ -858,6 +988,18 @@ bool WindowsBackend::setStartOnLogin(bool enabled, QString *error)
 
 bool WindowsBackend::startOnLogin() const
 {
+    if (QThread::currentThread() == thread()) return loginWorker([&] { return startOnLogin(); });
+    AppInstaller::Engine::Environment environment;
+    QJsonObject receipt;
+    if (AppInstaller::Engine::Environment::discover(&environment)
+        && environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt) && !receipt.isEmpty()) {
+        const QString executable = receipt.value(QStringLiteral("path")).toString();
+        if (!samePath(executable, QCoreApplication::applicationFilePath())) return false;
+        const QString startup = receipt.value(QStringLiteral("integration")).toObject().value(QStringLiteral("autostart")).toString();
+        ShortcutInfo shortcut;
+        if (!startup.isEmpty() && readShortcut(startup, &shortcut)
+            && samePath(shortcut.target, executable) && shortcut.arguments == QStringLiteral("--background")) return true;
+    }
     HKEY key = nullptr;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)
         return false;

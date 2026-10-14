@@ -70,6 +70,8 @@ public:
     QString linkSource() const { return m_linkSource; }
     QObject *arcadeWorker() const { return m_dispatcher.arcade().ioWorker(); }
     bool linkPending() const { return !m_linkDraft.isEmpty(); }
+    QJsonObject shortcutRegistration() const { return m_backend->shortcutRegistration(); }
+    QString shortcutFailureCode() const { return m_shortcutFailureCode; }
     // Starts a pending add (false if one is already waiting) and opens Settings.
     bool beginLinkAction(const QVariantMap &draft, const QString &sourceName);
     // The user saved the draft into a slot, or gave up (Cancel, closing Settings).
@@ -147,7 +149,7 @@ private:
     QJsonArray decks() const;
     QJsonObject deckAt(int index) const;
     int deckIndexById(const QString &id) const;
-    enum class Persist { Now, Coalesced };
+    enum class Persist { Now, Coalesced, Prepared };
     bool commit(QJsonObject updated, bool triggerChanged = false, Persist persist = Persist::Now);
     void applyStartOnLogin();
     void openOverlay();
@@ -175,6 +177,7 @@ private:
     QTimer m_centerHoldTimer;
     QTimer m_saveTimer;
     bool m_savePending = false;
+    bool m_persisting = false;
     int m_centerClicks = 0;
     bool m_centerPressed = false;
     QElapsedTimer m_openClock;
@@ -194,6 +197,7 @@ private:
     bool m_revealOnFrame = false;
     bool m_recordingShortcut = false;
     QString m_shortcutConflict;
+    QString m_shortcutFailureCode;
     bool m_shortcutPeerConflict = false;
     QString m_triggerStatus;
     QString m_lastError;

@@ -6,17 +6,33 @@
 
 #include <QCursor>
 #include <QDesktopServices>
+#include <QEventLoop>
 #include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonValue>
 #include <QKeySequence>
 #include <QQuickView>
 #include <QScreen>
+#include <QScopedValueRollback>
+#include <QThread>
 #include <QUrl>
 #include <algorithm>
 #include <cmath>
 
 namespace {
+template <typename F> auto configWorker(F work)
+{
+    using Result = decltype(work());
+    Result result{};
+    QEventLoop loop;
+    auto *worker = QThread::create([&] { result = work(); });
+    QObject::connect(worker, &QThread::finished, &loop, &QEventLoop::quit);
+    worker->start();
+    loop.exec();
+    worker->wait();
+    delete worker;
+    return result;
+}
 // Matches hideOverlay()'s close fallback plus a compositor frame to unmap the
 // surface, so a screenshot taken from the wheel does not capture the wheel.
 constexpr int kScreenCaptureDelayMs = 320;
@@ -105,10 +121,12 @@ WheelController::~WheelController()
 bool WheelController::flushPendingSave()
 {
     if (!m_savePending) return true;
+    if (m_persisting) return false;
     m_saveTimer.stop();
     m_savePending = false;
     QString error;
-    if (m_store.save(m_config, &error)) return true;
+    const QScopedValueRollback<bool> saving(m_persisting, true);
+    if (configWorker([&] { return m_store.save(m_config, &error); })) return true;
     reportError(error);
     return false;
 }
@@ -117,7 +135,7 @@ void WheelController::initialize()
 {
     refreshApplications();
     QString error;
-    m_config = m_store.load(m_applications, &error);
+    m_config = configWorker([&] { return m_store.load(m_applications, &error); });
     if (!error.isEmpty()) reportError(error);
     // The login entry is owned by the OS and can change outside the app.
     // Show what is actually installed rather than a stale saved flag; the
@@ -434,6 +452,7 @@ void WheelController::selectDeck(int index)
 
 bool WheelController::commit(QJsonObject updated, bool triggerChanged, Persist persist)
 {
+    if (m_persisting) { reportError(QStringLiteral("A settings save is in progress. Try again in a moment.")); return false; }
     QString error;
     updated = ConfigStore::normalize(updated, &error);
     if (updated.isEmpty()) {
@@ -444,7 +463,8 @@ bool WheelController::commit(QJsonObject updated, bool triggerChanged, Persist p
         m_savePending = true;
         m_saveTimer.start();
     } else {
-        if (!m_store.save(updated, &error)) {
+        const QScopedValueRollback<bool> saving(m_persisting, true);
+        if (persist != Persist::Prepared && !configWorker([&] { return m_store.save(updated, &error); })) {
             reportError(error);
             return false;
         }
@@ -720,13 +740,23 @@ QString WheelController::localPath(const QString &urlOrPath)
 
 bool WheelController::importConfig(const QString &urlOrPath)
 {
+    if (m_persisting) { reportError(QStringLiteral("A settings save is in progress.")); return false; }
     QJsonObject imported;
     QString error;
-    if (!m_store.importFrom(localPath(urlOrPath), &imported, &error)) {
-        reportError(error);
-        return false;
+    {
+        const QScopedValueRollback<bool> saving(m_persisting, true);
+        if (!configWorker([&] {
+            if (!m_store.importFrom(localPath(urlOrPath), &imported, &error)) return false;
+            if (m_savePending && !m_store.save(m_config, &error)) return false;
+            QString backup;
+            if (!m_store.backupCurrent(&backup, &error)) {
+                error = QStringLiteral("Could not back up current settings; import was not applied: %1").arg(error);
+                return false;
+            }
+            return m_store.save(imported, &error);
+        })) { reportError(error); return false; }
     }
-    if (!commit(imported, true)) return false;
+    if (!commit(imported, true, Persist::Prepared)) return false;
     applyStartOnLogin();
     return true;
 }
@@ -734,7 +764,8 @@ bool WheelController::importConfig(const QString &urlOrPath)
 bool WheelController::exportConfig(const QString &urlOrPath)
 {
     QString error;
-    if (m_store.exportTo(m_config, localPath(urlOrPath), &error)) return true;
+    const auto snapshot = m_config;
+    if (configWorker([&] { return m_store.exportTo(snapshot, localPath(urlOrPath), &error); })) return true;
     reportError(error);
     return false;
 }
@@ -790,6 +821,7 @@ void WheelController::setShortcutRecording(bool recording)
 
 bool WheelController::applyShortcut(const QString &shortcut, bool overrideConflict)
 {
+    m_shortcutFailureCode = QStringLiteral("denied");
     const QString validationError = m_backend->shortcutValidationError(shortcut);
     if (!validationError.isEmpty()) {
         m_shortcutConflict.clear();
@@ -805,13 +837,22 @@ bool WheelController::applyShortcut(const QString &shortcut, bool overrideConfli
     if (!backendConflict.isEmpty()) m_shortcutConflict += (m_shortcutConflict.isEmpty() ? QString() : QStringLiteral(". ")) + backendConflict;
     emit shortcutConflictChanged();
     if (!overrideConflict && !m_shortcutConflict.isEmpty()) return false;
+    const auto previous = m_config;
     auto updated = m_config;
     auto trigger = updated.value(QStringLiteral("trigger")).toObject();
     trigger.remove(QStringLiteral("preferredTrigger"));
     trigger.insert(QStringLiteral("shortcut"),shortcut.trimmed());
     trigger.insert(QStringLiteral("overrideConflict"),overrideConflict);
     updated.insert(QStringLiteral("trigger"),trigger);
-    if (!commit(updated,true)) return false;
+    if (!commit(updated,true)) { m_shortcutFailureCode = QStringLiteral("internal"); return false; }
+    const auto registration = m_backend->shortcutRegistration();
+    if (!registration.value("applied").toBool() && registration.value("via").toString() != u"manual") {
+        commit(previous, true);
+        m_shortcutFailureCode = QStringLiteral("unavailable");
+        reportError(registration.value("hint").toString(QStringLiteral("Could not register the shortcut.")));
+        return false;
+    }
+    m_shortcutFailureCode.clear();
     m_shortcutConflict.clear();
     m_shortcutPeerConflict = false;
     emit shortcutConflictChanged();

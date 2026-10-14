@@ -100,16 +100,52 @@ editor or recording a shortcut reads the cache only. There is no idle timer
 or polling. Bounded waits occur only during a user-requested invocation,
 startup authentication or cancellation of a pending add request.
 
-The Qt v1 module is unchanged in `src/link/ArcadeLink.{h,cpp}` and pinned to
-Arcade Link `v0.2.0` (commit `bedee71`) by `VENDORED.json`. The vendor check
-compares its checksums with that commit, alongside the vectors and release
-generator.
+The Qt protocol-1 bundle is vendored unchanged from Arcade Link `v0.3.0`
+(commit `33650a87`) under `src/link/qt/`, with its vectors, fixtures and shared
+install strings in the vendoring tool's layout. `src/link/VENDORED.json` records
+every bundled hash. Shared release/shortcut tools and Windows installer pieces
+use the same release commit, recorded in `scripts/VENDORED` and
+`packaging/windows/VENDORED`.
 `WheelInvoke` supplies bounded jobs and one-shot deadlines around that pinned
 protocol. `ARCADE_HOME` redirects registry, endpoints and handoff storage.
 Smoke-test/offscreen instances never publish to the real registry unless
 given an explicit `ARCADE_HOME`.
 
 ## Settings and CLI
+
+### Hub methods and tray hosting
+
+`describe.methods` advertises `app.settings`, `app.restart`, `app.menu`,
+`app.menu.invoke`, `app.shortcuts.set`, `app.settings.export` and
+`app.settings.import`. **Show Wheel** is the only app-specific menu item;
+standard actions are supplied by Tools. Restart returns `busy` during incoming
+or outgoing jobs or a pending add unless forced; acknowledgement precedes the
+successor request, and the successor waits on the old command socket.
+
+Wheel publishes its effective hold trigger under id `trigger` in Link's
+canonical notation. A configured `Tab` remains a hold/release trigger. Shortcut
+changes validate one chord, preserve conflicts, persist, register live and
+rewrite the manifest. Linux reports `hyprland-runtime`, `portal`, or `manual`
+with a keyboard-settings hint; Windows/macOS report their native registration.
+
+Portable settings use an allowlist of preferences, decks, slot fields and
+center gestures. Action options are recursively stripped of credentials,
+tokens, secrets and device identity. Export produces a private handoff file;
+import validates one absolute file, backs up current settings and applies
+without restarting. File operations run on workers. Link off removes the
+endpoint while leaving an installed manifest with no actions.
+
+`ArcadeTrayHost` gates the constructed tray icon. Its first answer has a 300 ms
+cap; Tools hosting hides the icon, exclusions and Link off restore it, and a
+closed socket returns ownership immediately. Tools restart has a five-second
+grace. The panel's D-Bus registration handler respects this gate. `app.status`
+reports `status.tray` as `own`, `hosted` or `none`; the manifest adds `menu`,
+`logs`, `docs.version` and the installation method.
+
+The Qt first-run dialog and lifecycle CLI use Link's shared installation
+engine and strings. See [installation](user/getting-started.md),
+[packaging](PACKAGING.md) and [vendored files](VENDORED.md). macOS keeps its
+native login item; Windows uses the pinned per-user Inno include.
 
 `link.enabled` is the master switch. Off publishes an installed manifest with
 no actions, closes Wheel's listener and hides all peer entries.

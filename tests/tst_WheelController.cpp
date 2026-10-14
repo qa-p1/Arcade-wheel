@@ -1,6 +1,7 @@
 #include "core/WheelController.h"
 #include <QGuiApplication>
 #include <QFile>
+#include <QDir>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QQuickView>
@@ -437,6 +438,7 @@ private slots:
             QVERIFY(controller.importConfig(exported)); // Import turns it back on.
             QVERIFY(backend.login);
             QVERIFY(readConfig(path).value("general").toObject().value("startOnLogin").toBool());
+            QVERIFY(!QDir(dir.path()).entryList({QStringLiteral("config.json.backup-*.json")}, QDir::Files).isEmpty());
         }
         {
             // The entry was removed outside the app: show the real state.

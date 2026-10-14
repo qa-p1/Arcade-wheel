@@ -24,6 +24,7 @@ public:
     // The manifest for this configuration (also printed by --arcade-manifest).
     static QJsonObject manifest(const QJsonObject &config, const QString &version);
     static QJsonArray actions();
+    static QJsonArray menuItems();
 
     // The controller that shows the wheel and opens Settings for wheel.add_action.
     void setController(WheelController *controller);
@@ -33,6 +34,7 @@ public:
     // Writes the manifest and starts or stops listening to match `config`.
     void apply(const QJsonObject &config);
     void stop();
+    void setTrayState(const QString &state);
     bool listening() const;
     QString lastError() const { return m_lastError; }
     const ArcadeLink::Locations &locations() const { return m_locations; }
@@ -51,6 +53,7 @@ private:
     std::shared_ptr<PresenceState> m_presence;
     QPointer<QObject> m_ioWorker;
     std::atomic_bool m_listening{false};
+    std::atomic_bool m_busy{false};
     QTimer m_addCancelTimer;
     void respond(const ArcadeLink::Responder &r, std::function<void(const ArcadeLink::Responder &)> reply);
     QString m_lastError;

@@ -26,6 +26,7 @@ public:
     ~WindowsBackend() override;
 
     QString name() const override;
+    QJsonObject shortcutRegistration() const override;
     void configureTrigger(const QJsonObject &trigger) override;
     bool prepareOverlay(QQuickWindow *window, QString *error) override;
     QPointF cursorPosition() const override;

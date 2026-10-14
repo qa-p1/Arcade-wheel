@@ -39,6 +39,8 @@ fi
 
 appdir="$stage/AppDir"
 DESTDIR="$appdir" cmake --install "$build" --prefix /usr
+test -s "$appdir/usr/share/doc/arcade-wheel/docs/user/index.md"
+test -s "$appdir/usr/share/doc/arcade-wheel/docs/user/images/settings.png"
 mkdir -p "$appdir/usr/plugins/wayland-shell-integration"
 cp "$layer_plugin" "$appdir/usr/plugins/wayland-shell-integration/"
 # These are dlopened by Qt, so ELF dependency scanning alone cannot find them.

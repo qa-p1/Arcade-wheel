@@ -1,10 +1,12 @@
 #include "config/ConfigStore.h"
 
 #include <QDir>
+#include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
 #include <QStandardPaths>
@@ -53,6 +55,39 @@ QJsonObject readJson(const QString &path, QString *error)
         return {};
     }
     return doc.object();
+}
+
+bool isSensitiveField(QString key)
+{
+    key = key.toLower();
+    key.remove(QRegularExpression(QStringLiteral("[^a-z0-9]")));
+    const bool deviceIdentity = key.contains(QStringLiteral("device"))
+        && (key.contains(QStringLiteral("id")) || key.contains(QStringLiteral("identity"))
+            || key.contains(QStringLiteral("key")) || key.contains(QStringLiteral("fingerprint")));
+    return key.contains(QStringLiteral("secret")) || key.contains(QStringLiteral("password"))
+        || key.contains(QStringLiteral("credential")) || key == QStringLiteral("auth")
+        || key.contains(QStringLiteral("authorization")) || key == QStringLiteral("token")
+        || key.endsWith(QStringLiteral("token")) || key == QStringLiteral("apikey")
+        || key.endsWith(QStringLiteral("apikey")) || key == QStringLiteral("privatekey")
+        || key.endsWith(QStringLiteral("privatekey")) || deviceIdentity;
+}
+
+QJsonValue portableValue(const QJsonValue &value)
+{
+    if (value.isObject()) {
+        QJsonObject portable;
+        const auto object = value.toObject();
+        for (auto it = object.begin(); it != object.end(); ++it) {
+            if (!isSensitiveField(it.key())) portable.insert(it.key(), portableValue(it.value()));
+        }
+        return portable;
+    }
+    if (value.isArray()) {
+        QJsonArray portable;
+        for (const auto &entry : value.toArray()) portable.append(portableValue(entry));
+        return portable;
+    }
+    return value;
 }
 }
 
@@ -298,8 +333,11 @@ QJsonObject ConfigStore::load(const QVector<DiscoveredApplication> &applications
     return config;
 }
 
-bool ConfigStore::writeJson(const QJsonObject &config, const QString &path, QString *error)
+bool ConfigStore::writeJson(const QJsonObject &config, const QString &path, QString *error, bool privateFile)
 {
+#ifndef Q_OS_UNIX
+    Q_UNUSED(privateFile);
+#endif
     if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
         if (error) *error = QStringLiteral("Could not create configuration directory");
         return false;
@@ -309,6 +347,13 @@ bool ConfigStore::writeJson(const QJsonObject &config, const QString &path, QStr
         if (error) *error = file.errorString();
         return false;
     }
+#ifdef Q_OS_UNIX
+    if (privateFile && !file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
+        if (error) *error = file.errorString();
+        file.cancelWriting();
+        return false;
+    }
+#endif
     const auto bytes = QJsonDocument(config).toJson(QJsonDocument::Indented);
     if (file.write(bytes) != bytes.size() || !file.commit()) {
         if (error) *error = file.errorString();
@@ -328,17 +373,100 @@ bool ConfigStore::save(const QJsonObject &config, QString *error) const
 
 bool ConfigStore::exportTo(const QJsonObject &config, const QString &path, QString *error) const
 {
-    return writeJson(config, path, error);
+    return writeJson(portable(config), path, error, true);
 }
 
 bool ConfigStore::importFrom(const QString &path, QJsonObject *config, QString *error) const
 {
     QString readError;
-    const auto imported = normalize(readJson(path, &readError), &readError);
+    const auto raw = readJson(path, &readError);
+    if (raw.isEmpty()) { if (error) *error = readError; return false; }
+    // Validate before sanitizing: unknown/newer schemas must never be made
+    // valid merely by omitting their schemaVersion field.
+    const auto validated = normalize(raw, &readError);
+    const auto imported = validated.isEmpty() ? QJsonObject{} : normalize(portable(validated), &readError);
     if (imported.isEmpty()) {
         if (error) *error = readError;
         return false;
     }
     *config = imported;
+    return true;
+}
+
+QJsonObject ConfigStore::portable(const QJsonObject &config)
+{
+    const auto select = [](const QJsonObject &object, const QStringList &keys) {
+        QJsonObject out;
+        for (const auto &key : keys) if (object.contains(key)) out.insert(key, portableValue(object.value(key)));
+        return out;
+    };
+    const auto action = [&](const QJsonObject &object) {
+        auto out = select(object, {"id", "type", "name", "icon"});
+        out.insert("payload", select(object.value("payload").toObject(),
+            {"desktopId", "command", "workingDirectory", "url", "path", "id", "app", "action",
+             "version", "input", "options", "preset", "providerId", "toolId"}));
+        return out;
+    };
+    const auto actions = [&](const QJsonArray &array) {
+        QJsonArray out;
+        for (const auto &entry : array) if (entry.isObject()) out.append(action(entry.toObject()));
+        return out;
+    };
+    QJsonObject out{{"schemaVersion", config.value("schemaVersion")}};
+    const auto baseline = defaults();
+    for (const auto &key : {"general", "link", "trigger", "appearance", "behaviour"}) {
+        QStringList keys = baseline.value(key).toObject().keys();
+        if (QString::fromLatin1(key) == u"trigger") keys << "overrideConflict";
+        out.insert(key, select(config.value(key).toObject(), keys));
+    }
+    QJsonArray decks;
+    for (const auto &entry : config.value("decks").toArray()) {
+        auto deck = select(entry.toObject(), {"id", "name"});
+        deck.insert("actions", actions(entry.toObject().value("actions").toArray()));
+        decks.append(deck);
+    }
+    out.insert("decks", decks);
+    const auto source = config.value("centerGestures").toObject();
+    auto gestures = select(source, {"clickIntervalMs", "longPressMs"});
+    for (const auto &key : {"singleClick", "doubleClick", "tripleClick", "longPress"}) {
+        auto group = select(source.value(key).toObject(), {"name", "enabled"});
+        group.insert("actions", actions(source.value(key).toObject().value("actions").toArray()));
+        gestures.insert(key, group);
+    }
+    out.insert("centerGestures", gestures);
+    return out;
+}
+
+bool ConfigStore::backupCurrent(QString *backupPath, QString *error) const
+{
+    QFile source(m_path);
+    if (!source.exists()) {
+        if (backupPath) backupPath->clear();
+        return true;
+    }
+    if (!source.open(QIODevice::ReadOnly)) {
+        if (error) *error = source.errorString();
+        return false;
+    }
+    const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd'T'HHmmsszzz'Z'"));
+    const QString destination = m_path + QStringLiteral(".backup-%1-%2.json").arg(stamp, freshId());
+    QSaveFile backup(destination);
+    if (!backup.open(QIODevice::WriteOnly)) {
+        if (error) *error = backup.errorString();
+        return false;
+    }
+#ifdef Q_OS_UNIX
+    if (!backup.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
+        if (error) *error = backup.errorString();
+        backup.cancelWriting();
+        return false;
+    }
+#endif
+    const QByteArray data = source.readAll();
+    if (backup.write(data) != data.size() || !backup.commit()) {
+        if (error) *error = backup.errorString();
+        return false;
+    }
+    if (backupPath) *backupPath = destination;
     return true;
 }

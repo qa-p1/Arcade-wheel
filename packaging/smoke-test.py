@@ -25,7 +25,8 @@ def main():
         environment.update(XDG_CONFIG_HOME=directory, XDG_CACHE_HOME=directory,
                            XDG_RUNTIME_DIR=directory, ARCADE_WHEEL_INSTANCE=directory)
         result = subprocess.run([str(executable), "--smoke-test"], env=environment,
-                                cwd=directory, capture_output=True, text=True, timeout=60)
+                                cwd=directory, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=60)
         print(result.stdout, end="")
         print(result.stderr, end="", file=sys.stderr)
         if result.returncode:

@@ -110,6 +110,12 @@ QString MacOSBackend::shortcutValidationError(const QString &shortcut) const
     return {};
 }
 
+QJsonObject MacOSBackend::shortcutRegistration() const
+{
+    return {{"applied", m_native->hotKey != nullptr}, {"via", "native"},
+            {"hint", "Could not register the shortcut. Choose one not used by another app or macOS."}};
+}
+
 void MacOSBackend::configureTrigger(const QJsonObject &trigger)
 {
     m_native->trigger = trigger;

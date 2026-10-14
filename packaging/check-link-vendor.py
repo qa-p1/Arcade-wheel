@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-"""Check the vendored Arcade Link files against src/link/VENDORED.json.
-
-Wheel vendors the Qt implementation of Arcade Link (src/link/ArcadeLink.*)
-its conformance vectors (tests/link-vectors/) and the release generator.
-VENDORED.json pins the
-Arcade-link version they came from and their SHA-256 sums.
-
-    python3 packaging/check-link-vendor.py            # files match the pins
-    python3 packaging/check-link-vendor.py --update   # re-pin after copying
-    python3 packaging/check-link-vendor.py --source ../../Rust/Arcade-link
-                                                      # compare at the pinned commit
-"""
-
+"""Verify the complete released Qt bundle and its commit-pinned provenance."""
 import argparse
 import hashlib
 import json
@@ -19,50 +7,34 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-PIN = ROOT / "src/link/VENDORED.json"
-FILES = {
-    "src/link/ArcadeLink.h": "qt/ArcadeLink.h",
-    "src/link/ArcadeLink.cpp": "qt/ArcadeLink.cpp",
-    "scripts/arcade-release.py": "tools/arcade-release.py",
-}
-FILES.update({f"tests/link-vectors/{p.name}": f"spec/vectors/{p.name}" for p in sorted((ROOT / "tests/link-vectors").glob("*.json"))})
+ROOT = Path(__file__).resolve().parents[1] / "src/link"
 
-
-def sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def main() -> int:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--update", action="store_true")
-    p.add_argument("--source", type=Path)
-    args = p.parse_args()
-    current = {name: sha(ROOT / name) for name in FILES}
-    if args.update:
-        pin = json.loads(PIN.read_text()) if PIN.exists() else {"arcadeLink": "unreleased"}
-        pin["files"] = current
-        PIN.write_text(json.dumps(pin, indent=2) + "\n")
-        print(f"pinned {len(current)} files")
-        return 0
-    pin = json.loads(PIN.read_text())
-    revision = pin.get("commit", "")
-    problems = [f"{n}: changed since it was vendored" for n, h in current.items() if pin["files"].get(n) != h]
-    problems += [f"{n}: pinned but missing" for n in pin["files"] if n not in current]
-    if args.source:
-        if len(revision) != 40 or any(c not in "0123456789abcdef" for c in revision):
-            problems.append("VENDORED.json must pin a full Arcade-link commit")
-        for name, upstream in FILES.items():
-            source = subprocess.run(["git", "-C", str(args.source), "show", f"{revision}:{upstream}"],
-                                    capture_output=True)
-            if source.returncode or hashlib.sha256(source.stdout).hexdigest() != current[name]:
-                problems.append(f"{name}: differs from {upstream} at {revision}")
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path)
+    args = parser.parse_args()
+    pin = json.loads((ROOT / "VENDORED.json").read_text(encoding="utf-8"))
+    commit = pin["commit"]
+    if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
+        parser.error("VENDORED.json must pin a full source commit")
+    problems = []
+    for name, expected in pin["files"].items():
+        path = Path(name)
+        if path.is_absolute() or ".." in path.parts:
+            problems.append(f"invalid vendor path: {name}")
+            continue
+        local = ROOT / path
+        if not local.is_file() or hashlib.sha256(local.read_bytes()).hexdigest() != expected:
+            problems.append(f"{name}: missing or changed since vendoring")
+        if args.source:
+            result = subprocess.run(["git", "-C", str(args.source), "show", f"{commit}:{name}"], capture_output=True)
+            if result.returncode or hashlib.sha256(result.stdout).hexdigest() != expected:
+                problems.append(f"{name}: differs from the released source")
     for problem in problems:
         print(problem, file=sys.stderr)
     if not problems:
-        print(f"vendored Arcade Link ({pin.get('arcadeLink')}) matches: {len(current)} files")
-    return 1 if problems else 0
-
+        print(f"Arcade Link {commit}: {len(pin['files'])} bundled files verified")
+    return bool(problems)
 
 if __name__ == "__main__":
     sys.exit(main())

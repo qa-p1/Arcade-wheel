@@ -15,14 +15,16 @@ public:
     bool save(const QJsonObject &config, QString *error = nullptr) const;
     bool exportTo(const QJsonObject &config, const QString &path, QString *error = nullptr) const;
     bool importFrom(const QString &path, QJsonObject *config, QString *error = nullptr) const;
+    bool backupCurrent(QString *backupPath = nullptr, QString *error = nullptr) const;
 
     static QJsonObject defaults(const QVector<DiscoveredApplication> &applications = {});
     static QJsonObject normalize(QJsonObject config, QString *error = nullptr);
+    static QJsonObject portable(const QJsonObject &config);
     static QJsonObject emptyAction();
     static QString freshId();
 
 private:
     QString m_path;
     mutable bool m_writeBlocked = false;
-    static bool writeJson(const QJsonObject &config, const QString &path, QString *error);
+    static bool writeJson(const QJsonObject &config, const QString &path, QString *error, bool privateFile = false);
 };

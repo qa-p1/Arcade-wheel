@@ -32,6 +32,7 @@ public:
     virtual bool movePointer(const QPointF &) { return false; }
     virtual QString shortcutValidationError(const QString &) const { return {}; }
     virtual QString shortcutConflict(const QString &) const { return {}; }
+    virtual QJsonObject shortcutRegistration() const { return {{"applied", true}, {"via", "native"}}; }
     virtual void setShortcutRecording(bool) {}
     virtual QVector<DiscoveredApplication> applications() const = 0;
     virtual bool launchApplication(const QString &id, bool focusExisting, QString *error) = 0;

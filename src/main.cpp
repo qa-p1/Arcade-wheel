@@ -1,6 +1,9 @@
 #include "core/IconImageProvider.h"
+#include "core/CommandReply.h"
 #include "core/WheelController.h"
 #include "link/WheelLink.h"
+#include "link/qt/ArcadeTrayHost.h"
+#include "install/AppInstaller.h"
 #ifdef Q_OS_WIN
 #include "platform/windows/WindowsBackend.h"
 #elif defined(Q_OS_MACOS)
@@ -15,6 +18,7 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QLockFile>
 #include <QTextStream>
@@ -35,6 +39,28 @@
 #include <QTemporaryDir>
 #include <memory>
 
+static bool readSettingsForExport(QJsonObject *config, QString *error)
+{
+    const ConfigStore store;
+    QFile file(store.path());
+    if (!file.exists()) {
+        *config = ConfigStore::defaults();
+        return true;
+    }
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (error) *error = file.errorString();
+        return false;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        if (error) *error = QStringLiteral("Invalid configuration JSON: %1").arg(parseError.errorString());
+        return false;
+    }
+    *config = ConfigStore::normalize(document.object(), error);
+    return !config->isEmpty();
+}
+
 int main(int argc, char **argv)
 {
     QQuickStyle::setStyle(QStringLiteral("Material"));
@@ -47,7 +73,8 @@ int main(int argc, char **argv)
     app.setQuitOnLastWindowClosed(false);
     app.setDesktopFileName(QStringLiteral("com.arcadewheel.ArcadeWheel"));
 
-    const QString command = app.arguments().size() > 1 ? app.arguments().at(1) : QStringLiteral("--settings");
+    const QStringList cliArguments = app.arguments().mid(1);
+    const QString command = cliArguments.isEmpty() ? QStringLiteral("--settings") : cliArguments.first();
     const bool smokeTest = command == QStringLiteral("--smoke-test");
     std::unique_ptr<QTemporaryDir> smokeDirectory;
     if (smokeTest) {
@@ -69,6 +96,16 @@ int main(int argc, char **argv)
             "  arcade-wheel --status      Show resident status as JSON\n"
             "  arcade-wheel --restart     Restart the resident launcher\n"
             "  arcade-wheel --quit        Quit the resident launcher\n"
+            "  arcade-wheel --menu        Print app-specific tray items as JSON\n"
+            "  arcade-wheel --settings-export FILE\n"
+            "                             Export portable settings without credentials or device identity\n"
+            "  arcade-wheel --settings-import FILE\n"
+            "                             Import portable settings after saving a private backup\n"
+            "  arcade-wheel --install [--silent] [--no-launch] [--channel C]\n"
+            "  arcade-wheel --uninstall [--silent] [--remove-data]\n"
+            "  arcade-wheel --repair\n"
+            "  arcade-wheel --integration-status\n"
+            "                             Show receipt, integration entries and PATH status\n"
             "  arcade-wheel --version     Print the version\n"
             "  arcade-wheel --arcade-manifest\n"
             "                             Print the Arcade Link manifest (no side effects)\n\n"
@@ -88,6 +125,42 @@ int main(int argc, char **argv)
         QTextStream(stdout) << QJsonDocument(WheelLink::manifest(config, QStringLiteral(ARCADE_VERSION))).toJson(QJsonDocument::Indented);
         return 0;
     }
+    if (command == QStringLiteral("--menu")) {
+        if (cliArguments.size() != 1) {
+            QTextStream(stderr) << "Usage: arcade-wheel --menu\n";
+            return 2;
+        }
+        QTextStream(stdout) << QJsonDocument(WheelLink::menuItems()).toJson(QJsonDocument::Indented);
+        return 0;
+    }
+    if (command == QStringLiteral("--settings-export")) {
+        if (cliArguments.size() != 2 || cliArguments.at(1).isEmpty()) {
+            QTextStream(stderr) << "Usage: arcade-wheel --settings-export FILE\n";
+            return 2;
+        }
+        QJsonObject config;
+        QString error;
+        if (!readSettingsForExport(&config, &error)) {
+            QTextStream(stderr) << error << '\n';
+            return 1;
+        }
+        const QString output = QFileInfo(cliArguments.at(1)).absoluteFilePath();
+        if (!ConfigStore().exportTo(config, output, &error)) {
+            QTextStream(stderr) << error << '\n';
+            return 1;
+        }
+        QTextStream(stdout) << "Exported portable settings to " << output << '\n';
+        return 0;
+    }
+    if (command == QStringLiteral("--settings-import")
+        && (cliArguments.size() != 2 || cliArguments.at(1).isEmpty())) {
+        QTextStream(stderr) << "Usage: arcade-wheel --settings-import FILE\n";
+        return 2;
+    }
+    const int installCommand = AppInstaller::command(cliArguments, QStringLiteral(ARCADE_VERSION));
+    if (installCommand >= 0) return installCommand;
+    if (!AppInstaller::firstRun(cliArguments, QStringLiteral(ARCADE_VERSION), smokeTest
+        || QGuiApplication::platformName() == u"offscreen" || QGuiApplication::platformName() == u"minimal")) return 0;
     QByteArray identity = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation).toUtf8()
         + qgetenv("ARCADE_WHEEL_INSTANCE") + qgetenv("WAYLAND_DISPLAY");
     // Test/offscreen instances must never intercept commands for the desktop.
@@ -104,22 +177,49 @@ int main(int argc, char **argv)
     const QString serverName = QDir(runtime).filePath(instanceKey + QStringLiteral(".sock"));
 #endif
     if (command == QStringLiteral("--restarting")) {
-        for (int attempt = 0; attempt < 60; ++attempt) {
-            QLocalSocket probe;
-            probe.connectToServer(serverName);
-            if (!probe.waitForConnected(30)) break;
-            probe.disconnectFromServer();
-            QThread::msleep(50);
+        QLocalSocket probe;
+        probe.connectToServer(serverName);
+        if (probe.waitForConnected(150)) {
+            // Wait on the old command socket, whose teardown precedes lock
+            // release. No repeated sleeps or probes on the startup thread.
+            probe.waitForDisconnected(3000);
         }
     } else {
         QLocalSocket existing;
         existing.connectToServer(serverName);
         if (existing.waitForConnected(150)) {
-            existing.write(command.toUtf8() + '\n');
+            QByteArray request;
+            if (command == QStringLiteral("--settings-import")) {
+                request = QJsonDocument(QJsonObject{{QStringLiteral("command"), command},
+                    {QStringLiteral("path"), QFileInfo(cliArguments.at(1)).absoluteFilePath()}}).toJson(QJsonDocument::Compact) + '\n';
+                if (request.size() > 16000) {
+                    QTextStream(stderr) << "The settings path is too long.\n";
+                    return 2;
+                }
+            } else request = command.toUtf8() + '\n';
+            existing.write(request);
             existing.waitForBytesWritten(300);
-            if (existing.waitForReadyRead(1000)) {
-                const QByteArray reply = existing.readAll();
+            const QByteArray reply = WheelCommands::readReply(existing);
+            if (!reply.isEmpty()) {
                 if (command == QStringLiteral("--status")) QTextStream(stdout) << reply;
+                else if (command == QStringLiteral("--settings-import")) {
+                    if (reply.startsWith("OK")) {
+                        QTextStream(stdout) << "Imported settings into the running Arcade Wheel.\n";
+                        return 0;
+                    }
+                    QTextStream(stderr) << reply;
+                    return 1;
+                }
+            }
+            if (command == QStringLiteral("--settings-import")) {
+                QTextStream(stderr) << "Arcade Wheel did not confirm the settings import.\n";
+                return 1;
+            }
+            // A resident that is still starting accepts the connection before
+            // its event loop answers; report that instead of an empty success.
+            if (command == QStringLiteral("--status") && reply.isEmpty()) {
+                QTextStream(stderr) << "Arcade Wheel did not answer.\n";
+                return 1;
             }
             return 0;
         }
@@ -168,6 +268,15 @@ int main(int argc, char **argv)
         QObject::connect(&controller, &WheelController::configChanged, link.get(),
                          [&] { link->apply(QJsonObject::fromVariantMap(controller.config())); });
     }
+    ArcadeLink::ArcadeTrayHost arcadeTrayHost(ArcadeLink::Locations::discover(), ArcadeLink::Ids::Wheel);
+    const bool hasTray = !smokeTest && !headless;
+    const auto syncTrayState = [&](const QString &state) { if (link) link->setTrayState(state); };
+    QObject::connect(&arcadeTrayHost, &ArcadeLink::ArcadeTrayHost::stateChanged, &app, syncTrayState);
+    QObject::connect(&controller, &WheelController::configChanged, &arcadeTrayHost, [&] {
+        arcadeTrayHost.setLinkEnabled(controller.config().value("link").toMap().value("enabled", true).toBool());
+    });
+    arcadeTrayHost.start(controller.config().value("link").toMap().value("enabled", true).toBool(), hasTray);
+    syncTrayState(arcadeTrayHost.state());
     QIcon appIcon(QStringLiteral(":/assets/arcade-wheel.png"));
     if (appIcon.isNull()) appIcon = QIcon::fromTheme(QStringLiteral("applications-system"));
     app.setWindowIcon(appIcon);
@@ -229,7 +338,7 @@ int main(int argc, char **argv)
     tray.setToolTip(QStringLiteral("Arcade Wheel"));
     tray.setIcon(appIcon);
     QMenu menu;
-    auto *wheelAction = menu.addAction(QStringLiteral("Open Wheel"));
+    auto *wheelAction = menu.addAction(QStringLiteral("Show Wheel"));
     QObject::connect(wheelAction, &QAction::triggered, &controller, &WheelController::showWheel);
     auto *openAction = menu.addAction(QStringLiteral("Open Settings"));
     auto *restartAction = menu.addAction(QStringLiteral("Restart Arcade Wheel"));
@@ -240,6 +349,7 @@ int main(int argc, char **argv)
     QObject::connect(&controller, &WheelController::settingsRequested, &app, showSettings);
     QObject::connect(&controller, &WheelController::quitRequested, &app, &QCoreApplication::quit);
     const auto restart = [&] {
+        if (!controller.flushPendingSave()) return;
         // Quitting without a successor would silently remove the launcher.
         QString executable = QCoreApplication::applicationFilePath();
 #ifdef Q_OS_LINUX
@@ -264,7 +374,13 @@ int main(int argc, char **argv)
     QObject::connect(&tray, &QSystemTrayIcon::activated, &app, [&](QSystemTrayIcon::ActivationReason reason) {
         if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) showSettings();
     });
-    if (QSystemTrayIcon::isSystemTrayAvailable()) tray.show();
+    const auto updateTray = [&] {
+        tray.setVisible(hasTray && arcadeTrayHost.ready() && arcadeTrayHost.state() == u"own"
+                        && QSystemTrayIcon::isSystemTrayAvailable());
+    };
+    QObject::connect(&arcadeTrayHost, &ArcadeLink::ArcadeTrayHost::stateChanged, &tray, updateTray);
+    QObject::connect(&arcadeTrayHost, &ArcadeLink::ArcadeTrayHost::startupReady, &tray, updateTray);
+    updateTray();
 #ifdef Q_OS_LINUX
     // At login Wheel often starts before the panel that hosts tray icons, and
     // panels restart. Show (or re-register) the icon whenever the tray host
@@ -274,11 +390,11 @@ int main(int argc, char **argv)
                                              QDBusServiceWatcher::WatchForRegistration, &app);
     QObject::connect(trayHost, &QDBusServiceWatcher::serviceRegistered, &app, [&] {
         tray.hide();
-        tray.show();
+        updateTray();
     });
 #endif
 
-    const auto handleCommand = [&](const QString &raw) {
+    const auto handleCommand = [&](const QString &raw, const QString &value = QString()) {
         const QString cmd = raw.trimmed();
         if (cmd == QStringLiteral("--show")) controller.showWheel();
         else if (cmd == QStringLiteral("--press")) controller.pressTrigger();
@@ -288,14 +404,30 @@ int main(int argc, char **argv)
         else if (cmd == QStringLiteral("--quit")) app.quit();
         else if (cmd == QStringLiteral("--restart")) restart();
         else if (cmd == QStringLiteral("--settings") || cmd.isEmpty()) showSettings();
+        else if (cmd == QStringLiteral("--settings-import")) {
+            if (value.isEmpty() || !controller.importConfig(value)) return false;
+            // Confirm the saved import before the first Settings/QML load.
+            QTimer::singleShot(0, &app, showSettings);
+        }
+        return true;
     };
     QObject::connect(&server, &QLocalServer::newConnection, &app, [&] {
         while (auto *socket = server.nextPendingConnection()) {
             const auto receive = [&, socket] {
                 if (!socket->canReadLine()) return;
-                const QString cmd = QString::fromUtf8(socket->readLine(256)).trimmed();
+                const QByteArray line = socket->readLine(16384).trimmed();
+                QString cmd = QString::fromUtf8(line);
+                QString value;
+                QJsonParseError parseError;
+                const auto envelope = QJsonDocument::fromJson(line, &parseError);
+                if (parseError.error == QJsonParseError::NoError && envelope.isObject()) {
+                    cmd = envelope.object().value(QStringLiteral("command")).toString();
+                    value = envelope.object().value(QStringLiteral("path")).toString();
+                }
                 if (cmd == QStringLiteral("--status")) {
                     const QJsonObject status{{QStringLiteral("running"), true},
+                        {QStringLiteral("pid"), QCoreApplication::applicationPid()},
+                        {QStringLiteral("tray"), arcadeTrayHost.state()},
                         {QStringLiteral("platform"), QGuiApplication::platformName()},
                         {QStringLiteral("trigger"), controller.triggerStatus()},
                         {QStringLiteral("overlayVisible"), controller.overlayVisible()},
@@ -306,9 +438,12 @@ int main(int argc, char **argv)
                         {QStringLiteral("error"), controller.lastError()}};
                     socket->write(QJsonDocument(status).toJson(QJsonDocument::Compact) + '\n');
                 } else {
-                    handleCommand(cmd);
-                    socket->write("OK\n");
+                    const bool ok = handleCommand(cmd, value);
+                    if (cmd == QStringLiteral("--settings-import") && !ok)
+                        socket->write((QStringLiteral("ERROR: ") + controller.lastError() + QLatin1Char('\n')).toUtf8());
+                    else socket->write("OK\n");
                 }
+                socket->flush();
                 socket->disconnectFromServer();
             };
             QObject::connect(socket, &QLocalSocket::readyRead, &app, receive);
@@ -323,6 +458,9 @@ int main(int argc, char **argv)
                      && overlay.status() == QQuickView::Ready ? 0 : 1);
         });
     } else if (command != QStringLiteral("--background"))
-        QTimer::singleShot(0, &app, [&] { handleCommand(command); });
+        QTimer::singleShot(0, &app, [&] {
+            if (!handleCommand(command, command == QStringLiteral("--settings-import") ? cliArguments.value(1) : QString())
+                && command == QStringLiteral("--settings-import")) app.exit(1);
+        });
     return app.exec();
 }

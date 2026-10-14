@@ -218,6 +218,22 @@ jobs:
         run: |
           $env:ARCADE_HOME = Join-Path $env:RUNNER_TEMP 'wheel-install-arcade'
           $env:ARCADE_WHEEL_INSTANCE = Join-Path $env:RUNNER_TEMP 'wheel-install-profile'
+          # Link v0.3.0 isolates registry PATH writes when ARCADE_HOME is set.
+          # Match the sibling apps' checks without duplicating the root hash.
+          function Get-IsolatedPathEntryCount([string]$Target) {
+            $rootKey = 'HKCU:\Software\ArcadeLink\Isolated'
+            if (-not (Test-Path -LiteralPath $rootKey)) { return 0 }
+            $count = 0
+            foreach ($key in Get-ChildItem -LiteralPath $rootKey -ErrorAction SilentlyContinue) {
+              $value = (Get-ItemProperty -LiteralPath $key.PSPath -Name Path -ErrorAction SilentlyContinue).Path
+              foreach ($entry in ([string]$value).Split(';')) {
+                $expanded = [Environment]::ExpandEnvironmentVariables($entry.Trim().Trim('"')).TrimEnd('\','/')
+                if ($expanded -ieq $Target.TrimEnd('\','/')) { $count++ }
+              }
+            }
+            return $count
+          }
+          $userPathBefore = [string](Get-ItemProperty -LiteralPath 'HKCU:\Environment' -Name Path -ErrorAction SilentlyContinue).Path
           $installer = Get-Item dist/*-Setup.exe
           $destination = Join-Path $env:RUNNER_TEMP 'Arcade Wheel Installed'
           $process = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/MERGETASKS=arcade_startup', "/DIR=`"$destination`"" -Wait -PassThru
@@ -234,8 +250,9 @@ jobs:
           $receipt = Get-Content -Raw $receiptPath | ConvertFrom-Json
           $expectedExecutable = [IO.Path]::GetFullPath((Join-Path $destination 'arcade-wheel.exe'))
           if ($receipt.id -ne 'arcade.wheel' -or $receipt.method -ne 'windows-installer' -or $receipt.path -ne $expectedExecutable) { throw 'Installer receipt has unexpected identity or path' }
-          $pathValue = [string][Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment').GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
-          if (-not (@($pathValue.Split(';') | Where-Object { $_.TrimEnd('\','/') -ieq (Join-Path $arcadeRoot 'bin').TrimEnd('\','/') }).Count -gt 0)) { throw 'Installer did not add its shim directory to user PATH' }
+          $arcadeBin = Join-Path $arcadeRoot 'bin'
+          if ((Get-IsolatedPathEntryCount $arcadeBin) -ne 1) { throw 'Installer did not add its shim directory to isolated PATH exactly once' }
+          if ([string](Get-ItemProperty -LiteralPath 'HKCU:\Environment' -Name Path -ErrorAction SilentlyContinue).Path -cne $userPathBefore) { throw 'Isolated installer changed the real user PATH' }
           python packaging/check-native-install.py windows "$destination/arcade-wheel.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Installed Windows lifecycle checks failed' }
           # Updating into another directory must preserve the successor's
@@ -253,6 +270,7 @@ jobs:
           $expectedExecutable = [IO.Path]::GetFullPath((Join-Path $destination 'arcade-wheel.exe'))
           if ($receipt.path -ne $expectedExecutable -or -not (Test-Path $shim) -or -not (Test-Path $startup) -or -not (Test-Path "$arcadeRoot/apps/arcade.wheel.json")) { throw 'Old uninstaller removed successor integration' }
           if (-not (Test-Path $receipt.integration.desktopEntry)) { throw 'Old uninstaller removed the successor launcher' }
+          if ((Get-IsolatedPathEntryCount $arcadeBin) -ne 1) { throw 'Successor integration lost or duplicated the shared PATH entry' }
           $process = Start-Process -FilePath "$destination/unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Uninstaller failed: $($process.ExitCode)" }
           if (Test-Path "$destination/arcade-wheel.exe") { throw 'Uninstaller left the executable behind' }
@@ -260,8 +278,8 @@ jobs:
           if (Test-Path $shim) { throw 'Uninstaller left the CLI shim behind' }
           if (Test-Path $startup) { throw 'Uninstaller left the login shortcut behind' }
           if (Test-Path "$arcadeRoot/apps/arcade.wheel.json") { throw 'Uninstaller left the Arcade Link manifest behind' }
-          $pathValue = [string][Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment').GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
-          if (@($pathValue.Split(';') | Where-Object { $_.TrimEnd('\','/') -ieq (Join-Path $arcadeRoot 'bin').TrimEnd('\','/') }).Count -gt 0) { throw 'Uninstaller left its shim directory on user PATH' }
+          if ((Get-IsolatedPathEntryCount $arcadeBin) -ne 0) { throw 'Uninstaller left its shim directory on isolated PATH' }
+          if ([string](Get-ItemProperty -LiteralPath 'HKCU:\Environment' -Name Path -ErrorAction SilentlyContinue).Path -cne $userPathBefore) { throw 'Isolated lifecycle changed the real user PATH' }
 
       - name: Package and smoke-test macOS DMG
         if: runner.os == 'macOS'

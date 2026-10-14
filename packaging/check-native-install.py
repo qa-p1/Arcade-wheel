@@ -83,8 +83,8 @@ def resident_round_trip(executable, environment, root, login_shortcut=None):
 
 def windows(executable):
     executable = executable.resolve(strict=True)
-    arcade_root = Path(os.environ["LOCALAPPDATA"]) / "Arcade"
-    environment = dict(os.environ, ARCADE_HOME=str(arcade_root), QT_QPA_PLATFORM="offscreen",
+    arcade_root = Path(os.environ.get("ARCADE_HOME") or Path(os.environ["LOCALAPPDATA"]) / "Arcade")
+    environment = dict(os.environ, QT_QPA_PLATFORM="offscreen",
                        QT_QUICK_BACKEND="software", ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT="1")
     manifest = json_command(executable, environment, "--arcade-manifest")
     assert manifest["install"] == "windows-installer" and manifest["menu"][0]["id"] == "show-wheel"

@@ -59,8 +59,17 @@ Rectangle {
             Layout.preferredWidth: 196; Layout.fillHeight: true
             color: "#14141b"
             Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: "#0cffffff" }
+            // Short windows scroll the sidebar instead of cutting off its footer.
+            Flickable {
+                id: sidebarFlick
+                anchors.fill: parent; clip: true
+                contentWidth: width; contentHeight: sidebarContent.height + 36
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: ScrollBar { policy: sidebarFlick.contentHeight > sidebarFlick.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
             ColumnLayout {
-                anchors.fill: parent; anchors.margins: 18; spacing: 5
+                id: sidebarContent
+                x: 18; y: 18; width: sidebarFlick.width - 36
+                height: Math.max(implicitHeight, sidebarFlick.height - 36); spacing: 5
                 RowLayout {
                     Layout.topMargin: 16; Layout.bottomMargin: 36; spacing: 10
                     Image { source: "qrc:/assets/arcade-wheel.png"; Layout.preferredWidth: 30; Layout.preferredHeight: 30; sourceSize: Qt.size(60,60) }
@@ -103,7 +112,8 @@ Rectangle {
                     }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.currentPage="Trigger" }
                 }
-                Text { text: "ARCADE WHEEL  /  0.2"; color: "#555260"; font.pixelSize: 9; font.letterSpacing: 0.8; Layout.topMargin: 9; Layout.leftMargin: 3 }
+                Text { objectName: "versionLabel"; text: "ARCADE WHEEL  /  " + Qt.application.version; color: "#555260"; font.pixelSize: 9; font.letterSpacing: 0.8; Layout.topMargin: 9; Layout.leftMargin: 3 }
+            }
             }
         }
         ColumnLayout {
@@ -124,7 +134,13 @@ Rectangle {
                 UiButton { id: dismiss; anchors.right: parent.right; anchors.rightMargin: 7; anchors.verticalCenter: parent.verticalCenter; compact: true; text: "×"; onClicked: controller.clearError() }
             }
             Loader {
+                // Pages fit the space they are given; their implicit size must
+                // never widen the window's layout.
+                id: pageLoader
+                objectName: "pageLoader"
                 Layout.fillWidth: true; Layout.fillHeight: true
+                Layout.minimumWidth: 0; Layout.minimumHeight: 0
+                Layout.preferredWidth: 0; Layout.preferredHeight: 0
                 sourceComponent: root.currentPage==="Wheel" ? wheelPage : root.currentPage==="Actions" ? actionsPage
                     : root.currentPage==="Center gestures" ? centerGesturesPage
                     : root.currentPage==="Trigger" ? triggerPage : root.currentPage==="Appearance" ? appearancePage
@@ -140,28 +156,52 @@ Rectangle {
     }
     Component {
         id: wheelPage
-        ColumnLayout {
-            anchors.fill: parent; anchors.leftMargin: 28; anchors.rightMargin: 28; anchors.bottomMargin: 24; spacing: 18
-            RowLayout {
-                Layout.fillWidth: true; spacing: 10
-                ComboBox { Layout.preferredWidth: 220; model: controller.config.decks.map(d=>d.name); currentIndex: controller.currentDeckIndex; onActivated: function(i) { controller.selectDeck(i) } }
-                UiButton { text: "+ New deck"; compact: true; onClicked: controller.createDeck() }
-                Item { Layout.fillWidth: true }
-                Text { text: root.activeActions.length + " actions"; color: "#726e81"; font.pixelSize: 11 }
-                UiButton { text: "Deck options"; compact: true; onClicked: deckMenu.open() }
-                Menu {
-                    id: deckMenu
-                    MenuItem { text: "Duplicate deck"; onTriggered: controller.duplicateDeck(root.activeDeck.id) }
-                    MenuItem { text: "Move earlier"; enabled: controller.currentDeckIndex>0; onTriggered: controller.moveDeck(controller.currentDeckIndex,controller.currentDeckIndex-1) }
-                    MenuItem { text: "Move later"; enabled: controller.currentDeckIndex<controller.deckCount-1; onTriggered: controller.moveDeck(controller.currentDeckIndex,controller.currentDeckIndex+1) }
-                    MenuSeparator {}
-                    MenuItem { text: "Delete deck"; enabled: controller.deckCount>1; onTriggered: controller.deleteDeck(root.activeDeck.id) }
+        // Page roots are sized by the Loader and never anchored: some Qt
+        // versions let the Loader's size override anchors.fill, which pushed
+        // margined content past the window edge.
+        ScrollView {
+            id: wheelScroll
+            objectName: "wheelPage"
+            clip: true
+            contentWidth: availableWidth
+            contentHeight: wheelContent.height + 24
+            // Side by side when there is room; otherwise Actions moves below the preview.
+            readonly property bool stacked: availableWidth < 780
+            ColumnLayout {
+                id: wheelContent
+                x: 28
+                width: Math.max(0, wheelScroll.availableWidth - 56)
+                // Grow to the viewport; scroll when it is shorter than the content.
+                height: Math.max(deckRow.implicitHeight + 18 + (wheelScroll.stacked
+                    ? 400 + 18 + actionsPanel.Layout.preferredHeight
+                    : Math.max(340, actionsPanel.Layout.preferredHeight)), pageLoader.height - 24)
+                spacing: 18
+                RowLayout {
+                    id: deckRow
+                    Layout.fillWidth: true; spacing: 10
+                    ComboBox { Layout.fillWidth: true; Layout.maximumWidth: 220; Layout.minimumWidth: 120; model: controller.config.decks.map(d=>d.name); currentIndex: controller.currentDeckIndex; onActivated: function(i) { controller.selectDeck(i) } }
+                    UiButton { text: "+ New deck"; compact: true; onClicked: controller.createDeck() }
+                    Item { Layout.fillWidth: true }
+                    Text { text: root.activeActions.length + " actions"; color: "#726e81"; font.pixelSize: 11; visible: wheelContent.width >= 520 }
+                    UiButton { text: "Deck options"; compact: true; onClicked: deckMenu.open() }
+                    Menu {
+                        id: deckMenu
+                        MenuItem { text: "Duplicate deck"; onTriggered: controller.duplicateDeck(root.activeDeck.id) }
+                        MenuItem { text: "Move earlier"; enabled: controller.currentDeckIndex>0; onTriggered: controller.moveDeck(controller.currentDeckIndex,controller.currentDeckIndex-1) }
+                        MenuItem { text: "Move later"; enabled: controller.currentDeckIndex<controller.deckCount-1; onTriggered: controller.moveDeck(controller.currentDeckIndex,controller.currentDeckIndex+1) }
+                        MenuSeparator {}
+                        MenuItem { text: "Delete deck"; enabled: controller.deckCount>1; onTriggered: controller.deleteDeck(root.activeDeck.id) }
+                    }
                 }
-            }
-            RowLayout {
-                Layout.fillWidth: true; Layout.fillHeight: true; spacing: 18
+                GridLayout {
+                    Layout.fillWidth: true; Layout.fillHeight: true
+                    columns: wheelScroll.stacked ? 1 : 2
+                    columnSpacing: 18; rowSpacing: 18
                 Rectangle {
-                    Layout.fillWidth: true; Layout.fillHeight: true; radius: 16; color: "#0d0e13"; border.color: "#1f202a"; clip: true
+                    Layout.fillWidth: true; Layout.fillHeight: !wheelScroll.stacked
+                    Layout.minimumWidth: 0
+                    Layout.minimumHeight: 340; Layout.preferredHeight: wheelScroll.stacked ? 400 : 340
+                    radius: 16; color: "#0d0e13"; border.color: "#1f202a"; clip: true
                     Canvas {
                         anchors.fill: parent
                         onPaint: {
@@ -185,25 +225,38 @@ Rectangle {
                             deck: root.activeDeck; deckIndex: controller.currentDeckIndex; deckCount: controller.deckCount
                             selectedIndex: root.selectedSlot; appearance: controller.config.appearance
                             reduceMotion: !!controller.config.appearance.reduceMotion; interactive: true
-                            scale: Math.min(1.12,(previewArea.width-22)/(width*appearanceScale),(previewArea.height-12)/(height*appearanceScale))
+                            scale: Math.max(0.1, Math.min(1.12,(previewArea.width-22)/(width*appearanceScale),(previewArea.height-12)/(height*appearanceScale)))
                             onSlotClicked: function(i) { root.selectedSlot=i }
                             onScrollDeck: function(d) { root.scrollPreviewDeck(d) }
                         }
                     }
                     Column {
-                        anchors.bottom: parent.bottom; anchors.bottomMargin: 21; anchors.horizontalCenter: parent.horizontalCenter; spacing: 7
-                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Hold " + controller.config.trigger.shortcut + "   →   move   →   release"; color: "#aaa4ba"; font.pixelSize: 11 }
-                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Select a position to edit · Scroll to change decks"; color: "#5e5b6c"; font.pixelSize: 10 }
+                        anchors.bottom: parent.bottom; anchors.bottomMargin: 21; anchors.left: parent.left; anchors.right: parent.right; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 7
+                        Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight; text: "Hold " + controller.config.trigger.shortcut + "   →   move   →   release"; color: "#aaa4ba"; font.pixelSize: 11 }
+                        Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight; text: "Select a position to edit · Scroll to change decks"; color: "#5e5b6c"; font.pixelSize: 10 }
                     }
                 }
                 Rectangle {
-                    Layout.preferredWidth: 278; Layout.fillHeight: true; radius: 16; color: "#17171f"; border.color: "#24232f"
+                    id: actionsPanel
+                    objectName: "actionsPanel"
+                    Layout.preferredWidth: wheelScroll.stacked ? -1 : 278
+                    Layout.minimumWidth: wheelScroll.stacked ? 0 : 240
+                    Layout.fillWidth: wheelScroll.stacked
+                    Layout.fillHeight: !wheelScroll.stacked
+                    Layout.preferredHeight: panelContent.implicitHeight + 34
+                    radius: 16; color: "#17171f"; border.color: "#24232f"
                     ColumnLayout {
+                        id: panelContent
                         anchors.fill: parent; anchors.margins: 17; spacing: 10
                         Text { text: "Actions"; color: "#e6e2ee"; font.pixelSize: 16; font.weight: Font.Medium }
-                        Text { text: "Clockwise, starting at the top"; color: "#797486"; font.pixelSize: 10; Layout.bottomMargin: 6 }
+                        Text { text: "Clockwise, starting at the top"; color: "#797486"; font.pixelSize: 10; Layout.bottomMargin: 6; Layout.fillWidth: true; elide: Text.ElideRight }
                         ListView {
-                            Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 5
+                            id: actionList
+                            Layout.fillWidth: true; Layout.fillHeight: !wheelScroll.stacked
+                            Layout.minimumHeight: wheelScroll.stacked ? contentHeight : 111
+                            Layout.preferredHeight: wheelScroll.stacked ? contentHeight : 111
+                            interactive: !wheelScroll.stacked
+                            clip: true; spacing: 5
                             model: root.activeActions
                             delegate: Rectangle {
                                 required property var modelData
@@ -215,7 +268,7 @@ Rectangle {
                                     anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 11
                                     Image { source: "image://icons/"+encodeURIComponent(modelData.icon || "applications-other"); sourceSize: Qt.size(64,64); Layout.preferredWidth: 29; Layout.preferredHeight: 29 }
                                     ColumnLayout {
-                                        Layout.fillWidth: true; spacing: 3
+                                        Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 3
                                         Text { text: modelData.name || "Choose action"; color: "#dcd7e7"; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
                                         Text { text: controller.actionUnavailableReason(modelData) || (modelData.type==="application" ? "Application" : modelData.type); color: controller.actionUnavailableReason(modelData) ? "#d6a0a5" : "#7b758b"; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
                                     }
@@ -226,25 +279,28 @@ Rectangle {
                         }
                         RowLayout {
                             Layout.fillWidth: true; spacing: 6
-                            UiButton { text: "Edit action"; accent: true; Layout.fillWidth: true; enabled: root.selectedSlot>=0; onClicked: actionPicker.editAction(root.activeDeck.id,root.selectedSlot,root.activeAction) }
+                            UiButton { text: "Edit action"; accent: true; Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.maximumWidth: wheelScroll.stacked ? 260 : Number.POSITIVE_INFINITY; enabled: root.selectedSlot>=0; onClicked: actionPicker.editAction(root.activeDeck.id,root.selectedSlot,root.activeAction) }
                             UiButton { text: "↑"; compact: true; enabled: root.selectedSlot>0; onClicked: { const n=root.selectedSlot-1; controller.moveAction(root.activeDeck.id,root.selectedSlot,n); root.selectedSlot=n } }
                             UiButton { text: "↓"; compact: true; enabled: root.selectedSlot>=0 && root.selectedSlot<root.activeActions.length-1; onClicked: { const n=root.selectedSlot+1; controller.moveAction(root.activeDeck.id,root.selectedSlot,n); root.selectedSlot=n } }
+                            Item { Layout.fillWidth: wheelScroll.stacked; visible: wheelScroll.stacked }
                         }
                         Rectangle { Layout.fillWidth: true; height: 1; color: "#2a2634"; Layout.topMargin: 9; Layout.bottomMargin: 4 }
                         Text { text: "DECK SETTINGS"; color: "#777082"; font.pixelSize: 9; font.letterSpacing: 1.1 }
-                        TextField { id: deckName; Layout.fillWidth: true; text: root.activeDeck.name || ""; placeholderText: "Deck name"; onEditingFinished: controller.setDeckName(root.activeDeck.id,text) }
+                        TextField { id: deckName; Layout.fillWidth: true; Layout.minimumWidth: 0; text: root.activeDeck.name || ""; placeholderText: "Deck name"; onEditingFinished: controller.setDeckName(root.activeDeck.id,text) }
                         RowLayout {
                             Layout.fillWidth: true
-                            Text { text: "Positions"; color: "#9890a5"; font.pixelSize: 11; Layout.fillWidth: true }
-                            ComboBox { Layout.preferredWidth: 77; model: [4,5,6,7,8]; currentIndex: root.activeActions.length-4; onActivated: function(i) { controller.resizeDeck(root.activeDeck.id,i+4) } }
+                            Text { text: "Positions"; color: "#9890a5"; font.pixelSize: 11; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
+                            ComboBox { Layout.preferredWidth: 88; model: [4,5,6,7,8]; currentIndex: root.activeActions.length-4; onActivated: function(i) { controller.resizeDeck(root.activeDeck.id,i+4) } }
                         }
                     }
+                }
                 }
             }
         }
     }
     Component {
         id: actionsPage
+        Item {
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 28
@@ -253,13 +309,14 @@ Rectangle {
             Text { text: "Pick any application from the Wheel editor. Arcade Wheel discovers desktop entries and Start Menu shortcuts automatically."; color: "#91889f"; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             RowLayout {
                 Layout.fillWidth: true
-                TextField { id: catalogSearch; Layout.fillWidth: true; placeholderText: "Search applications" }
+                TextField { id: catalogSearch; Layout.fillWidth: true; Layout.minimumWidth: 0; placeholderText: "Search applications" }
                 UiButton { text: "Refresh"; onClicked: controller.refreshApplications() }
             }
             Rectangle {
-                Layout.fillWidth: true; Layout.fillHeight: true; radius: 13; color: "#17171f"; border.color: "#282532"
+                Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 120; radius: 13; color: "#17171f"; border.color: "#282532"
                 ListView {
                     anchors.fill: parent; anchors.margins: 10; clip: true; spacing: 4
+                    ScrollBar.vertical: ScrollBar { }
                     model: controller.applications.filter(function(app) { return app.name.toLowerCase().indexOf(catalogSearch.text.toLowerCase()) >= 0 })
                     delegate: Rectangle {
                         required property var modelData
@@ -267,22 +324,24 @@ Rectangle {
                         RowLayout {
                             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 12
                             Image { source: "image://icons/" + encodeURIComponent(modelData.icon || "application-x-executable"); sourceSize: Qt.size(28, 28); Layout.preferredWidth: 28; Layout.preferredHeight: 28 }
-                            Text { text: modelData.name; color: "#e7e1f0"; font.pixelSize: 13; Layout.fillWidth: true }
-                            Text { text: modelData.id; color: "#7b6e89"; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.maximumWidth: 270 }
+                            Text { text: modelData.name; color: "#e7e1f0"; font.pixelSize: 13; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
+                            Text { text: modelData.id; color: "#7b6e89"; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.maximumWidth: Math.min(270, parent.width * 0.4) }
                         }
                     }
                 }
             }
+        }
         }
     }
 
     Component {
         id: triggerPage
             ScrollView {
-                anchors.fill: parent
+                id: triggerScroll
                 clip: true
+                contentWidth: availableWidth
             ColumnLayout {
-                width: Math.max(0, Math.min(700, parent.width - 60))
+                width: Math.max(0, Math.min(700, triggerScroll.availableWidth - 60))
                 x: 30; y: 26; spacing: 22
                 Text { text: "Activation shortcut"; color: "#e8e3ef"; font.pixelSize: 18; font.weight: Font.Medium }
                 Text { text: "Click the field and press your shortcut. Hold it to open the wheel, move toward an action, then release to launch."; color: "#91889f"; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true }
@@ -406,13 +465,16 @@ Rectangle {
 
     Component {
         id: appearancePage
+        Item {
         RowLayout {
             id: appearanceLayout
             anchors.fill: parent; anchors.margins: 28; spacing: 18
             ScrollView {
-                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                id: appearanceScroll
+                Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumWidth: 0; clip: true
+                contentWidth: availableWidth
                 ColumnLayout {
-                    width: Math.max(0, Math.min(560, parent.width - 18)); spacing: 20
+                    width: Math.max(0, Math.min(560, appearanceScroll.availableWidth - 18)); spacing: 20
                     Text { text: "Shape and motion"; color: "#e8e3ef"; font.pixelSize: 18; font.weight: Font.Medium }
                     SettingSlider { Layout.fillWidth: true; title: "Wheel radius"; section: "appearance"; settingKey: "radius"; fromValue: 110; toValue: 240; stepValue: 2; unit: " px" }
                     SettingSlider { Layout.fillWidth: true; title: "Wheel scale"; section: "appearance"; settingKey: "scale"; fromValue: 0.75; toValue: 1.3; stepValue: 0.05 }
@@ -443,18 +505,20 @@ Rectangle {
                     appearance: controller.config.appearance
                     reduceMotion: !!controller.config.appearance.reduceMotion
                     scale: Math.max(0.1, Math.min(0.68,
-                        280 / (width * appearanceScale), (parent.height - 30) / (height * appearanceScale)))
+                        (parent.width - 30) / (width * appearanceScale), (parent.height - 30) / (height * appearanceScale)))
                 }
             }
+        }
         }
     }
 
     Component {
         id: behaviourPage
         ScrollView {
-            anchors.fill: parent; clip: true
+            id: behaviourScroll
+            clip: true; contentWidth: availableWidth
             ColumnLayout {
-                width: Math.max(0, Math.min(700, parent.width - 60)); x: 30; y: 26; spacing: 22
+                width: Math.max(0, Math.min(700, behaviourScroll.availableWidth - 60)); x: 30; y: 26; spacing: 22
                 Text { text: "Interaction"; color: "#e8e3ef"; font.pixelSize: 18; font.weight: Font.Medium }
                 SettingSlider { Layout.fillWidth: true; title: "Cancel dead zone"; detail: "Return to the screen center before releasing to cancel."; section: "behaviour"; settingKey: "deadZone"; fromValue: 30; toValue: 120; stepValue: 2; unit: " px" }
                 SettingSlider { Layout.fillWidth: true; title: "Selection sensitivity"; section: "behaviour"; settingKey: "selectionSensitivity"; fromValue: 0.5; toValue: 2; stepValue: 0.1 }
@@ -474,17 +538,18 @@ Rectangle {
     Component {
         id: generalPage
         ScrollView {
-            anchors.fill: parent; clip: true
+            id: generalScroll
+            clip: true; contentWidth: availableWidth
             ColumnLayout {
-                width: Math.max(0, Math.min(720, parent.width - 60)); x: 30; y: 26; spacing: 23
+                width: Math.max(0, Math.min(720, generalScroll.availableWidth - 60)); x: 30; y: 26; spacing: 23
                 Text { text: "Application"; color: "#e8e3ef"; font.pixelSize: 18; font.weight: Font.Medium }
                 SettingToggle { Layout.fillWidth: true; title: "Start on login"; detail: "Keep Arcade Wheel ready in the background."; section: "general"; settingKey: "startOnLogin" }
                 SettingToggle { Layout.fillWidth: true; title: "Show failure notifications"; section: "general"; settingKey: "showNotifications" }
                 Rectangle { Layout.fillWidth: true; height: 1; color: "#302938" }
                 Text { text: "Configuration"; color: "#e8e3ef"; font.pixelSize: 18; font.weight: Font.Medium }
                 Text { text: controller.configPath; color: "#8d809e"; font.pixelSize: 12; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true }
-                RowLayout {
-                    spacing: 9
+                Flow {
+                    Layout.fillWidth: true; spacing: 9
                     UiButton { text: "Import portable JSON"; onClicked: importDialog.open() }
                     UiButton { text: "Export portable JSON"; onClicked: exportDialog.open() }
                     UiButton { text: "Reset defaults"; destructive: true; onClicked: resetDialog.open() }
@@ -494,8 +559,8 @@ Rectangle {
                     color: "#8d809e"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
                 }
                 Rectangle { Layout.fillWidth: true; height: 1; color: "#302938" }
-                RowLayout {
-                    spacing: 9
+                Flow {
+                    Layout.fillWidth: true; spacing: 9
                     UiButton { text: "Restart Arcade Wheel"; onClicked: controller.requestRestart() }
                     UiButton { text: "Quit Arcade Wheel"; destructive: true; onClicked: controller.requestQuit() }
                 }

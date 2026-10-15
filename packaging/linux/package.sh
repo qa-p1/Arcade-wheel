@@ -50,6 +50,16 @@ for category in wayland-shell-integration wayland-graphics-integration-client wa
         cp -a "$qt_plugins/$category/." "$appdir/usr/plugins/$category/"
     fi
 done
+# The SVG icon engine is also dlopened. Without it Qt reports "SVG support
+# false" and every SVG-only theme icon (most of Papirus, Adwaita, ...) fails.
+svg_icon_engine="$qt_plugins/iconengines/libqsvgicon.so"
+if [[ ! -f "$svg_icon_engine" ]]; then
+    echo "Qt's SVG icon engine is missing: $svg_icon_engine" >&2
+    exit 1
+fi
+mkdir -p "$appdir/usr/plugins/iconengines"
+cp "$svg_icon_engine" "$appdir/usr/plugins/iconengines/"
+export EXTRA_QT_MODULES=svg
 extra_platforms=libqoffscreen.so
 for plugin in "$qt_plugins"/platforms/libqwayland*.so; do
     [[ -f "$plugin" ]] || continue
@@ -68,6 +78,7 @@ export OUTPUT="$output/ArcadeWheel-$version-Linux-x86_64.AppImage"
     --desktop-file "$repo/packaging/linux/com.arcadewheel.ArcadeWheel.desktop" \
     --icon-file "$repo/assets/arcade-wheel.svg" --plugin qt --output appimage
 test -s "$OUTPUT"
+test -s "$appdir/usr/plugins/iconengines/libqsvgicon.so"
 python3 "$repo/packaging/smoke-test.py" "$OUTPUT"
 python3 "$repo/scripts/arcade-release.py" --id arcade.wheel --version "$version" \
     --channel stable --windows-installer inno \

@@ -1,4 +1,5 @@
 #include "core/IconImageProvider.h"
+#include "core/IconTheme.h"
 #include "core/CommandReply.h"
 #include "core/WheelController.h"
 #include "link/WheelLink.h"
@@ -277,6 +278,12 @@ int main(int argc, char **argv)
     });
     arcadeTrayHost.start(controller.config().value("link").toMap().value("enabled", true).toBool(), hasTray);
     syncTrayState(arcadeTrayHost.state());
+#ifdef Q_OS_LINUX
+    // Inside the AppImage Qt cannot load the host's platform theme plugin
+    // (qtengine, qt6ct, ...) and falls back to "hicolor", which lacks most
+    // application icons. Use the theme the user configured instead.
+    IconTheme::applyUserTheme();
+#endif
     QIcon appIcon(QStringLiteral(":/assets/arcade-wheel.png"));
     if (appIcon.isNull()) appIcon = QIcon::fromTheme(QStringLiteral("applications-system"));
     app.setWindowIcon(appIcon);
@@ -300,7 +307,7 @@ int main(int argc, char **argv)
             settings = std::make_unique<QQuickView>();
             settings->setTitle(QStringLiteral("Arcade Wheel · Settings"));
             settings->setColor(QColor(QStringLiteral("#0d1118")));
-            settings->setMinimumSize(QSize(960, 640));
+            settings->setMinimumSize(QSize(800, 560));
             settings->resize(1240, 820);
             settings->setResizeMode(QQuickView::SizeRootObjectToView);
             settings->engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);

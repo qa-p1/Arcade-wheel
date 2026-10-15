@@ -2,6 +2,15 @@
 
 All notable changes to Arcade Wheel are documented here.
 
+## 0.3.1 — 2026-10-15
+
+### Fixes
+
+- **App icons load in the Linux AppImage.** The AppImage now bundles Qt's SVG icon engine (`iconengines/libqsvgicon.so`), so SVG-only theme icons (Files, Celluloid, Calculator and the generic fallback) no longer show a grey placeholder. CI extracts the AppImage and checks the plugin is present.
+- **Wheel follows your icon theme.** When Qt cannot load the desktop's platform theme plugin (for example qtengine or qt6ct from inside the AppImage) and falls back to `hicolor`, Wheel reads the icon theme from the configured platform theme (qtengine, qt6ct/qt5ct), then GNOME settings, KDE and GTK 3, and uses the first one that is installed.
+- **Settings fits smaller windows.** Pages no longer run past the right edge in tiled or small windows: the Actions panel moves below the preview when narrow, pages scroll vertically, the sidebar scrolls on short windows, and the minimum window size is 800×560. A new offscreen test checks every page at several sizes.
+- The Settings footer shows the real application version instead of `0.2`.
+
 ## 0.3.0 — 2026-10-14
 
 ### Arcade Tools hub support

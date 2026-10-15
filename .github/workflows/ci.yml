@@ -184,6 +184,18 @@ jobs:
           export QMAKE="$QT_ROOT_DIR/bin/qmake"
           bash packaging/linux/package.sh build dist
 
+      - name: Check the AppImage bundles the SVG icon engine
+        if: runner.os == 'Linux'
+        run: |
+          appimage=$(realpath dist/*.AppImage)
+          extract_dir="$RUNNER_TEMP/appimage-contents"
+          mkdir -p "$extract_dir"
+          (cd "$extract_dir" && "$appimage" --appimage-extract > /dev/null)
+          for file in usr/plugins/iconengines/libqsvgicon.so usr/plugins/imageformats/libqsvg.so; do
+            test -s "$extract_dir/squashfs-root/$file" || { echo "Missing $file in the AppImage" >&2; exit 1; }
+          done
+          ls "$extract_dir"/squashfs-root/usr/lib/libQt6Svg.so*
+
       - name: Packaged AppImage install and uninstall (isolated, CI only)
         if: runner.os == 'Linux'
         env:

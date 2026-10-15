@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(ArcadeWheel VERSION 0.3.0 LANGUAGES CXX)
+project(ArcadeWheel VERSION 0.3.1 LANGUAGES CXX)
 
 if(APPLE)
     enable_language(OBJCXX)
@@ -23,6 +23,7 @@ add_library(arcade_core STATIC
     src/core/WheelLogic.h src/core/WheelLogic.cpp
     src/core/WheelController.h src/core/WheelController.cpp
     src/core/IconImageProvider.h src/core/IconImageProvider.cpp
+    src/core/IconTheme.h src/core/IconTheme.cpp
     src/actions/ActionDispatcher.h src/actions/ActionDispatcher.cpp
     src/providers/ActionProvider.h
     src/providers/ArcadeLinkProvider.h src/providers/ArcadeLinkProvider.cpp
@@ -78,17 +79,7 @@ else()
     endif()
 endif()
 
-qt_add_resources(arcade-wheel arcade_qml PREFIX "/" FILES
-    qml/wheel/WheelView.qml
-    qml/wheel/Overlay.qml
-    qml/settings/Settings.qml
-    qml/settings/ActionPicker.qml
-    qml/settings/LinkActivity.qml
-    qml/settings/ConnectedAppsPage.qml
-    qml/settings/CenterGesturesPage.qml
-    qml/components/UiButton.qml
-    qml/components/SettingSlider.qml
-    qml/components/SettingToggle.qml
+set(ARCADE_ASSET_FILES
     assets/arcade/arcade.box.svg
     assets/arcade/arcade.lens.svg
     assets/arcade/arcade.look.svg
@@ -100,6 +91,19 @@ qt_add_resources(arcade-wheel arcade_qml PREFIX "/" FILES
     assets/arcade/tokens.json
     assets/arcade-wheel.svg
     assets/arcade-wheel.png
+)
+qt_add_resources(arcade-wheel arcade_qml PREFIX "/" FILES
+    qml/wheel/WheelView.qml
+    qml/wheel/Overlay.qml
+    qml/settings/Settings.qml
+    qml/settings/ActionPicker.qml
+    qml/settings/LinkActivity.qml
+    qml/settings/ConnectedAppsPage.qml
+    qml/settings/CenterGesturesPage.qml
+    qml/components/UiButton.qml
+    qml/components/SettingSlider.qml
+    qml/components/SettingToggle.qml
+    ${ARCADE_ASSET_FILES}
 )
 
 install(TARGETS arcade-wheel RUNTIME DESTINATION bin BUNDLE DESTINATION .)
@@ -132,6 +136,12 @@ if(BUILD_TESTING)
     qt_add_resources(test_AppInstaller install_test_assets PREFIX "/" FILES assets/arcade-wheel.svg assets/arcade-wheel.png)
     add_test(NAME AppInstaller COMMAND test_AppInstaller)
     set_tests_properties(AppInstaller PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # Every Settings page at common window sizes; ARCADE_WHEEL_SHOTS=DIR saves PNGs.
+    qt_add_executable(test_SettingsLayout tests/tst_SettingsLayout.cpp)
+    target_link_libraries(test_SettingsLayout PRIVATE arcade_core Qt6::Test Qt6::QuickControls2)
+    qt_add_resources(test_SettingsLayout layout_assets PREFIX "/" FILES ${ARCADE_ASSET_FILES})
+    add_test(NAME SettingsLayout COMMAND test_SettingsLayout)
+    set_tests_properties(SettingsLayout PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Material;QT_QUICK_CONTROLS_MATERIAL_THEME=Dark;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")
     qt_add_executable(test_WheelTrayHost tests/tst_WheelTrayHost.cpp)
     target_link_libraries(test_WheelTrayHost PRIVATE arcade_link_qt Qt6::Test)
     add_test(NAME WheelTrayHost COMMAND test_WheelTrayHost)
@@ -171,6 +181,11 @@ if(BUILD_TESTING)
             src/platform/linux/LinuxBackend.h src/platform/linux/LinuxBackend.cpp)
         target_link_libraries(test_LinuxLaunch PRIVATE arcade_core Qt6::Test Qt6::DBus Qt6::Network PkgConfig::GIO)
         add_test(NAME LinuxLaunch COMMAND test_LinuxLaunch)
+        qt_add_executable(test_IconTheme tests/tst_IconTheme.cpp)
+        target_link_libraries(test_IconTheme PRIVATE arcade_core Qt6::Test)
+        target_compile_definitions(test_IconTheme PRIVATE ARCADE_ICON_THEME_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/icon-theme")
+        add_test(NAME IconTheme COMMAND test_IconTheme)
+        set_tests_properties(IconTheme PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
         set_tests_properties(LinuxLaunch PROPERTIES ENVIRONMENT "ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")
         find_program(DBUS_RUN_SESSION dbus-run-session)
         if(DBUS_RUN_SESSION)

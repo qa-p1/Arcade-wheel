@@ -2,7 +2,7 @@
 
 All notable changes to Arcade Wheel are documented here.
 
-## 0.3.0 — Unreleased
+## 0.3.0 — 2026-10-14
 
 ### Arcade Tools hub support
 

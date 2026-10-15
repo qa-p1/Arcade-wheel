@@ -160,7 +160,8 @@ def publish(repository, version, tag, commit, assets, run_url, run_number):
         "- **macOS 13+:** open the DMG matching your processor and drag the app to Applications.\n\n"
         "Qt and the application runtime are bundled. Verify downloads with `SHA256SUMS.txt`; "
         "`arcade-release.json` supplies Arcade Tools with package hashes and installer details.\n\n"
-        "Windows packages are unsigned; macOS packages are ad-hoc signed, without notarization.\n"
+        "Windows packages are unsigned; macOS packages are ad-hoc signed, without notarization.\n\n"
+        "User guide: https://github.com/qa-p1/Arcade-wheel/tree/main/docs/user\n"
     )
     with tempfile.TemporaryDirectory(prefix="arcade-release-") as temporary:
         notes_file = Path(temporary) / "notes.md"

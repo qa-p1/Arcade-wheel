@@ -1,0 +1,8 @@
+{
+    "theme": {
+        "colorScheme": "~/.config/qtengine/example.colors",
+        "iconTheme": "Papirus-Dark",
+        "style": "Fusion"
+    },
+    "misc": { "menusHaveIcons": true }
+}

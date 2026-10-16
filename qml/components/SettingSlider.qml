@@ -16,7 +16,7 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
-        Text { text: row.title; color: "#e7edf8"; font.pixelSize: 14; font.weight: Font.Medium; Layout.fillWidth: true }
+        Text { text: row.title; color: "#e7edf8"; font.pixelSize: 14; font.weight: Font.Medium; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
         Text { text: Number((Math.round(slider.value / row.stepValue) * row.stepValue).toFixed(2)) + row.unit; color: "#a9bedb"; font.pixelSize: 13 }
     }
     Text { text: row.detail; color: "#8291a5"; font.pixelSize: 12; visible: text.length > 0; Layout.fillWidth: true; wrapMode: Text.WordWrap }

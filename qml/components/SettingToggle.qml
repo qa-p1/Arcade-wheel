@@ -12,7 +12,7 @@ RowLayout {
     ColumnLayout {
         Layout.fillWidth: true
         spacing: 3
-        Text { text: row.title; color: "#e7edf8"; font.pixelSize: 14; font.weight: Font.Medium }
+        Text { text: row.title; color: "#e7edf8"; font.pixelSize: 14; font.weight: Font.Medium; wrapMode: Text.WordWrap; Layout.fillWidth: true }
         Text { text: row.detail; color: "#8291a5"; font.pixelSize: 12; visible: text.length > 0; wrapMode: Text.WordWrap; Layout.fillWidth: true }
     }
     Switch {

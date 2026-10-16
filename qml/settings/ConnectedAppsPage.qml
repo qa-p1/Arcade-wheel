@@ -70,7 +70,7 @@ ScrollView {
             visible: diagnostics.expanded
             Layout.fillWidth: true; spacing: 8
             Text { text: "Registry: " + controller.linkDiagnostics.registry; color: "#9AA3B2"; font.pixelSize: 11; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true }
-            Text { text: "Wheel endpoint: " + controller.linkDiagnostics.endpoint; color: "#9AA3B2"; font.pixelSize: 11 }
+            Text { text: "Wheel endpoint: " + controller.linkDiagnostics.endpoint; color: "#9AA3B2"; font.pixelSize: 11; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true }
             Text { text: "Last error: " + (controller.linkDiagnostics.lastError || "None"); color: "#9AA3B2"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
             Repeater {
                 model: controller.connectedApps

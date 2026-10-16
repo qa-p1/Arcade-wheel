@@ -149,6 +149,7 @@ jobs:
           ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT: '1'
           QT_FORCE_STDERR_LOGGING: '1'
           QT_LOGGING_TO_CONSOLE: '1'
+          QT_QPA_FONTDIR: C:\Windows\Fonts
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'SettingsLayout.txt'
           & build/Release/test_SettingsLayout.exe -o "$log,txt" -maxwarnings 0

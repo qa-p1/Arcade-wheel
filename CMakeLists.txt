@@ -140,9 +140,17 @@ if(BUILD_TESTING)
     qt_add_executable(test_SettingsLayout tests/tst_SettingsLayout.cpp)
     target_link_libraries(test_SettingsLayout PRIVATE arcade_core Qt6::Test Qt6::QuickControls2)
     qt_add_resources(test_SettingsLayout layout_assets PREFIX "/" FILES ${ARCADE_ASSET_FILES})
-    # Explicit stdout logging is needed for QtTest GUI executables on Windows.
-    add_test(NAME SettingsLayout COMMAND test_SettingsLayout -o -,txt)
-    set_tests_properties(SettingsLayout PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Material;QT_QUICK_CONTROLS_MATERIAL_THEME=Dark;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")
+    # The QtTest log also goes to Testing/Temporary, which CI uploads on failure.
+    add_test(NAME SettingsLayout COMMAND test_SettingsLayout -o -,txt
+        -o "${CMAKE_BINARY_DIR}/Testing/Temporary/SettingsLayout.txt,txt")
+    set(settings_layout_env "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Material;QT_QUICK_CONTROLS_MATERIAL_THEME=Dark;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")
+    if(WIN32)
+        # The offscreen platform finds no fonts on Windows unless pointed at the
+        # system folder; its fallback glyphs are one em wide and every label overflows.
+        string(REPLACE "\\" "/" windows_font_dir "$ENV{SystemRoot}/Fonts")
+        list(APPEND settings_layout_env "QT_QPA_FONTDIR=${windows_font_dir}")
+    endif()
+    set_tests_properties(SettingsLayout PROPERTIES ENVIRONMENT "${settings_layout_env}")
     qt_add_executable(test_WheelTrayHost tests/tst_WheelTrayHost.cpp)
     target_link_libraries(test_WheelTrayHost PRIVATE arcade_link_qt Qt6::Test)
     add_test(NAME WheelTrayHost COMMAND test_WheelTrayHost)

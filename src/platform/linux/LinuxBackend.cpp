@@ -1420,7 +1420,8 @@ bool LinuxBackend::setStartOnLogin(bool enabled, QString *error)
 
 bool LinuxBackend::startOnLogin() const
 {
-    return QFileInfo::exists(autostartDesktopFile());
+    // An entry switched off in the desktop's startup settings won't run.
+    return ArcadeLink::ArcadeInstall::autostartEnabled(autostartDesktopFile());
 }
 
 QJsonObject LinuxBackend::shortcutRegistration() const

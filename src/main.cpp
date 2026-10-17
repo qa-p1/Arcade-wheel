@@ -387,6 +387,8 @@ int main(int argc, char **argv)
     };
     QObject::connect(&arcadeTrayHost, &ArcadeLink::ArcadeTrayHost::stateChanged, &tray, updateTray);
     QObject::connect(&arcadeTrayHost, &ArcadeLink::ArcadeTrayHost::startupReady, &tray, updateTray);
+    // Quitting while Tools hosts the tray must not flash Wheel's own icon.
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &arcadeTrayHost, [&arcadeTrayHost] { arcadeTrayHost.finish(); });
     updateTray();
 #ifdef Q_OS_LINUX
     // At login Wheel often starts before the panel that hosts tray icons, and

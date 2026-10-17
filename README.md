@@ -31,7 +31,7 @@ Download the file for your system from [Releases](https://github.com/qa-p1/Arcad
 | macOS 13+, Apple Silicon | `ArcadeWheel-<version>-macOS-arm64.dmg` | Open the dmg and drag Arcade Wheel to Applications. Started from Downloads or the dmg, it offers **Move to Applications**. |
 | macOS 13+, Intel | `ArcadeWheel-<version>-macOS-x86_64.dmg` | Same as above. |
 
-- Scripted Linux install: `./ArcadeWheel.AppImage --install --silent --no-launch`. To repair launchers or a moved AppImage, run that copy with `--repair`. `--integration-status` prints the receipt, entries and PATH status without changing them.
+- Scripted Linux install: `./ArcadeWheel.AppImage --install --silent --no-launch`. To repair launchers or a moved AppImage, run that copy with `--repair`. `--integration-status` prints the receipt, entries and PATH status without changing them. A silent install removes the AppImage it was started from only when that file is in your Downloads folder; add `--keep-download` to keep it there too. Files elsewhere are never removed.
 - If your command folder is not on PATH, the installer shows the exact line for your shell; Wheel never edits shell profiles.
 - Qt, QML imports, plugins, and the necessary application libraries are bundled. The AppImage targets Ubuntu 22.04 or newer compatible distributions; the desktop must provide a Wayland compositor and a GlobalShortcuts portal.
 - Builds are unsigned: Windows installers have no publisher certificate and macOS bundles are ad-hoc signed, without notarization. On Windows, SmartScreen may warn: choose **More info → Run anyway**. On macOS, Control-click or right-click the app and choose **Open** the first time.
@@ -113,7 +113,7 @@ When Arcade Wheel is already running, each command is sent to the running instan
 | `--menu` | Print app-specific tray items as JSON |
 | `--settings-export FILE` | Export portable settings without credentials or device identity |
 | `--settings-import FILE` | Import portable settings after saving a private backup |
-| `--install [--silent] [--no-launch] [--channel C]` | Install this AppImage / macOS bundle |
+| `--install [--silent] [--no-launch] [--keep-download] [--channel C]` | Install this AppImage / macOS bundle |
 | `--uninstall [--silent] [--remove-data]` | Remove the installation |
 | `--repair` | Repair launchers and entries |
 | `--integration-status` | Show receipt, integration entries and PATH status |

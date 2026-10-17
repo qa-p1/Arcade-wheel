@@ -26,7 +26,10 @@ private slots:
         d.receipt.insert("version", "0.3.0");
         QCOMPARE(AppInstaller::promptKind(d, "0.3.0"), QStringLiteral("sameOrNewer"));
         d.receipt.insert("version", "0.10.0");
-        QCOMPARE(AppInstaller::promptKind(d, "0.9.0"), QStringLiteral("sameOrNewer"));
+        // An older file says a newer copy is installed (numeric, not string, order).
+        QCOMPARE(AppInstaller::promptKind(d, "0.9.0"), QStringLiteral("newerInstalled"));
+        QCOMPARE(AppInstaller::dialogText(d, "0.9.0").value("title").toString(), QStringLiteral("A newer Arcade Wheel is already installed."));
+        QCOMPARE(AppInstaller::dialogText(d, "0.9.0").value("body").toString(), QStringLiteral("The installed copy is 0.10.0; this file is the older 0.9.0."));
         d.state = "installedHere"; QVERIFY(AppInstaller::promptKind(d, "0.3.0").isEmpty());
         d.state = "devBuild"; QVERIFY(AppInstaller::promptKind(d, "0.3.0").isEmpty());
     }

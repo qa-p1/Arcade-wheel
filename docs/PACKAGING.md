@@ -103,6 +103,6 @@ sha256sum --ignore-missing -c SHA256SUMS.txt
 shasum -a 256 -c SHA256SUMS.txt
 ```
 
-On Windows, use `Get-FileHash .\ArcadeWheel-0.3.1-Windows-x64-Setup.exe -Algorithm SHA256` and compare with its line in `SHA256SUMS.txt`. On macOS, entries for packages you did not download will report missing files; check the downloaded DMG's result.
+On Windows, use `Get-FileHash .\ArcadeWheel-0.4.0-Windows-x64-Setup.exe -Algorithm SHA256` and compare with its line in `SHA256SUMS.txt`. On macOS, entries for packages you did not download will report missing files; check the downloaded DMG's result.
 
 The dependency deployment follows [Qt's Windows deployment](https://doc.qt.io/qt-6/windows-deployment.html), [Qt's macOS deployment](https://doc.qt.io/qt-6/macos-deployment.html), and the [linuxdeploy Qt plugin](https://github.com/linuxdeploy/linuxdeploy-plugin-qt) documentation.

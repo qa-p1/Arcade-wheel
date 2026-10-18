@@ -40,6 +40,9 @@
 #include <QTimer>
 #include <QTemporaryDir>
 #include <memory>
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
 
 static bool readSettingsForExport(QJsonObject *config, QString *error)
 {
@@ -329,7 +332,20 @@ int main(int argc, char **argv)
     controller.setOverlayView(&overlay);
 
     std::unique_ptr<QQuickView> settings;
+    // Settings holds its own QML engine, about 80 MiB. Keep it for a quick
+    // reopen, then let it go; the wheel overlay itself is never released.
+    QTimer releaseSettings;
+    releaseSettings.setSingleShot(true);
+    releaseSettings.setInterval(10000);
+    QObject::connect(&releaseSettings, &QTimer::timeout, &app, [&] {
+        if (!settings || settings->isVisible()) return;
+        settings.reset();
+#ifdef __GLIBC__
+        malloc_trim(0);
+#endif
+    });
     const auto showSettings = [&] {
+        releaseSettings.stop();
         if (!settings) {
             settings = std::make_unique<QQuickView>();
             settings->setTitle(QStringLiteral("Arcade Wheel · Settings"));
@@ -346,7 +362,9 @@ int main(int argc, char **argv)
             }
             // Closing Settings gives up an action another app asked to add.
             QObject::connect(settings.get(), &QWindow::visibleChanged, &controller, [&](bool visible) {
-                if (!visible) controller.finishLinkAction(false);
+                if (visible) return;
+                controller.finishLinkAction(false);
+                releaseSettings.start();
             });
         }
         settings->show();

@@ -69,6 +69,7 @@ static bool readSettingsForExport(QJsonObject *config, QString *error)
 
 int main(int argc, char **argv)
 {
+    ArcadeLink::onStartup();
     QQuickStyle::setStyle(QStringLiteral("Material"));
     qputenv("QT_QUICK_CONTROLS_MATERIAL_THEME", "Dark");
     QApplication app(argc, argv);

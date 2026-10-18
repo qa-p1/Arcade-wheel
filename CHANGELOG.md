@@ -2,6 +2,12 @@
 
 All notable changes to Arcade Wheel are documented here.
 
+## 0.4.1 — 2026-10-18
+
+### Fixes
+
+- **Installing or updating from Downloads no longer leaves the old AppImage running.** A program Wheel started inherited an open handle on its AppImage mount, so the downloaded image stayed mounted and its runtime (about 20 MB) kept running.
+
 ## 0.4.0 — 2026-10-18
 
 ### Fixes

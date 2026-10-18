@@ -2,7 +2,8 @@
 
 ## Release status (2026-10-18)
 
-- Latest release: [0.4.0](https://github.com/qa-p1/Arcade-wheel/releases/latest) (tag `v0.4.0+build.<CI run>`), published 2026-10-18 (fixes from the October audit and stress test; see CHANGELOG.md). The CI and e2e notes below were recorded for the earlier v0.3.0+build.44.
+- Latest release: [0.4.1](https://github.com/qa-p1/Arcade-wheel/releases/latest) (tag `v0.4.1+build.<CI run>`), published 2026-10-18 (fixes for what verifying the previous release found; see CHANGELOG.md). The CI and e2e notes below were recorded for the earlier v0.3.0+build.44.
+- Previously released: [0.4.0](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.4.0%2Bbuild.61) (tag `v0.4.0+build.61`), published 2026-10-18 (fixes from the October audit and stress test).
 - Previously released: [v0.3.1+build.56](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.3.1%2Bbuild.56), published 2026-10-16.
 - Previously released: [v0.3.0+build.44](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.3.0%2Bbuild.44) with a Linux self-installing AppImage, a per-user Windows installer, a macOS dmg, `arcade-release.json` and `SHA256SUMS.txt`.
 - Merged to `main` from PR #6 (deaf79c) after CI passed on Linux, Windows and macOS: [run 38599266119](https://github.com/qa-p1/Arcade-wheel/actions/runs/38599266119). That covers the build, tests, clippy or analyzers, installer smoke tests on each OS, and the Linux AppImage install, repair and uninstall check in a temporary profile.

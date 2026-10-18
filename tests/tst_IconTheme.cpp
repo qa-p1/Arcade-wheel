@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QFile>
 #include <QIcon>
+#include <QImage>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -75,6 +76,35 @@ private slots:
         QCOMPARE(IconTheme::applyUserTheme(), QStringLiteral("Papirus-Dark"));
         QCOMPARE(QIcon::themeName(), QStringLiteral("Papirus-Dark"));
         QCOMPARE(QIcon::fallbackThemeName(), QStringLiteral("hicolor"));
+    }
+    void newSearchPathsGoFirst() {
+        QTemporaryDir root;
+        QDir(root.path()).mkpath("data/icons");
+        const QString created = root.path() + "/data/icons";
+        const QStringList current{"/usr/share/icons", ":/icons"};
+        QCOMPARE(IconTheme::withNewSearchPaths(current, {created + "/", root.path() + "/missing", "/usr/share/icons"}),
+                 (QStringList{created, "/usr/share/icons", ":/icons"}));
+        QCOMPARE(IconTheme::withNewSearchPaths(current, {}), current);
+    }
+    void reloadFindsIconsInstalledLater() {
+        QTemporaryDir data;
+        qputenv("XDG_DATA_HOME", data.path().toUtf8());
+        QIcon::setThemeSearchPaths({":/icons"});
+        QIcon::setThemeName("hicolor");
+        QVERIFY(QIcon::fromTheme("arcade-later").isNull());
+        // A fresh home: the icons folder appears with the first installed app.
+        const QDir theme(data.path() + "/icons/hicolor");
+        QVERIFY(theme.mkpath("48x48/apps"));
+        QFile index(theme.filePath("index.theme"));
+        QVERIFY(index.open(QIODevice::WriteOnly));
+        index.write("[Icon Theme]\nName=Hicolor\nDirectories=48x48/apps\n\n[48x48/apps]\nSize=48\nType=Fixed\n");
+        index.close();
+        QImage icon(48, 48, QImage::Format_ARGB32);
+        icon.fill(Qt::red);
+        QVERIFY(icon.save(theme.filePath("48x48/apps/arcade-later.png")));
+        QVERIFY(QIcon::fromTheme("arcade-later").isNull()); // Qt keeps the failed lookup
+        IconTheme::reloadSearchPaths();
+        QVERIFY(!QIcon::fromTheme("arcade-later").isNull());
     }
 };
 

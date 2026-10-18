@@ -18,6 +18,7 @@ Item {
         deck: root.controller ? root.controller.currentDeck : ({actions: []})
         deckIndex: root.controller ? root.controller.currentDeckIndex : 0
         deckCount: root.controller ? root.controller.deckCount : 1
+        iconGeneration: root.controller ? root.controller.iconGeneration : 0
         selectedIndex: root.controller ? root.controller.selectedIndex : -1
         appearance: root.appearance
         reduceMotion: !!root.appearance.reduceMotion

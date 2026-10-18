@@ -11,7 +11,8 @@ QImage IconImageProvider::requestImage(const QString &id, QSize *size, const QSi
 {
     const int width = qBound(16, requestedSize.width() > 0 ? requestedSize.width() : 96, 256);
     const int height = qBound(16, requestedSize.height() > 0 ? requestedSize.height() : width, 256);
-    QString name = QUrl::fromPercentEncoding(id.toUtf8());
+    // QML adds "?v=<generation>" after the encoded name to bypass its cache.
+    QString name = QUrl::fromPercentEncoding(id.section(u'?', 0, 0).toUtf8());
     if (name.startsWith(QStringLiteral("qrc:/"))) name = name.mid(3);
     QIcon icon = QFileInfo::exists(name) ? QIcon(name) : QIcon::fromTheme(name);
     if (icon.isNull()) icon = QIcon::fromTheme(QStringLiteral("application-x-executable"));

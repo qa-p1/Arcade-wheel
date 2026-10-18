@@ -20,6 +20,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QJsonDocument>
 #include <QLockFile>
 #include <QTextStream>
@@ -255,6 +256,32 @@ int main(int argc, char **argv)
     WheelController controller(&backend, nullptr,
         smokeTest ? smokeDirectory->filePath(QStringLiteral("config.json")) : QString());
     controller.initialize();
+    // Apps installed or removed while Wheel runs: rescan their launchers once
+    // a burst of changes settles, instead of waiting for Settings → Refresh.
+    // A folder that does not exist yet is watched through its nearest parent.
+    QFileSystemWatcher applicationFolders;
+    QTimer applicationRescan;
+    applicationRescan.setSingleShot(true);
+    applicationRescan.setInterval(1000);
+    const auto watchApplicationFolders = [&] {
+        QStringList wanted;
+        for (QString dir : QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation)) {
+            while (!QFileInfo(dir).isDir() && QFileInfo(dir).path() != dir) dir = QFileInfo(dir).path();
+            if (QFileInfo(dir).isDir() && !wanted.contains(dir)) wanted.append(dir);
+        }
+        const QStringList watched = applicationFolders.directories();
+        for (const QString &dir : watched) if (!wanted.contains(dir)) applicationFolders.removePath(dir);
+        for (const QString &dir : wanted) if (!watched.contains(dir)) applicationFolders.addPath(dir);
+    };
+    if (!smokeTest) {
+        QObject::connect(&applicationFolders, &QFileSystemWatcher::directoryChanged, &applicationRescan,
+                         qOverload<>(&QTimer::start));
+        QObject::connect(&applicationRescan, &QTimer::timeout, &controller, [&] {
+            watchApplicationFolders();
+            controller.refreshApplications();
+        });
+        watchApplicationFolders();
+    }
     // Arcade Link, set up once the event loop runs. Test instances (the smoke
     // test, offscreen platforms) stay out of the real registry unless they
     // were given their own ARCADE_HOME.

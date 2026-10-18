@@ -13,6 +13,7 @@ Item {
     property bool opened: true
     property bool hubPressed: false
     property int hoverIndex: -1
+    property int iconGeneration: 0
     signal slotClicked(int index)
     signal scrollDeck(int delta)
     signal closeFinished()
@@ -22,7 +23,7 @@ Item {
         return v !== undefined && isFinite(Number(v)) ? Number(v) : fallback
     }
     function duration(ms) { return reduceMotion ? 0 : Math.round(ms / animationSpeed) }
-    function iconSource(action) { return action && action.icon ? "image://icons/" + encodeURIComponent(action.icon) : "" }
+    function iconSource(action) { return action && action.icon ? "image://icons/" + encodeURIComponent(action.icon) + "?v=" + iconGeneration : "" }
     function selectedName() {
         const a = actions[effectiveSelection]
         return a ? (a.name || "") + (a.outbound ? " ↗" : "") : ""

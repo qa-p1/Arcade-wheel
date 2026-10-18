@@ -320,7 +320,7 @@ Popup {
                                 anchors.leftMargin: 12
                                 anchors.rightMargin: 12
                                 spacing: 11
-                                Image { source: "image://icons/" + encodeURIComponent(modelData.icon || "application-x-executable"); sourceSize: Qt.size(28, 28); Layout.preferredWidth: 28; Layout.preferredHeight: 28; fillMode: Image.PreserveAspectFit }
+                                Image { source: "image://icons/" + encodeURIComponent(modelData.icon || "application-x-executable") + "?v=" + controller.iconGeneration; sourceSize: Qt.size(28, 28); Layout.preferredWidth: 28; Layout.preferredHeight: 28; fillMode: Image.PreserveAspectFit }
                                 Text { text: modelData.name; color: "#e8eff9"; font.pixelSize: 13; elide: Text.ElideRight; Layout.fillWidth: true }
                             }
                             MouseArea {

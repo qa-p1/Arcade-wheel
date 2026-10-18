@@ -26,6 +26,9 @@ class WheelController final : public QObject {
     Q_PROPERTY(QString shortcutConflict READ shortcutConflict NOTIFY shortcutConflictChanged)
     Q_PROPERTY(bool shortcutPeerConflict READ shortcutPeerConflict NOTIFY shortcutConflictChanged)
     Q_PROPERTY(QVariantList applications READ applications NOTIFY applicationsChanged)
+    // Changes with every application refresh. Icon URLs carry it, so QML
+    // drops images cached before an app's icon was installed.
+    Q_PROPERTY(int iconGeneration READ iconGeneration NOTIFY applicationsChanged)
     Q_PROPERTY(QVariantList arcadeActions READ arcadeActions NOTIFY providersChanged)
     Q_PROPERTY(QVariantList linkJobs READ linkJobs NOTIFY linkJobsChanged)
     Q_PROPERTY(QVariantList connectedApps READ connectedApps NOTIFY providersChanged)
@@ -57,6 +60,7 @@ public:
     QString shortcutConflict() const { return m_shortcutConflict; }
     bool shortcutPeerConflict() const { return m_shortcutPeerConflict; }
     QVariantList applications() const;
+    int iconGeneration() const { return m_iconGeneration; }
     QVariantList arcadeActions() const { return m_dispatcher.arcade().tools(); }
     QVariantList linkJobs() const { return m_linkJobs; }
     QVariantList connectedApps() const { return m_dispatcher.arcade().connectedApps(); }
@@ -187,6 +191,7 @@ private:
     QPointF m_visualCenter;
     QPointF m_lastPointer;
     int m_deckIndex = 0;
+    int m_iconGeneration = 0;
     int m_selectedIndex = -1;
     bool m_pressed = false;
     enum class Mode { Hold, Click, Preview };

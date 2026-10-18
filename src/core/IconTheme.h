@@ -34,4 +34,14 @@ Sources systemSources();
 // Returns the applied theme name, or an empty string when nothing changed.
 QString applyUserTheme();
 
+// Qt computes its icon search paths once, leaving out folders that did not
+// exist yet (the first app installed into a fresh home creates
+// ~/.local/share/icons), and it caches failed lookups. Returns the current
+// paths with the new existing candidates in front.
+QStringList withNewSearchPaths(const QStringList &current, const QStringList &candidates);
+
+// Adds icon folders created since start-up and drops cached lookups, so
+// newly installed apps get their own icons without a restart.
+void reloadSearchPaths();
+
 } // namespace IconTheme

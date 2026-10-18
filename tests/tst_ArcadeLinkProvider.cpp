@@ -158,6 +158,7 @@ private slots:
         const auto video = root->filePath("in.mp4");
         QFile file(video); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("video"); file.close();
         setClipboardFile(video);
+        provider.refreshClipboard(); // as the wheel does when it opens
         const auto action = slot(Ids::Box, "box:arcade.video.compress#share-25mb", "clipboard");
         QTRY_VERIFY(provider.unavailableReason(action).isEmpty());
         int heartbeats = 0;
@@ -248,6 +249,12 @@ private slots:
         ArcadeLinkProvider provider; provider.apply({{"enabled", true}});
         QGuiApplication::clipboard()->setText("12345");
         const auto action = slot(Ids::Box, "box.small", "clipboard");
+        // A copy made while the wheel is closed is not read...
+        QTRY_VERIFY_WITH_TIMEOUT(!provider.unavailableReason(action).isEmpty(), 5000);
+        QTest::qWait(200);
+        QVERIFY(provider.unavailableReason(action) != QStringLiteral("Too large for Arcade Box (limit 4 bytes)."));
+        // ...until the wheel opens.
+        provider.refreshClipboard();
         QTRY_COMPARE_WITH_TIMEOUT(provider.unavailableReason(action), QStringLiteral("Too large for Arcade Box (limit 4 bytes)."), 5000);
         QString error; QVERIFY(!provider.execute(action, &error)); QCOMPARE(error, QStringLiteral("Too large for Arcade Box (limit 4 bytes)."));
     }

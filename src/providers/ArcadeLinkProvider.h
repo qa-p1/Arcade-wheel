@@ -30,6 +30,7 @@ public:
     bool execute(const QJsonObject &action, QString *error) override;
     void apply(const QJsonObject &link);
     void refresh();
+    // Reads and converts the clipboard if it changed since the last read.
     void refreshClipboard();
     QObject *ioWorker() const { return m_worker; }
     void cancel(const QString &job);
@@ -50,6 +51,7 @@ private:
     QString referenceReason(const QString &app, const QJsonObject &payload) const;
     QStringList inputModes(const QJsonObject &action) const;
     void startDiscovery();
+    void clipboardChanged();
     ArcadeLink::Locations m_locations;
     QThread m_discoveryThread;
     QObject *m_worker = nullptr;
@@ -58,6 +60,7 @@ private:
     QJsonObject m_errors;
     QJsonObject m_link;
     WheelClipboard m_clipboard;
+    bool m_clipboardStale = true;
     QJsonArray m_clipboardInputs;
     QString m_clipboardPreview;
     quint64 m_clipboardGeneration = 0;

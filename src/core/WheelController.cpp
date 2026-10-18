@@ -334,6 +334,7 @@ void WheelController::cancelTrigger()
 void WheelController::openOverlay()
 {
     if (m_visible || !m_overlay) return;
+    m_dispatcher.arcade().refreshClipboard();
     const QPointF cursor = m_backend->cursorPosition();
     QScreen *screen = QGuiApplication::screenAt(cursor.toPoint());
     if (!screen) screen = QGuiApplication::primaryScreen();

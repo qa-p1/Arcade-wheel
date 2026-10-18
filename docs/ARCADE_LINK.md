@@ -100,8 +100,8 @@ editor or recording a shortcut reads the cache only. There is no idle timer
 or polling. Bounded waits occur only during a user-requested invocation,
 startup authentication or cancellation of a pending add request.
 
-The Qt protocol-1 bundle is vendored unchanged from Arcade Link `v0.3.0`
-(commit `33650a87`) under `src/link/qt/`, with its vectors, fixtures and shared
+The Qt protocol-1 bundle is vendored unchanged from Arcade Link commit
+`2fc7c91` (after `v0.3.0`) under `src/link/qt/`, with its vectors, fixtures and shared
 install strings in the vendoring tool's layout. `src/link/VENDORED.json` records
 every bundled hash. Shared release/shortcut tools and Windows installer pieces
 use the same release commit, recorded in `scripts/VENDORED` and

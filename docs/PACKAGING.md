@@ -17,7 +17,7 @@ Each platform artifact includes its own checksum list and manifest. The release 
 
 The Qt bundle, conformance vectors, embedded install strings, release generator,
 shortcut validator and Windows Inno/NSIS integration are all vendored from
-Arcade Link `v0.3.0`, commit `33650a87`. The bundle follows the vendoring tool's
+Arcade Link commit `2fc7c91` (after `v0.3.0`). The bundle follows the vendoring tool's
 layout under `src/link/`, with hashes in `src/link/VENDORED.json`;
 `scripts/VENDORED` and `packaging/windows/VENDORED` pin the shared copies.
 Local checks need no network:

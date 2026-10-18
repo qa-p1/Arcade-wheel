@@ -3,6 +3,7 @@
 #include "core/CommandReply.h"
 #include "core/WheelController.h"
 #include "link/WheelLink.h"
+#include "link/qt/ArcadeLink.h"
 #include "link/qt/ArcadeTrayHost.h"
 #include "install/AppInstaller.h"
 #ifdef Q_OS_WIN
@@ -248,6 +249,10 @@ int main(int argc, char **argv)
         QTextStream(stderr) << "Arcade Wheel could not open its command socket: " << server.errorString() << '\n';
         return 1;
     }
+    // Started at login or by Tools, stderr often goes to /dev/null: keep
+    // Qt's warnings in the log folder the manifest advertises instead.
+    ArcadeLink::captureStderr(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/logs"),
+                              QStringLiteral("arcade-wheel"));
 
 #ifdef Q_OS_WIN
     WindowsBackend backend;

@@ -336,12 +336,14 @@ int main(int argc, char **argv)
         overlay.rootObject()->setProperty("controller", QVariant::fromValue(static_cast<QObject *>(&controller)));
     controller.setOverlayView(&overlay);
 
-    std::unique_ptr<QQuickView> settings;
     // Settings holds its own QML engine, about 80 MiB. Keep it for a quick
     // reopen, then let it go; the wheel overlay itself is never released.
+    // Declared before the view: a view destroyed while visible (at exit)
+    // reports itself hidden, and that handler restarts this timer.
     QTimer releaseSettings;
     releaseSettings.setSingleShot(true);
     releaseSettings.setInterval(10000);
+    std::unique_ptr<QQuickView> settings;
     QObject::connect(&releaseSettings, &QTimer::timeout, &app, [&] {
         if (!settings || settings->isVisible()) return;
         settings.reset();

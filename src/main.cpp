@@ -470,7 +470,7 @@ int main(int argc, char **argv)
         }
         return true;
     };
-    QObject::connect(&server, &QLocalServer::newConnection, &app, [&] {
+    const auto acceptCommands = [&] {
         while (auto *socket = server.nextPendingConnection()) {
             const auto receive = [&, socket] {
                 if (!socket->canReadLine()) return;
@@ -509,7 +509,12 @@ int main(int argc, char **argv)
             QObject::connect(socket, &QLocalSocket::disconnected, socket, &QObject::deleteLater);
             receive(); // Data may have arrived before readyRead was connected.
         }
-    });
+    };
+    QObject::connect(&server, &QLocalServer::newConnection, &app, acceptCommands);
+    // A command sent while Wheel was starting was announced before this
+    // handler existed, and Qt does not announce it again: answer it once the
+    // event loop runs.
+    QTimer::singleShot(0, &app, acceptCommands);
     if (smokeTest) {
         QTimer::singleShot(0, &app, showSettings);
         QTimer::singleShot(1500, &app, [&] {

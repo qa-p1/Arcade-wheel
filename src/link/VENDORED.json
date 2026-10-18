@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/qa-p1/Arcade-Link",
   "arcadeLink": "v0.3.0 (protocol 1)",
-  "commit": "008e26202064fd28081facbb0f8b9ee3c5da996b",
+  "commit": "2fc7c91b7578ca424264627b82174bedc176e511",
   "license": "MIT OR Apache-2.0",
   "files": {
     "Cargo.toml": "5db122b2760581a60dfd1e2a5e49e13bc74551fef15522a235fd8cd81a20dee2",
@@ -21,8 +21,8 @@
     "qt/ArcadeInstall.cpp": "61a1718132968bde3caeb530612277836b7f3da74866223db0dcda186998647f",
     "qt/ArcadeInstall.h": "0b6e8358a7f7fd52ca3125a2f270fdf1008d165aa838a0b9346a6bf24279a283",
     "qt/ArcadeInstallPlatform.cpp": "8a1cc346b021e354d185358bffb934634502e83872a022eb2d10b8bd0ae28875",
-    "qt/ArcadeLink.cpp": "d6ff92ed141beb7c45e0c88aebcf071d8389e7e5d4981afb7bc88c2d2e97cb35",
-    "qt/ArcadeLink.h": "8a24899130e636e1b16ce53cda9511f38a469ea00f078b7c89b0421e39ff2ae7",
+    "qt/ArcadeLink.cpp": "63ca857f5200b238a23e734e947b254e260d93e5b734686445ba543fcf362c24",
+    "qt/ArcadeLink.h": "b273e47f1f6231731cb3185054c9fa8d1c03fc3738e5a0ddb1d11ed557114cd6",
     "qt/ArcadeShortcuts.cpp": "0e1638d835a59380205e8fcad5558b538549903b9e5add646935dd8139d862fd",
     "qt/ArcadeShortcuts.h": "7fe20b85c3f3285dd922f9c2c8d5f743b87f085eefc3b809b956cbf91761eedc",
     "qt/ArcadeTrayHost.cpp": "69496e9db6b70e33b38cd8d95f0fd2094893a37bb879e5bfa02806fbea1db799",

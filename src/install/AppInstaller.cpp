@@ -15,7 +15,10 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QProcess>
+#include <QHBoxLayout>
 #include <QPushButton>
+#include <QScreen>
+#include <QGuiApplication>
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QTextStream>
@@ -127,8 +130,17 @@ QString format(const QString &text, const QString &version, const QString &from 
 {
     return Engine::formatString(text, QStringLiteral("Arcade Wheel"), version, from, to);
 }
-struct Choice { int button = 1; AppInstaller::Options options; };
-Choice ask(const Engine::Detection &d, const QString &version, bool managed)
+// button -1: the window was closed, which answers nothing (no install, no start).
+struct Choice { int button = -1; AppInstaller::Options options; };
+bool loginEnabled(const QJsonObject &receipt)
+{
+    // Fresh installs start at login like every Arcade app; an existing install
+    // reflects whether its entry will really run.
+    if (receipt.isEmpty()) return true;
+    const QString autostart = receipt.value("integration").toObject().value("autostart").toString();
+    return !autostart.isEmpty() && Engine::autostartEnabled(autostart);
+}
+Choice ask(const Engine::Detection &d, const QString &version, bool managed, const QStringList &legacy = {})
 {
     const auto text = AppInstaller::dialogText(d, version);
     QDialog dialog;
@@ -147,21 +159,34 @@ Choice ask(const Engine::Detection &d, const QString &version, bool managed)
         note->setWordWrap(true);
         layout->addWidget(note);
     }
+    const auto note = Engine::strings().value("replacesLegacy").toString();
+    if (!legacy.isEmpty() && !note.isEmpty()) {
+        auto *replaces = new QLabel(format(note, version, legacy.first()));
+        replaces->setWordWrap(true);
+        layout->addWidget(replaces);
+    }
     Choice choice;
-    choice.options.startAtLogin = !d.receipt.value("integration").toObject().value("autostart").toString().isEmpty();
+    choice.options.startAtLogin = loginEnabled(d.receipt);
     QCheckBox *login = nullptr, *download = nullptr;
-    if (AppInstaller::promptKind(d, version) == u"notInstalled") {
+    const auto kind = AppInstaller::promptKind(d, version);
+    if (kind == u"notInstalled" || kind == u"older") {
         const auto labels = Engine::strings().value("notInstalled").toObject().value("options").toArray();
         login = new QCheckBox(labels.at(0).toString());
+        login->setChecked(choice.options.startAtLogin);
         download = new QCheckBox(labels.at(1).toString());
         download->setChecked(true);
         layout->addWidget(login);
         layout->addWidget(download);
     }
-    auto *buttons = new QDialogButtonBox;
+    // The main action sits rightmost and is the default, as in every Arcade
+    // prompt, whatever button layout the Qt platform theme prefers.
+    auto *row = new QHBoxLayout;
+    row->addStretch();
     const auto labels = text.value("buttons").toArray();
-    for (qsizetype i = 0; i < labels.size(); ++i) {
-        auto *button = buttons->addButton(labels.at(i).toString(), i == 0 ? QDialogButtonBox::AcceptRole : QDialogButtonBox::RejectRole);
+    for (qsizetype i = labels.size() - 1; i >= 0; --i) {
+        auto *button = new QPushButton(labels.at(i).toString());
+        if (i == 0) button->setDefault(true);
+        row->addWidget(button);
         QObject::connect(button, &QPushButton::clicked, &dialog, [&, i] {
             choice.button = int(i);
             if (login) choice.options.startAtLogin = login->isChecked();
@@ -169,7 +194,10 @@ Choice ask(const Engine::Detection &d, const QString &version, bool managed)
             dialog.accept();
         });
     }
-    layout->addWidget(buttons);
+    layout->addLayout(row);
+    dialog.adjustSize();
+    if (const auto *screen = QGuiApplication::primaryScreen())
+        dialog.move(screen->availableGeometry().center() - dialog.rect().center());
     dialog.exec();
     return choice;
 }
@@ -213,8 +241,11 @@ QString AppInstaller::promptKind(const Engine::Detection &d, const QString &vers
     if (d.state == u"installedElsewhere") {
         const auto oldVersion = QVersionNumber::fromString(d.receipt.value("version").toString());
         const auto newVersion = QVersionNumber::fromString(version);
-        return !oldVersion.isNull() && !newVersion.isNull() && oldVersion < newVersion
-            ? QStringLiteral("older") : QStringLiteral("sameOrNewer");
+        if (!oldVersion.isNull() && !newVersion.isNull() && oldVersion < newVersion) return QStringLiteral("older");
+        // Say so when this file is the older one, not just "already installed".
+        if (!oldVersion.isNull() && !newVersion.isNull() && oldVersion > newVersion
+            && Engine::strings().contains(QStringLiteral("newerInstalled"))) return QStringLiteral("newerInstalled");
+        return QStringLiteral("sameOrNewer");
     }
 #ifdef Q_OS_MACOS
     if (d.runningFrom.endsWith(u".app")) return QStringLiteral("macos");
@@ -227,7 +258,11 @@ QJsonObject AppInstaller::dialogText(const Engine::Detection &d, const QString &
     auto text = Engine::strings().value(kind).toObject();
     const auto old = d.receipt.value("version").toString();
     for (const auto &key : {QStringLiteral("title"), QStringLiteral("body")})
-        if (text.contains(key)) text.insert(key, format(text.value(key).toString(), kind == u"sameOrNewer" ? old : version, old, version));
+        if (text.contains(key)) {
+            const bool installedFirst = kind == u"sameOrNewer" || kind == u"newerInstalled";
+            // newerInstalled reads "{version} installed; this file is the older {from}".
+            text.insert(key, format(text.value(key).toString(), installedFirst ? old : version, kind == u"newerInstalled" ? version : old, version));
+        }
     return text;
 }
 bool AppInstaller::dismissed(const QString &path, const QString &directory)
@@ -273,7 +308,19 @@ bool AppInstaller::installCopy(const Engine &engine, const Engine::Runtime &runt
     if (!engine.detect(Ids::Wheel, runtime, &d, error)) return false;
     if (d.state == u"devBuild") { *error = Engine::strings().value("errors").toObject().value("devBuild").toString(); return false; }
 #ifdef Q_OS_LINUX
-    if (!runtime.isAppImage()) { *error = QStringLiteral("Self-install requires an AppImage. Run the downloaded AppImage with --install."); return false; }
+    if (!runtime.isAppImage()) {
+        // A second install window, after the first one installed (and removed) this download.
+        if (!runtime.appimage.isEmpty() && !QFileInfo::exists(runtime.appimage)) {
+            if (d.receipt.value("version").toString() == version && QFileInfo(d.receipt.value("path").toString()).isFile()) {
+                *receipt = d.receipt;
+                return true;
+            }
+            *error = QStringLiteral("This downloaded file is gone (it may have been installed from another window). Open Arcade Wheel from the app launcher.");
+            return false;
+        }
+        *error = QStringLiteral("Self-install requires an AppImage. Run the downloaded AppImage with --install.");
+        return false;
+    }
     Engine::InstallOptions opts;
     opts.app = appInfo(); opts.runtime = runtime; opts.version = version;
     opts.channel = options.channel;
@@ -369,12 +416,14 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
     const QString cmd = arguments.first();
     if (cmd != u"--install" && cmd != u"--uninstall" && cmd != u"--repair" && cmd != u"--integration-status") return -1;
     Options options;
-    options.removeDownload = false; // explicit CLI keeps the source unless the dialog chooses otherwise
+    // Like every Arcade app: --silent removes the download only from Downloads.
+    options.removeDownload = true;
     bool silent = false, noLaunch = false, removeData = false;
     for (qsizetype i = 1; i < arguments.size(); ++i) {
         const auto arg = arguments.at(i);
         if (arg == u"--silent" && (cmd == u"--install" || cmd == u"--uninstall")) silent = true;
         else if (arg == u"--no-launch" && cmd == u"--install") noLaunch = true;
+        else if (arg == u"--keep-download" && cmd == u"--install") options.removeDownload = false;
         else if (arg == u"--remove-data" && cmd == u"--uninstall") removeData = true;
         else if (arg == u"--channel" && cmd == u"--install" && i + 1 < arguments.size()
                  && (arguments.at(i+1) == u"stable" || arguments.at(i+1) == u"nightly")) options.channel = arguments.at(++i);
@@ -387,18 +436,21 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
     const auto runtime = Engine::Runtime::discover();
     Engine::Detection detection;
     if (!onWorker([&] { return engine.detect(Ids::Wheel, runtime, &detection, &error); })) { QTextStream(stderr) << error << '\n'; return 1; }
-    options.startAtLogin = !detection.receipt.value("integration").toObject().value("autostart").toString().isEmpty();
+    options.startAtLogin = loginEnabled(detection.receipt);
     if (cmd == u"--install" && !silent && detection.state != u"devBuild") {
         auto dialogDetection = detection;
         if (dialogDetection.state == u"installedHere") dialogDetection.state = QStringLiteral("notInstalled");
         const bool managed = onWorker([&] { return detection.receipt.value("managedBy").toString() == u"tools" && toolsAvailable(engine); });
-        const auto choice = ask(dialogDetection, version, managed);
+        const auto legacy = onWorker([&] { return engine.legacyCopies(appInfo()); });
+        const auto choice = ask(dialogDetection, version, managed, legacy);
         if (choice.button != 0) {
             if (choice.button == 2 && !onWorker([&] { return dismiss(detection.runningFrom, configDirectory(), &error); })) { QTextStream(stderr) << error << '\n'; return 1; }
             return 0;
         }
         const QString channel = options.channel;
+        const bool keep = !options.removeDownload;
         options = choice.options; options.channel = channel;
+        if (keep) options.removeDownload = false;
     }
     if (cmd == u"--uninstall" && !silent
         && QMessageBox::question(nullptr, QStringLiteral("Uninstall Arcade Wheel?"),
@@ -457,7 +509,11 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
     });
     if (!ok) { QTextStream(stderr) << error << '\n'; return 1; }
     if (!receipt.isEmpty()) QTextStream(stdout) << QJsonDocument(receipt).toJson(QJsonDocument::Indented);
-    if (cmd == u"--install" && !noLaunch && !receipt.isEmpty() && !launchInstalled(launchPath(receipt), {}, &error)) { QTextStream(stderr) << error << '\n'; return 1; }
+    if (cmd == u"--install" && !noLaunch && !receipt.isEmpty()) {
+        // The installed copy replaces an older one still running.
+        onWorker([&] { return Engine::quitRunning(environment.locations, Ids::Wheel, 10000); });
+        if (!launchInstalled(launchPath(receipt), {}, &error)) { QTextStream(stderr) << error << '\n'; return 1; }
+    }
     return 0;
 }
 bool AppInstaller::firstRun(const QStringList &arguments, const QString &version, bool noPrompt)
@@ -495,13 +551,16 @@ bool AppInstaller::firstRun(const QStringList &arguments, const QString &version
     });
     if (!detected) { QTextStream(stderr) << error << '\n'; return true; }
     if (!prompt) return true;
-    const auto choice = ask(detection, version, managed);
+    const auto legacy = onWorker([&] { return engine.legacyCopies(appInfo()); });
+    const auto choice = ask(detection, version, managed, legacy);
+    if (choice.button == -1) return false;
     if (choice.button != 0) {
         if (choice.button == 2 && !onWorker([&] { return dismiss(detection.runningFrom, configDirectory(), &error); })) QMessageBox::warning(nullptr, "Arcade Wheel", error);
         return true;
     }
     QJsonObject receipt;
-    if (promptKind(detection, version) == u"sameOrNewer") receipt = detection.receipt;
+    const auto kind = promptKind(detection, version);
+    if (kind == u"sameOrNewer" || kind == u"newerInstalled") receipt = detection.receipt;
     else {
         const bool ok = onWorker([&] { return managed ? handoff(engine, version, &error) : installCopy(engine, runtime, choice.options, version, &receipt, &error); });
         if (!ok) { QMessageBox::warning(nullptr, "Arcade Wheel", format(Engine::strings().value("errors").toObject().value("install").toString(), version, error)); return true; }
@@ -514,6 +573,8 @@ bool AppInstaller::firstRun(const QStringList &arguments, const QString &version
 #endif
             QMessageBox::information(nullptr, "Arcade Wheel", hint);
         }
+        // The installed copy replaces an older one still running.
+        onWorker([&] { return Engine::quitRunning(environment.locations, Ids::Wheel, 10000); });
     }
     if (!launchInstalled(launchPath(receipt), arguments, &error)) { QMessageBox::warning(nullptr, "Arcade Wheel", error); return true; }
     return false;

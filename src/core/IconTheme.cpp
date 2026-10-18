@@ -139,4 +139,26 @@ QString applyUserTheme()
     return theme;
 }
 
+QStringList withNewSearchPaths(const QStringList &current, const QStringList &candidates)
+{
+    QStringList added;
+    for (const QString &path : candidates) {
+        const QString clean = QDir::cleanPath(path);
+        if (!current.contains(clean) && !added.contains(clean) && QFileInfo(clean).isDir()) added.append(clean);
+    }
+    return added + current;
+}
+
+void reloadSearchPaths()
+{
+    QStringList candidates;
+#ifdef Q_OS_LINUX
+    candidates.append(QDir::homePath() + QStringLiteral("/.icons"));
+    for (const QString &data : QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation))
+        candidates.append(data + QStringLiteral("/icons"));
+#endif
+    // Setting the paths, even unchanged, also forgets failed lookups.
+    QIcon::setThemeSearchPaths(withNewSearchPaths(QIcon::themeSearchPaths(), candidates));
+}
+
 } // namespace IconTheme

@@ -1,6 +1,7 @@
 #include "link/AppMetadata.h"
 #include "core/WheelController.h"
 
+#include "core/IconTheme.h"
 #include "core/WheelLogic.h"
 #include "link/WheelInvoke.h"
 
@@ -334,6 +335,7 @@ void WheelController::cancelTrigger()
 void WheelController::openOverlay()
 {
     if (m_visible || !m_overlay) return;
+    m_dispatcher.arcade().refreshClipboard();
     const QPointF cursor = m_backend->cursorPosition();
     QScreen *screen = QGuiApplication::screenAt(cursor.toPoint());
     if (!screen) screen = QGuiApplication::primaryScreen();
@@ -666,6 +668,9 @@ QString WheelController::actionUnavailableReason(const QVariantMap &action) cons
 
 void WheelController::refreshApplications()
 {
+    // Apps installed since the last scan may bring icons Qt has not seen.
+    IconTheme::reloadSearchPaths();
+    ++m_iconGeneration;
     m_applications = m_backend->applications();
     std::sort(m_applications.begin(), m_applications.end(), [](const auto &a, const auto &b) {
         return a.name.localeAwareCompare(b.name) < 0;

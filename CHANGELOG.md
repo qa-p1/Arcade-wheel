@@ -2,6 +2,20 @@
 
 All notable changes to Arcade Wheel are documented here.
 
+## 0.4.0 — 2026-10-18
+
+### Fixes
+
+- **Copying no longer costs CPU.** Wheel reads the clipboard only when the wheel opens. Before, every copy cost about a second of CPU and pulled the copied item (passwords included) into Wheel's memory even if the wheel was never opened.
+- **Tray hand-back is quick again.** When Arcade Tools takes over the tray, Wheel's own icon now leaves in about 12 ms; under constant copying it used to linger for up to a second.
+- **The Linux AppImage bundles libOpenGL** and CI checks for it, so Wheel starts on systems without the host library.
+- **Newly installed apps and their icons appear** without restarting Wheel.
+- **Commands sent while Wheel is starting are answered**, and startup is faster (benchmark 354 → 227 ms).
+- **Settings is released 10 s after you close it** (about 134 MiB instead of 196–204 MiB, and no growth per open).
+- On X11 the hint suggests a desktop key binding instead of a Wayland portal.
+- Logs are kept when Wheel starts without a terminal.
+- Built against Arcade Link commit `2fc7c91` (vendored Qt client).
+
 ## 0.3.1 — 2026-10-15
 
 ### Fixes

@@ -388,8 +388,10 @@ void ArcadeLinkProvider::startDiscovery()
     });
     m_discoveryThread.start();
     if (qobject_cast<QGuiApplication *>(QCoreApplication::instance())) {
-        connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &ArcadeLinkProvider::refreshClipboard);
-        refreshClipboard();
+        // A copy only marks the clipboard as changed: it is read and converted
+        // when the wheel opens (refreshClipboard), never for copies made while
+        // the wheel is closed (passwords included).
+        connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &ArcadeLinkProvider::clipboardChanged);
     }
 }
 
@@ -411,8 +413,19 @@ void ArcadeLinkProvider::refresh()
     else QMetaObject::invokeMethod(m_worker, [worker = static_cast<Discovery *>(m_worker)] { worker->refresh(); });
 }
 
+void ArcadeLinkProvider::clipboardChanged()
+{
+    m_clipboardStale = true;
+    ++m_clipboardGeneration;
+    m_clipboard = {};
+    m_clipboardInputs = {};
+    m_clipboardPreview.clear();
+}
+
 void ArcadeLinkProvider::refreshClipboard()
 {
+    if (!m_clipboardStale || !qobject_cast<QGuiApplication *>(QCoreApplication::instance())) return;
+    m_clipboardStale = false;
     const auto *mime = QGuiApplication::clipboard()->mimeData();
     m_clipboard = {};
     if (mime) {

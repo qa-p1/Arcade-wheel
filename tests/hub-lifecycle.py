@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import selectors
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -76,7 +77,31 @@ def start(executable):
     residents.append(process)
     return process
 
+def early_command(executable):
+    # A command sent while Wheel is still starting (before its event loop runs)
+    # must be answered, not left waiting forever.
+    runtime = Path(env["XDG_RUNTIME_DIR"])
+    process = start(executable)
+    deadline = time.monotonic() + 10
+    while True:
+        assert time.monotonic() < deadline, "Wheel's command socket did not appear"
+        channel = socket.socket(socket.AF_UNIX)
+        try:
+            channel.connect(str(next(runtime.glob("arcade-wheel-*.sock"))))
+            break
+        except (OSError, StopIteration):
+            channel.close()
+            time.sleep(0.002)
+    with channel:
+        channel.settimeout(5)
+        channel.sendall(b"--status\n")
+        assert json.loads(channel.recv(65536))["running"], "early --status was not answered"
+    run(executable, "--quit")
+    process.wait(timeout=10)
+
 try:
+    early_command(source)
+
     # --arcade-manifest and integration status must not install a dev build.
     manifest = json.loads(run(source, "--arcade-manifest").stdout)
     assert manifest["install"] == "dev" and manifest["docs"]["version"]

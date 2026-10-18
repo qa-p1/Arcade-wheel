@@ -223,6 +223,7 @@ Rectangle {
                             id: previewWheel
                             anchors.centerIn: parent
                             deck: root.activeDeck; deckIndex: controller.currentDeckIndex; deckCount: controller.deckCount
+                            iconGeneration: controller.iconGeneration
                             selectedIndex: root.selectedSlot; appearance: controller.config.appearance
                             reduceMotion: !!controller.config.appearance.reduceMotion; interactive: true
                             scale: Math.max(0.1, Math.min(1.12,(previewArea.width-22)/(width*appearanceScale),(previewArea.height-12)/(height*appearanceScale)))
@@ -266,7 +267,7 @@ Rectangle {
                                 border.color: root.selectedSlot===index ? "#514462" : "transparent"
                                 RowLayout {
                                     anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 11
-                                    Image { source: "image://icons/"+encodeURIComponent(modelData.icon || "applications-other"); sourceSize: Qt.size(64,64); Layout.preferredWidth: 29; Layout.preferredHeight: 29 }
+                                    Image { source: "image://icons/"+encodeURIComponent(modelData.icon || "applications-other")+"?v="+controller.iconGeneration; sourceSize: Qt.size(64,64); Layout.preferredWidth: 29; Layout.preferredHeight: 29 }
                                     ColumnLayout {
                                         Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 3
                                         Text { text: modelData.name || "Choose action"; color: "#dcd7e7"; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
@@ -323,7 +324,7 @@ Rectangle {
                         width: ListView.view.width; height: 50; radius: 8; color: "#20202a"
                         RowLayout {
                             anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 12
-                            Image { source: "image://icons/" + encodeURIComponent(modelData.icon || "application-x-executable"); sourceSize: Qt.size(28, 28); Layout.preferredWidth: 28; Layout.preferredHeight: 28 }
+                            Image { source: "image://icons/" + encodeURIComponent(modelData.icon || "application-x-executable") + "?v=" + controller.iconGeneration; sourceSize: Qt.size(28, 28); Layout.preferredWidth: 28; Layout.preferredHeight: 28 }
                             Text { text: modelData.name; color: "#e7e1f0"; font.pixelSize: 13; Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight }
                             Text { text: modelData.id; color: "#7b6e89"; font.pixelSize: 11; elide: Text.ElideMiddle; Layout.maximumWidth: Math.min(270, parent.width * 0.4) }
                         }
@@ -501,6 +502,7 @@ Rectangle {
                     deck: root.activeDeck
                     deckIndex: controller.currentDeckIndex
                     deckCount: controller.deckCount
+                    iconGeneration: controller.iconGeneration
                     selectedIndex: root.selectedSlot
                     appearance: controller.config.appearance
                     reduceMotion: !!controller.config.appearance.reduceMotion

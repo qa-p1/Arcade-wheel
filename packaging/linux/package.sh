@@ -70,6 +70,17 @@ if [[ "$extra_platforms" != *wayland* ]]; then
     exit 1
 fi
 export EXTRA_PLATFORM_PLUGINS="$extra_platforms"
+# libLayerShellQtInterface needs libOpenGL.so.0, glvnd's vendor-neutral OpenGL
+# dispatcher. linuxdeploy leaves it to the host, but its package (libopengl0)
+# is missing from some desktop installs, where the AppImage then did nothing.
+# Ship it; the bundle keeps the host's libGLdispatch and drivers.
+opengl=$(ldconfig -p | awk '/libOpenGL\.so\.0 /{print $NF; exit}')
+if [[ -z "$opengl" ]]; then
+    echo 'libOpenGL.so.0 (package libopengl0) is required to package Wheel.' >&2
+    exit 1
+fi
+mkdir -p "$appdir/usr/lib"
+cp -L "$opengl" "$appdir/usr/lib/libOpenGL.so.0"
 export QML_SOURCES_PATHS="$repo/qml"
 export APPIMAGE_EXTRACT_AND_RUN=1
 export OUTPUT="$output/ArcadeWheel-$version-Linux-x86_64.AppImage"
@@ -79,6 +90,7 @@ export OUTPUT="$output/ArcadeWheel-$version-Linux-x86_64.AppImage"
     --icon-file "$repo/assets/arcade-wheel.svg" --plugin qt --output appimage
 test -s "$OUTPUT"
 test -s "$appdir/usr/plugins/iconengines/libqsvgicon.so"
+python3 "$repo/packaging/linux/check-bundle.py" "$OUTPUT"
 python3 "$repo/packaging/smoke-test.py" "$OUTPUT"
 python3 "$repo/scripts/arcade-release.py" --id arcade.wheel --version "$version" \
     --channel stable --windows-installer inno \

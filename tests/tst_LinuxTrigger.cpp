@@ -7,6 +7,7 @@
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QtTest>
+#include <functional>
 
 namespace {
 const QString service = QStringLiteral("org.freedesktop.portal.Desktop");
@@ -28,6 +29,14 @@ public:
     int registrations = 0;
     int binds = 0;
     int delay = 15;
+    // While set, request responses wait for release() instead of a timer.
+    bool hold = false;
+    QList<std::function<void()>> held;
+    void release() {
+        hold = false;
+        const auto responses = std::exchange(held, {});
+        for (const auto &respond : responses) respond();
+    }
     QDBusConnection bus = QDBusConnection::sessionBus();
     QString introspect(const QString &) const override { return {}; }
     bool handleMessage(const QDBusMessage &m, const QDBusConnection &connection) override {
@@ -72,11 +81,13 @@ public:
             result.insert("session_handle",session);
         }
         connection.send(m.createReply(QVariant::fromValue(QDBusObjectPath(path))));
-        QTimer::singleShot(delay, this, [=] {
+        const auto respond = [=] {
             auto response = QDBusMessage::createTargetedSignal(m.service(),path,"org.freedesktop.portal.Request","Response");
             response << uint(0) << result;
             connection.send(response);
-        });
+        };
+        if (hold) held << respond;
+        else QTimer::singleShot(delay, this, respond);
         return true;
     }
     void edge(const QString &session, const QString &name) {
@@ -156,12 +167,16 @@ private slots:
         QCOMPARE(portal->registrations,2);
     }
     void rapidChangesDiscardOldSessions() {
+        // The second change must land before the first session is answered,
+        // however slow the machine: hold the portal's answers until then.
+        portal->hold = true;
         LinuxBackend backend; QSignalSpy status(&backend,&PlatformBackend::triggerStatusChanged);
         backend.configureTrigger(trigger("F8"));
         QTRY_COMPARE(portal->created.size(),1);
         backend.configureTrigger(trigger("Ctrl+Down"));
+        QTRY_COMPARE(portal->created.size(),2);
+        portal->release();
         QTRY_VERIFY(status.last().first().toString().startsWith("Ready"));
-        QCOMPARE(portal->created.size(),2);
         QTRY_VERIFY(portal->closed.contains(portal->created.first()));
         QCOMPARE(portal->binds,1);
     }

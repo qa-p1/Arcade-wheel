@@ -578,7 +578,12 @@ void LinuxBackend::ensurePortalRegistered()
         if (owner.isValid()) m_portalOwner = owner.value();
     }
     if (m_portalOwner.isEmpty()) {
-        emit triggerStatusChanged(QStringLiteral("The XDG GlobalShortcuts portal is unavailable. Install xdg-desktop-portal and a desktop portal backend."));
+        // Most X11 desktops have no GlobalShortcuts portal at all, so
+        // installing one is the wrong advice there.
+        if (QGuiApplication::platformName() == QStringLiteral("xcb"))
+            emit triggerStatusChanged(QStringLiteral("This X11 desktop offers no global shortcut service. Bind arcade-wheel --show to a key in your desktop's keyboard settings."));
+        else
+            emit triggerStatusChanged(QStringLiteral("The XDG GlobalShortcuts portal is unavailable. Install xdg-desktop-portal and a desktop portal backend."));
         return;
     }
     if (m_portalRegistered) {
@@ -1420,7 +1425,8 @@ bool LinuxBackend::setStartOnLogin(bool enabled, QString *error)
 
 bool LinuxBackend::startOnLogin() const
 {
-    return QFileInfo::exists(autostartDesktopFile());
+    // An entry switched off in the desktop's startup settings won't run.
+    return ArcadeLink::ArcadeInstall::autostartEnabled(autostartDesktopFile());
 }
 
 QJsonObject LinuxBackend::shortcutRegistration() const

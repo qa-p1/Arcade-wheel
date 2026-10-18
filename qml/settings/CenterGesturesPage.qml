@@ -80,7 +80,7 @@ ScrollView {
                         RowLayout {
                             anchors.fill: parent; anchors.margins: 10; spacing: 10
                             Image {
-                                source: "image://icons/" + encodeURIComponent(modelData.icon || "applications-other")
+                                source: "image://icons/" + encodeURIComponent(modelData.icon || "applications-other") + "?v=" + controller.iconGeneration
                                 sourceSize: Qt.size(64,64)
                                 Layout.preferredWidth: 30; Layout.preferredHeight: 30
                             }

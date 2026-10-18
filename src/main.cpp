@@ -3,6 +3,7 @@
 #include "core/CommandReply.h"
 #include "core/WheelController.h"
 #include "link/WheelLink.h"
+#include "link/qt/ArcadeLink.h"
 #include "link/qt/ArcadeTrayHost.h"
 #include "install/AppInstaller.h"
 #ifdef Q_OS_WIN
@@ -20,6 +21,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QJsonDocument>
 #include <QLockFile>
 #include <QTextStream>
@@ -39,6 +41,9 @@
 #include <QTimer>
 #include <QTemporaryDir>
 #include <memory>
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
 
 static bool readSettingsForExport(QJsonObject *config, QString *error)
 {
@@ -244,6 +249,10 @@ int main(int argc, char **argv)
         QTextStream(stderr) << "Arcade Wheel could not open its command socket: " << server.errorString() << '\n';
         return 1;
     }
+    // Started at login or by Tools, stderr often goes to /dev/null: keep
+    // Qt's warnings in the log folder the manifest advertises instead.
+    ArcadeLink::captureStderr(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/logs"),
+                              QStringLiteral("arcade-wheel"));
 
 #ifdef Q_OS_WIN
     WindowsBackend backend;
@@ -255,6 +264,32 @@ int main(int argc, char **argv)
     WheelController controller(&backend, nullptr,
         smokeTest ? smokeDirectory->filePath(QStringLiteral("config.json")) : QString());
     controller.initialize();
+    // Apps installed or removed while Wheel runs: rescan their launchers once
+    // a burst of changes settles, instead of waiting for Settings → Refresh.
+    // A folder that does not exist yet is watched through its nearest parent.
+    QFileSystemWatcher applicationFolders;
+    QTimer applicationRescan;
+    applicationRescan.setSingleShot(true);
+    applicationRescan.setInterval(1000);
+    const auto watchApplicationFolders = [&] {
+        QStringList wanted;
+        for (QString dir : QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation)) {
+            while (!QFileInfo(dir).isDir() && QFileInfo(dir).path() != dir) dir = QFileInfo(dir).path();
+            if (QFileInfo(dir).isDir() && !wanted.contains(dir)) wanted.append(dir);
+        }
+        const QStringList watched = applicationFolders.directories();
+        for (const QString &dir : watched) if (!wanted.contains(dir)) applicationFolders.removePath(dir);
+        for (const QString &dir : wanted) if (!watched.contains(dir)) applicationFolders.addPath(dir);
+    };
+    if (!smokeTest) {
+        QObject::connect(&applicationFolders, &QFileSystemWatcher::directoryChanged, &applicationRescan,
+                         qOverload<>(&QTimer::start));
+        QObject::connect(&applicationRescan, &QTimer::timeout, &controller, [&] {
+            watchApplicationFolders();
+            controller.refreshApplications();
+        });
+        watchApplicationFolders();
+    }
     // Arcade Link, set up once the event loop runs. Test instances (the smoke
     // test, offscreen platforms) stay out of the real registry unless they
     // were given their own ARCADE_HOME.
@@ -301,8 +336,23 @@ int main(int argc, char **argv)
         overlay.rootObject()->setProperty("controller", QVariant::fromValue(static_cast<QObject *>(&controller)));
     controller.setOverlayView(&overlay);
 
+    // Settings holds its own QML engine, about 80 MiB. Keep it for a quick
+    // reopen, then let it go; the wheel overlay itself is never released.
+    // Declared before the view: a view destroyed while visible (at exit)
+    // reports itself hidden, and that handler restarts this timer.
+    QTimer releaseSettings;
+    releaseSettings.setSingleShot(true);
+    releaseSettings.setInterval(10000);
     std::unique_ptr<QQuickView> settings;
+    QObject::connect(&releaseSettings, &QTimer::timeout, &app, [&] {
+        if (!settings || settings->isVisible()) return;
+        settings.reset();
+#ifdef __GLIBC__
+        malloc_trim(0);
+#endif
+    });
     const auto showSettings = [&] {
+        releaseSettings.stop();
         if (!settings) {
             settings = std::make_unique<QQuickView>();
             settings->setTitle(QStringLiteral("Arcade Wheel · Settings"));
@@ -319,7 +369,9 @@ int main(int argc, char **argv)
             }
             // Closing Settings gives up an action another app asked to add.
             QObject::connect(settings.get(), &QWindow::visibleChanged, &controller, [&](bool visible) {
-                if (!visible) controller.finishLinkAction(false);
+                if (visible) return;
+                controller.finishLinkAction(false);
+                releaseSettings.start();
             });
         }
         settings->show();
@@ -387,6 +439,8 @@ int main(int argc, char **argv)
     };
     QObject::connect(&arcadeTrayHost, &ArcadeLink::ArcadeTrayHost::stateChanged, &tray, updateTray);
     QObject::connect(&arcadeTrayHost, &ArcadeLink::ArcadeTrayHost::startupReady, &tray, updateTray);
+    // Quitting while Tools hosts the tray must not flash Wheel's own icon.
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, &arcadeTrayHost, [&arcadeTrayHost] { arcadeTrayHost.finish(); });
     updateTray();
 #ifdef Q_OS_LINUX
     // At login Wheel often starts before the panel that hosts tray icons, and
@@ -418,7 +472,7 @@ int main(int argc, char **argv)
         }
         return true;
     };
-    QObject::connect(&server, &QLocalServer::newConnection, &app, [&] {
+    const auto acceptCommands = [&] {
         while (auto *socket = server.nextPendingConnection()) {
             const auto receive = [&, socket] {
                 if (!socket->canReadLine()) return;
@@ -457,7 +511,12 @@ int main(int argc, char **argv)
             QObject::connect(socket, &QLocalSocket::disconnected, socket, &QObject::deleteLater);
             receive(); // Data may have arrived before readyRead was connected.
         }
-    });
+    };
+    QObject::connect(&server, &QLocalServer::newConnection, &app, acceptCommands);
+    // A command sent while Wheel was starting was announced before this
+    // handler existed, and Qt does not announce it again: answer it once the
+    // event loop runs.
+    QTimer::singleShot(0, &app, acceptCommands);
     if (smokeTest) {
         QTimer::singleShot(0, &app, showSettings);
         QTimer::singleShot(1500, &app, [&] {

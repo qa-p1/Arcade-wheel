@@ -16,6 +16,8 @@ Open **Settings → Trigger** and check the status below the shortcut field. App
 
 On Linux Wayland, the desktop needs an XDG GlobalShortcuts portal and the package needs its LayerShellQt overlay support. If the portal is unavailable, install or enable the desktop portal backend and try again. On Hyprland, older portal versions may ask you to bind Wheel's global shortcut target in compositor settings.
 
+On Linux X11, most desktops offer no global shortcut service that Wheel can register with. Bind the command `arcade-wheel --show` to a key in your desktop's keyboard settings instead; it opens the wheel in click mode.
+
 ## The overlay opens but pointer selection feels wrong
 
 Hyprland supplies Wheel with the pointer position and Wheel moves the pointer to the center when the overlay appears. Other Wayland desktops may provide only a best-effort position or may not move the pointer. Adjust **Selection sensitivity** or the **Cancel dead zone** in **Settings → Behaviour**. Multi-monitor and fullscreen handling can depend on the compositor.

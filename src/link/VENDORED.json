@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/qa-p1/Arcade-Link",
   "arcadeLink": "v0.3.0 (protocol 1)",
-  "commit": "85bdb0e9769cc724c0edd83c6f214b70fba33f42",
+  "commit": "829cc90a0628fe5c4afc87796eb900aff3fd4e50",
   "license": "MIT OR Apache-2.0",
   "files": {
     "Cargo.toml": "5db122b2760581a60dfd1e2a5e49e13bc74551fef15522a235fd8cd81a20dee2",
@@ -21,8 +21,8 @@
     "qt/ArcadeInstall.cpp": "1506f86ee8d5ba4ddc13b46a34fd377eb02275c90e259f90d4ea54f4ed5b6fdc",
     "qt/ArcadeInstall.h": "0b6e8358a7f7fd52ca3125a2f270fdf1008d165aa838a0b9346a6bf24279a283",
     "qt/ArcadeInstallPlatform.cpp": "8a1cc346b021e354d185358bffb934634502e83872a022eb2d10b8bd0ae28875",
-    "qt/ArcadeLink.cpp": "da2ad0e10943176adffb38591ab4d926031540af691abb03195ca7bb5f023d2d",
-    "qt/ArcadeLink.h": "4ff3b6070f45b78ce46d4db484ee2b2c673cdb019def3fbb0a2170345f968890",
+    "qt/ArcadeLink.cpp": "d1f2d73a27ff2d6085b3a18b5d7ff930097af4744ddc442a5f38169f3ef67d3c",
+    "qt/ArcadeLink.h": "a25eba108d889d685aca75b3394d671e46550f778fb5ca71c3c296fa3fdb76fa",
     "qt/ArcadeShortcuts.cpp": "0e1638d835a59380205e8fcad5558b538549903b9e5add646935dd8139d862fd",
     "qt/ArcadeShortcuts.h": "7fe20b85c3f3285dd922f9c2c8d5f743b87f085eefc3b809b956cbf91761eedc",
     "qt/ArcadeTrayHost.cpp": "69496e9db6b70e33b38cd8d95f0fd2094893a37bb879e5bfa02806fbea1db799",
@@ -31,7 +31,7 @@
     "qt/README.md": "214ae51a7554e643ba5741802b0e076f8035994f71948a3c6ca560b2e0929448",
     "qt/examples/startup-probe.cpp": "ebf6a235d8867cbc4f684d78dbde5c2017ce8489b56121010bd64ae970289f66",
     "qt/install-strings.inc": "0c447be04c977da0fa2a335408753ea00e028cf66ff1765190238f39826e123c",
-    "qt/tests/tst_Install.cpp": "a97a889f7e6a31ed8f8842397d75599c108a815f8704f84d4c8b897bda0482ca",
+    "qt/tests/tst_Install.cpp": "b466659ea4afdd39de07e063d204bb3c9f926d57e6e74db50a04b763402e799f",
     "qt/tests/tst_Methods.cpp": "bd936b2eea7caf4caaefca608325c41d2c8c38e92c6db89a38f00b3e93feb7dc",
     "qt/tests/tst_Server.cpp": "5d86f986481e3e6c26061a95170c8cda8a1b70b860278dd9f5f746d39ccb49a7",
     "qt/tests/tst_TrayHost.cpp": "d040b4f8f3961b52dd3d26b6867b3e1f86ba52ef335e9d718a6f3b88fd72e80b",

@@ -2,7 +2,8 @@
 
 ## Release status (2026-10-18)
 
-- Latest release: [0.4.1](https://github.com/qa-p1/Arcade-wheel/releases/latest) (tag `v0.4.1+build.<CI run>`), published 2026-10-18 (fixes for what verifying the previous release found; see CHANGELOG.md). The CI and e2e notes below were recorded for the earlier v0.3.0+build.44.
+- Latest release: [0.4.2](https://github.com/qa-p1/Arcade-wheel/releases/latest) (tag `v0.4.2+build.<CI run>`), published 2026-10-19 (releases every descriptor an AppImage start inherits; see CHANGELOG.md). The CI and e2e notes below were recorded for the earlier v0.3.0+build.44.
+- Previously released: [0.4.1](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.4.1%2Bbuild.63) (tag `v0.4.1+build.63`), published 2026-10-18 (fixes for what verifying the release before it found).
 - Previously released: [0.4.0](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.4.0%2Bbuild.61) (tag `v0.4.0+build.61`), published 2026-10-18 (fixes from the October audit and stress test).
 - Previously released: [v0.3.1+build.56](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.3.1%2Bbuild.56), published 2026-10-16.
 - Previously released: [v0.3.0+build.44](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.3.0%2Bbuild.44) with a Linux self-installing AppImage, a per-user Windows installer, a macOS dmg, `arcade-release.json` and `SHA256SUMS.txt`.

@@ -17,7 +17,7 @@ Each platform artifact includes its own checksum list and manifest. The release 
 
 The Qt bundle, conformance vectors, embedded install strings, release generator,
 shortcut validator and Windows Inno/NSIS integration are all vendored from
-Arcade Link commit `85bdb0e` (after `v0.3.0`). The bundle follows the vendoring tool's
+Arcade Link commit `829cc90` (after `v0.3.0`). The bundle follows the vendoring tool's
 layout under `src/link/`, with hashes in `src/link/VENDORED.json`;
 `scripts/VENDORED` and `packaging/windows/VENDORED` pin the shared copies.
 Local checks need no network:
@@ -103,6 +103,6 @@ sha256sum --ignore-missing -c SHA256SUMS.txt
 shasum -a 256 -c SHA256SUMS.txt
 ```
 
-On Windows, use `Get-FileHash .\ArcadeWheel-0.4.1-Windows-x64-Setup.exe -Algorithm SHA256` and compare with its line in `SHA256SUMS.txt`. On macOS, entries for packages you did not download will report missing files; check the downloaded DMG's result.
+On Windows, use `Get-FileHash .\ArcadeWheel-0.4.2-Windows-x64-Setup.exe -Algorithm SHA256` and compare with its line in `SHA256SUMS.txt`. On macOS, entries for packages you did not download will report missing files; check the downloaded DMG's result.
 
 The dependency deployment follows [Qt's Windows deployment](https://doc.qt.io/qt-6/windows-deployment.html), [Qt's macOS deployment](https://doc.qt.io/qt-6/macos-deployment.html), and the [linuxdeploy Qt plugin](https://github.com/linuxdeploy/linuxdeploy-plugin-qt) documentation.

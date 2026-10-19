@@ -7,11 +7,11 @@ are recorded here and in the generated provenance.
 
 | Files | Source and pin | Purpose |
 |---|---|---|
-| `src/link/qt/`, `spec/`, `fixtures/`, `assets/strings/`, bundled spec/Cargo metadata/tools | Arcade Link `85bdb0e9769cc724c0edd83c6f214b70fba33f42` (after v0.3.0); `src/link/VENDORED.json` owns every bundled SHA-256 | Qt protocol, install, accelerator, shortcuts, tray and conformance tests |
+| `src/link/qt/`, `spec/`, `fixtures/`, `assets/strings/`, bundled spec/Cargo metadata/tools | Arcade Link `829cc90a0628fe5c4afc87796eb900aff3fd4e50` (after v0.3.0); `src/link/VENDORED.json` owns every bundled SHA-256 | Qt protocol, install, accelerator, shortcuts, tray and conformance tests |
 | `scripts/arcade-release.py`, `scripts/validate_shortcuts.py` | Same commit, hashes in `scripts/VENDORED` | Release metadata and canonical shortcut documentation |
 | `packaging/windows/arcade.iss`, `arcade.nsh`, `arcade-integration.ps1` | Same commit, hashes in `packaging/windows/VENDORED` | Shared per-user installer integration; Wheel uses Inno |
 
-Source: [Arcade Link 85bdb0e](https://github.com/qa-p1/Arcade-link/tree/85bdb0e9769cc724c0edd83c6f214b70fba33f42).
+Source: [Arcade Link 829cc90](https://github.com/qa-p1/Arcade-link/tree/829cc90a0628fe5c4afc87796eb900aff3fd4e50).
 The compatibility header `src/link/ArcadeLink.h` and Wheel-specific adapter,
 installer UI/CLI, tests and checks are maintained by Wheel. Vendored sources
 are byte-for-byte release copies. `packaging/check-link-vendor.py --source`

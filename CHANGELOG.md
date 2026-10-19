@@ -2,6 +2,12 @@
 
 All notable changes to Arcade Wheel are documented here.
 
+## 0.4.2 — 2026-10-19
+
+### Fixes
+
+- **Installing or updating from Downloads really leaves nothing behind now.** 0.4.1 stopped passing on the handle on the AppImage's mount, but the runtime also waits on a pipe Wheel inherits, and the installed copy still inherited that, so the downloaded image stayed mounted and its runtime kept running. Now no inherited handle is passed on.
+
 ## 0.4.1 — 2026-10-18
 
 ### Fixes

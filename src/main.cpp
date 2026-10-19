@@ -415,7 +415,12 @@ int main(int argc, char **argv)
 #ifdef Q_OS_LINUX
         if (!qEnvironmentVariableIsEmpty("APPIMAGE")) executable = qEnvironmentVariable("APPIMAGE");
 #endif
-        if (!QProcess::startDetached(executable, {QStringLiteral("--restarting")})) {
+        // The successor runs from a new mount; it mustn't keep this one alive.
+        QProcess successor;
+        successor.setProgram(executable);
+        successor.setArguments({QStringLiteral("--restarting")});
+        ArcadeLink::detachFromImage(successor);
+        if (!successor.startDetached()) {
             const QString message = QStringLiteral("Arcade Wheel could not start a new instance, so it kept running.");
             if (tray.isVisible()) tray.showMessage(QStringLiteral("Arcade Wheel"), message, QSystemTrayIcon::Warning, 3000);
             QTextStream(stderr) << message << '\n';

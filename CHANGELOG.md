@@ -2,6 +2,12 @@
 
 All notable changes to Arcade Wheel are documented here.
 
+## 0.4.3 — 2026-10-19
+
+### Fixes
+
+- **Helpers keep working after Wheel quits, and restarts leave nothing behind.** 0.4.2 stopped passing the AppImage runtime's keep-alive pipe to every program, Wheel's own helpers included; now only programs from another image (the installed copy, other Arcade apps, the restart through the AppImage file) drop it.
+
 ## 0.4.2 — 2026-10-19
 
 ### Fixes

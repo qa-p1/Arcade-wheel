@@ -6,7 +6,7 @@ All notable changes to Arcade Wheel are documented here.
 
 ### Fixes
 
-- **Wheel no longer crashes on start.** 0.4.4 rendered with Vulkan on Wayland, which crashed in the Vulkan driver's Wayland code with the Qt 6.8 bundled in the AppImage (tests had used a newer system Qt). Wheel renders with OpenGL again, as in 0.4.3. The rest of 0.4.4 stays: the trigger fix, graphics released a minute after the wheel closes, copied images kept as PNG, and the activity window released after it closes. Without Vulkan, idle memory is about 143 MiB instead of 158 MiB.
+- **Wheel starts and draws normally again.** 0.4.4 rendered with Vulkan on Wayland, which crashed on start with the Qt bundled in the AppImage, and released the wheel's graphics after a minute closed, after which it could reopen fully transparent. Both are gone: rendering is the same as 0.4.3. The trigger fix stays, as do copied images kept as PNG (14 MiB less for a 1440p screenshot) and the Link activity window released 10 seconds after it closes.
 
 ## 0.4.4 — 2026-10-25
 

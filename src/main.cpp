@@ -343,28 +343,6 @@ int main(int argc, char **argv)
         overlay.rootObject()->setProperty("controller", QVariant::fromValue(static_cast<QObject *>(&controller)));
     controller.setOverlayView(&overlay);
 
-    // The overlay's swapchain and scene graph hold full-screen buffers (on an
-    // integrated GPU, system RAM). Keep them while the wheel is in use so
-    // opening stays instant, and release them once it has been closed for a
-    // minute; the QML scene stays loaded and the native surface stays a
-    // layer surface, so the next open only recreates the swapchain.
-    QTimer releaseOverlayGraphics;
-    releaseOverlayGraphics.setSingleShot(true);
-    releaseOverlayGraphics.setInterval(60000);
-    QObject::connect(&overlay, &QWindow::visibleChanged, &releaseOverlayGraphics, [&](bool visible) {
-        if (visible) releaseOverlayGraphics.stop();
-        else releaseOverlayGraphics.start();
-    });
-    QObject::connect(&releaseOverlayGraphics, &QTimer::timeout, &app, [&] {
-        if (overlay.isVisible() || controller.overlayVisible()) return;
-        overlay.setPersistentGraphics(false);
-        overlay.setPersistentSceneGraph(false);
-        overlay.releaseResources();
-        overlay.setPersistentGraphics(true);
-        overlay.setPersistentSceneGraph(true);
-        releaseFreedHeap();
-    });
-
     // Settings holds its own QML engine, about 80 MiB. Keep it for a quick
     // reopen, then let it go.
     // Declared before the view: a view destroyed while visible (at exit)

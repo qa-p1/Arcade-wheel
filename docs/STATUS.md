@@ -2,8 +2,8 @@
 
 ## Release status (2026-10-18)
 
-- Latest release: [0.4.5](https://github.com/qa-p1/Arcade-wheel/releases/latest) (tag `v0.4.5+build.<CI run>`), published 2026-10-25 (back to OpenGL: 0.4.4's Vulkan renderer crashed on start with the bundled Qt 6.8; see CHANGELOG.md).
-- Previously released: [0.4.4](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.4.4%2Bbuild.70) (tag `v0.4.4+build.70`), published 2026-10-25 (the Hyprland trigger works the first time after a click in the wheel; idle memory reduced; crashed on Wayland with Vulkan, replaced by 0.4.5). The CI and e2e notes below were recorded for the earlier v0.3.0+build.44.
+- Latest release: [0.4.5](https://github.com/qa-p1/Arcade-wheel/releases/latest) (tag `v0.4.5+build.<CI run>`), published 2026-10-25 (rendering as in 0.4.3: 0.4.4's Vulkan renderer crashed on start with the bundled Qt 6.8, and its idle graphics release could leave the wheel transparent; see CHANGELOG.md).
+- Previously released: [0.4.4](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.4.4%2Bbuild.70) (tag `v0.4.4+build.70`), published 2026-10-25 (the Hyprland trigger works the first time after a click in the wheel; crashed on Wayland with Vulkan and could reopen transparent; replaced by 0.4.5). The CI and e2e notes below were recorded for the earlier v0.3.0+build.44.
 - Previously released: [0.4.3](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.4.3%2Bbuild.67) (tag `v0.4.3+build.67`), published 2026-10-19 (only programs from another image drop the AppImage's descriptors).
 - Previously released: [0.4.2](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.4.2%2Bbuild.65) (tag `v0.4.2+build.65`), published 2026-10-19 (released every inherited descriptor at start, which also cut off helpers from the app's own image).
 - Previously released: [0.4.1](https://github.com/qa-p1/Arcade-wheel/releases/tag/v0.4.1%2Bbuild.63) (tag `v0.4.1+build.63`), published 2026-10-18 (fixes for what verifying the release before it found).

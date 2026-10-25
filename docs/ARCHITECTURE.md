@@ -30,7 +30,7 @@ The overlay forwards left-button presses and releases inside the hub to `WheelCo
 
 ## Resource lifetime
 
-The overlay's QML scene is loaded once at start. Its graphics resources (swapchain and scene graph) stay while the wheel is in use and are released a minute after it closes; the next open recreates them, and the native surface stays a layer surface. On Wayland Qt Quick uses Vulkan when an instance and a graphics-capable device exist, because its resources are released completely; otherwise OpenGL. Settings and the Link activity window are separate views destroyed 10 seconds after they close. A copied image is read when the wheel opens and kept as PNG once the discovery worker has encoded it.
+The overlay's QML scene is loaded once at start. Its graphics resources (swapchain and scene graph) stay while the wheel is in use and are released a minute after it closes; the next open recreates them, and the native surface stays a layer surface. Settings and the Link activity window are separate views destroyed 10 seconds after they close. A copied image is read when the wheel opens and kept as PNG once the discovery worker has encoded it.
 
 ## Coordinates
 

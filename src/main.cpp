@@ -44,45 +44,6 @@
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
-// Qt's Vulkan headers need the system's; without them, build for OpenGL only.
-#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
-#define ARCADE_PREFER_VULKAN 1
-#include <QVulkanFunctions>
-#include <QVulkanInstance>
-#endif
-
-// On Wayland, Qt Quick's default OpenGL path keeps tens of MiB more resident
-// (the GL driver and its compiler) than Vulkan, and Vulkan's resources can be
-// released completely while the wheel is idle. Qt does not fall back by
-// itself, so use Vulkan only when it works here. QSG_RHI_BACKEND or
-// QT_QUICK_BACKEND still choose explicitly.
-static void preferVulkanRenderer()
-{
-#ifdef ARCADE_PREFER_VULKAN
-    if (!qEnvironmentVariableIsEmpty("QSG_RHI_BACKEND") || !qEnvironmentVariableIsEmpty("QT_QUICK_BACKEND")) return;
-    if (!QGuiApplication::platformName().startsWith(QStringLiteral("wayland"))) return;
-    QVulkanInstance instance;
-    if (!instance.create()) return;
-    auto *vk = instance.functions();
-    uint32_t count = 0;
-    if (vk->vkEnumeratePhysicalDevices(instance.vkInstance(), &count, nullptr) != VK_SUCCESS || count == 0) return;
-    QVarLengthArray<VkPhysicalDevice, 4> devices(count);
-    if (vk->vkEnumeratePhysicalDevices(instance.vkInstance(), &count, devices.data()) != VK_SUCCESS) return;
-    for (VkPhysicalDevice device : devices) {
-        uint32_t families = 0;
-        vk->vkGetPhysicalDeviceQueueFamilyProperties(device, &families, nullptr);
-        QVarLengthArray<VkQueueFamilyProperties, 8> properties(families);
-        vk->vkGetPhysicalDeviceQueueFamilyProperties(device, &families, properties.data());
-        for (const auto &family : properties) {
-            if (family.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                QQuickWindow::setGraphicsApi(QSGRendererInterface::Vulkan);
-                return;
-            }
-        }
-    }
-#endif
-}
-
 static void releaseFreedHeap()
 {
 #ifdef __GLIBC__
@@ -369,7 +330,6 @@ int main(int argc, char **argv)
     if (appIcon.isNull()) appIcon = QIcon::fromTheme(QStringLiteral("applications-system"));
     app.setWindowIcon(appIcon);
 
-    preferVulkanRenderer();
     QQuickView overlay;
     overlay.setColor(Qt::transparent);
     overlay.setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint |

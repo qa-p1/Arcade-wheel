@@ -44,7 +44,9 @@
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
-#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan)
+// Qt's Vulkan headers need the system's; without them, build for OpenGL only.
+#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
+#define ARCADE_PREFER_VULKAN 1
 #include <QVulkanFunctions>
 #include <QVulkanInstance>
 #endif
@@ -56,7 +58,7 @@
 // QT_QUICK_BACKEND still choose explicitly.
 static void preferVulkanRenderer()
 {
-#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan)
+#ifdef ARCADE_PREFER_VULKAN
     if (!qEnvironmentVariableIsEmpty("QSG_RHI_BACKEND") || !qEnvironmentVariableIsEmpty("QT_QUICK_BACKEND")) return;
     if (!QGuiApplication::platformName().startsWith(QStringLiteral("wayland"))) return;
     QVulkanInstance instance;

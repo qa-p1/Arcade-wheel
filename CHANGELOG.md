@@ -2,6 +2,12 @@
 
 All notable changes to Arcade Wheel are documented here.
 
+## 0.4.5 — 2026-10-25
+
+### Fixes
+
+- **Wheel starts and draws normally again.** 0.4.4 rendered with Vulkan on Wayland, which crashed on start with the Qt bundled in the AppImage, and released the wheel's graphics after a minute closed, after which it could reopen fully transparent. Both are gone: rendering is the same as 0.4.3. The trigger fix stays, as do copied images kept as PNG (14 MiB less for a 1440p screenshot) and the Link activity window released 10 seconds after it closes.
+
 ## 0.4.4 — 2026-10-25
 
 ### Fixes

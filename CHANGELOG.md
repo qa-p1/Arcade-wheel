@@ -2,6 +2,12 @@
 
 All notable changes to Arcade Wheel are documented here.
 
+## Unreleased
+
+### Fixes
+
+- **The trigger works the first time after a click in the wheel.** On Hyprland, clicking the hub (any center gesture, or a plain cancel), a slot, or another bound key while holding the trigger made Hyprland drop the key's release, so the next press did nothing. The trigger bind is now exempt from that, and a press after a lost release reopens the wheel instead of being ignored.
+
 ## 0.4.3 — 2026-10-19
 
 ### Fixes

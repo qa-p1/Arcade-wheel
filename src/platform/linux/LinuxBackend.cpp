@@ -872,9 +872,18 @@ void LinuxBackend::onShortcutActivated(const QDBusObjectPath &session,
 {
     Q_UNUSED(timestamp)
     Q_UNUSED(options)
-    if (m_recordingShortcut || !m_triggerSupported || m_triggerDown || shortcutId != QString::fromLatin1(kShortcutId)
+    if (m_recordingShortcut || !m_triggerSupported || shortcutId != QString::fromLatin1(kShortcutId)
         || session.path() != m_sessionHandle) {
         return;
+    }
+    if (m_triggerDown) {
+        // Our compositor bind never repeats, so a second press means the
+        // previous release was lost (e.g. a modifier changed mid-hold).
+        // Without this the press after a lost release does nothing.
+        if (!m_bindingInstalled) return;
+        m_triggerDown = false;
+        m_triggerClock.invalidate();
+        emit triggerCancelled();
     }
     m_triggerDown = true;
     m_triggerClock.restart();
@@ -1803,12 +1812,15 @@ bool LinuxBackend::installHyprlandBinding(QString *error)
     }
     // Hyprland 0.55+ Lua configs reject `keyword bind`. Its Lua dispatcher
     // wrapper also requests the matching release edge for the portal shortcut.
+    // A Lua bind is not a `global` handler, so any mouse button or other bind
+    // used while the key is held shadows it and Hyprland drops that release.
+    // `transparent` exempts it from shadowing, as plain `global` binds are.
     parts.replaceInStrings(QStringLiteral("LOGO"), QStringLiteral("SUPER"));
     parts.replaceInStrings(QStringLiteral("NUM"), QStringLiteral("MOD2"));
     const QString chord = parts.isEmpty() ? key : parts.join(QStringLiteral(" + ")) + QStringLiteral(" + ") + key;
     const QString luaBinding = QStringLiteral(
         "eval if _G.arcadeWheelTrigger then _G.arcadeWheelTrigger:remove() end; "
-        "_G.arcadeWheelTrigger = hl.bind(\"%1\", hl.dsp.global(\"%2\"), {description=\"Arcade Wheel trigger\"})")
+        "_G.arcadeWheelTrigger = hl.bind(\"%1\", hl.dsp.global(\"%2\"), {description=\"Arcade Wheel trigger\", transparent=true})")
                                     .arg(chord, target);
     m_boundKey = key;
     m_boundModifiers = mask;

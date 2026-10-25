@@ -12,6 +12,9 @@ struct WheelClipboard {
     QString text;
     QString html;
     QImage image;
+    // The image as PNG, once encoded. It replaces the decoded image, which
+    // costs width x height x 4 bytes for as long as the clipboard is unchanged.
+    QByteArray png;
     QList<QUrl> urls;
 };
 

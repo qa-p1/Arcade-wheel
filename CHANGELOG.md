@@ -2,11 +2,12 @@
 
 All notable changes to Arcade Wheel are documented here.
 
-## Unreleased
+## 0.4.4 — 2026-10-25
 
 ### Fixes
 
 - **The trigger works the first time after a click in the wheel.** On Hyprland, clicking the hub (any center gesture, or a plain cancel), a slot, or another bound key while holding the trigger made Hyprland drop the key's release, so the next press did nothing. The trigger bind is now exempt from that, and a press after a lost release reopens the wheel instead of being ignored.
+- **Less memory while idle.** On Wayland the wheel renders with Vulkan when it is available (OpenGL otherwise), and a minute after it closes it gives back its graphics memory: measured at 1440p on an AMD integrated GPU, about 120 MiB resident instead of 158 MiB, and no GPU memory instead of 140 MiB. Nothing is released while you keep using the wheel; the first open after an idle minute takes about 20 ms to appear. Copied images are kept as PNG rather than decoded pixels (a 1440p screenshot was 14 MiB), and the Link activity window is released 10 seconds after it closes, like Settings.
 
 ## 0.4.3 — 2026-10-19
 

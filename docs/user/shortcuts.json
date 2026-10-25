@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "app": "arcade.wheel",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "groups": [
     {
       "title": "Show the wheel",

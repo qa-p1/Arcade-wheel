@@ -1,6 +1,7 @@
 #include "providers/ArcadeLinkProvider.h"
 #include "link/WheelInvoke.h"
 
+#include <QBuffer>
 #include <QClipboard>
 #include <QFile>
 #include <QGuiApplication>
@@ -257,6 +258,29 @@ private slots:
         provider.refreshClipboard();
         QTRY_COMPARE_WITH_TIMEOUT(provider.unavailableReason(action), QStringLiteral("Too large for Arcade Box (limit 4 bytes)."), 5000);
         QString error; QVERIFY(!provider.execute(action, &error)); QCOMPARE(error, QStringLiteral("Too large for Arcade Box (limit 4 bytes)."));
+    }
+    void clipboardImageIsHandedOffFromItsEncodedCopy()
+    {
+        if (QStandardPaths::findExecutable("arcade-link").isEmpty()) QSKIP("arcade-link mock is not on PATH");
+        const auto log = root->filePath("image-calls.jsonl");
+        const QJsonObject json{{"actions", QJsonArray{QJsonObject{{"id", "box.image"}, {"title", "Image input"}, {"accepts", QJsonArray{"file/image"}}}}}};
+        MockPeer box; QVERIFY(box.start(Ids::Box, writeFixture(*root, json), log));
+        ArcadeLinkProvider provider; provider.apply({{"enabled", true}});
+        QImage image(64, 48, QImage::Format_ARGB32);
+        image.fill(QColor(20, 140, 220));
+        QByteArray png; QBuffer buffer(&png); buffer.open(QIODevice::WriteOnly); QVERIFY(image.save(&buffer, "PNG"));
+        QGuiApplication::clipboard()->setImage(image);
+        const auto action = slot(Ids::Box, "box.image", "clipboard");
+        QTRY_VERIFY_WITH_TIMEOUT(provider.tools().size() > 0, 5000);
+        provider.refreshClipboard();
+        // Once the worker has encoded it, only the PNG is kept.
+        QTRY_VERIFY_WITH_TIMEOUT(provider.unavailableReason(action).isEmpty(), 5000);
+        QSignalSpy finished(&provider, &ArcadeLinkProvider::jobFinished);
+        QString error; QVERIFY2(provider.execute(action, &error), qPrintable(error));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 5000);
+        const auto input = invocations(log).last().value("inputs").toArray().first().toObject();
+        QCOMPARE(input.value("type").toString(), QStringLiteral("file/image"));
+        QCOMPARE(input.value("size").toInt(), png.size());
     }
     void fileSelectionResolvesFilesWithoutPreviewBeforeTheTarget()
     {

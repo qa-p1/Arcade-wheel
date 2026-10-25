@@ -118,6 +118,20 @@ private slots:
         controller.pressTrigger(); centerClick(controller);
         QVERIFY(!controller.overlayVisible()); QTest::qWait(10); QCOMPARE(backend.launches,2);
     }
+    void pressAfterLostReleaseOpensAtOnce() {
+        // A gesture runs while the trigger is held and the compositor drops
+        // the release; the backend reports the next press as cancel+press.
+        QTemporaryDir dir; ControllerBackend backend;
+        WheelController controller(&backend,nullptr,dir.filePath("config.json"));
+        controller.initialize(); QQuickView overlay; controller.setOverlayView(&overlay);
+        emit backend.triggerPressed(); centerClick(controller);
+        QVERIFY(!controller.overlayVisible());
+        emit backend.triggerCancelled(); emit backend.triggerPressed();
+        QVERIFY(controller.overlayVisible());
+        emit backend.triggerPressed(); emit backend.triggerCancelled(); emit backend.triggerPressed();
+        QVERIFY(controller.overlayVisible());
+        emit backend.triggerReleased(); QVERIFY(!controller.overlayVisible());
+    }
     void singleClickWaitsForMultiClickGestures() {
         QTemporaryDir dir; ControllerBackend backend;
         WheelController controller(&backend,nullptr,dir.filePath("config.json"));

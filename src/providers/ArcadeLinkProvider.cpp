@@ -64,7 +64,7 @@ public:
 
 signals:
     void snapshot(const QJsonArray &manifests, const QJsonObject &states, const QJsonObject &errors);
-    void clipboardReady(quint64 generation, const QJsonArray &inputs, const QString &preview);
+    void clipboardReady(quint64 generation, const QJsonArray &inputs, const QString &preview, const QByteArray &png);
 
 private:
     struct Peer {
@@ -256,6 +256,14 @@ QString handoffFile(const Locations &loc, const QString &name, const QByteArray 
     return file.fileName();
 }
 
+QByteArray encodedPng(const QImage &image)
+{
+    QByteArray png;
+    QBuffer buffer(&png);
+    buffer.open(QIODevice::WriteOnly);
+    return image.save(&buffer, "PNG") ? png : QByteArray();
+}
+
 QJsonArray clipboardInputs(const WheelClipboard &snapshot, const Locations &loc, QStringList *owned = nullptr)
 {
     if (!snapshot.urls.isEmpty()) {
@@ -271,11 +279,9 @@ QJsonArray clipboardInputs(const WheelClipboard &snapshot, const Locations &loc,
         if (paths.size() == 1) return {fileContent(paths.first().toString())};
         if (!paths.isEmpty()) return {QJsonObject{{"type", "file/any[]"}, {"paths", paths}, {"size", bytes}}};
     }
-    if (!snapshot.image.isNull()) {
-        QByteArray png;
-        QBuffer buffer(&png);
-        buffer.open(QIODevice::WriteOnly);
-        if (!snapshot.image.save(&buffer, "PNG")) return {};
+    if (!snapshot.png.isEmpty() || !snapshot.image.isNull()) {
+        const QByteArray png = !snapshot.png.isEmpty() ? snapshot.png : encodedPng(snapshot.image);
+        if (png.isEmpty()) return {};
         QJsonObject content{{"type", "file/image"}, {"size", png.size()}};
         if (owned) {
             const auto path = handoffFile(loc, "clipboard.png", png, owned);
@@ -303,8 +309,10 @@ QJsonArray clipboardInputs(const WheelClipboard &snapshot, const Locations &loc,
     return {content};
 }
 
-void Discovery::clipboard(const WheelClipboard &value, quint64 generation)
+void Discovery::clipboard(const WheelClipboard &snapshot, quint64 generation)
 {
+    WheelClipboard value = snapshot;
+    if (!value.image.isNull()) value.png = encodedPng(value.image);
     const auto inputs = clipboardInputs(value, loc);
     QString preview;
     if (!inputs.isEmpty()) {
@@ -313,7 +321,7 @@ void Discovery::clipboard(const WheelClipboard &value, quint64 generation)
         if (preview.isEmpty()) preview = content.value("path").toString();
         if (preview.isEmpty()) preview = content.value("type").toString();
     }
-    emit clipboardReady(generation, inputs, preview);
+    emit clipboardReady(generation, inputs, preview, value.png);
 }
 
 bool outbound(const QJsonObject &action)
@@ -382,8 +390,9 @@ void ArcadeLinkProvider::startDiscovery()
     connect(worker, &Discovery::snapshot, this, [this](const QJsonArray &manifests, const QJsonObject &states, const QJsonObject &errors) {
         m_manifests = manifests; m_states = states; m_errors = errors; emit changed();
     });
-    connect(worker, &Discovery::clipboardReady, this, [this](quint64 generation, const QJsonArray &inputs, const QString &preview) {
+    connect(worker, &Discovery::clipboardReady, this, [this](quint64 generation, const QJsonArray &inputs, const QString &preview, const QByteArray &png) {
         if (generation != m_clipboardGeneration) return;
+        if (!png.isEmpty()) { m_clipboard.png = png; m_clipboard.image = {}; }
         m_clipboardInputs = inputs; m_clipboardPreview = preview; emit changed();
     });
     m_discoveryThread.start();

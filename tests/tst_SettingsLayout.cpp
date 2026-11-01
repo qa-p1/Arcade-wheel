@@ -7,7 +7,11 @@
 #include <QDir>
 #include <QGuiApplication>
 #include <QQmlContext>
+#include <QQmlApplicationEngine>
 #include <QQmlEngine>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <ArcadeInstall.h>
 #include <QQuickItem>
 #include <QQuickView>
 #include <QTemporaryDir>
@@ -73,6 +77,14 @@ void collectOverflow(QQuickItem *item, const QRectF &bounds, QStringList *proble
         if (childBounds.width() <= 0) return; // nothing inside can be seen
     }
     for (QQuickItem *child : item->childItems()) collectOverflow(child, childBounds, problems);
+}
+// Repeater delegates are items, not QObject children: walk the item tree.
+QQuickItem *itemNamed(QQuickItem *item, const QString &name)
+{
+    if (item->objectName() == name) return item;
+    for (QQuickItem *child : item->childItems())
+        if (QQuickItem *found = itemNamed(child, name)) return found;
+    return nullptr;
 }
 } // namespace
 
@@ -183,6 +195,50 @@ private slots:
                     QStringLiteral("%1-picker-%2-%3x%4.png").arg(theme, QString::fromLatin1(type)).arg(size.width()).arg(size.height()))));
         }
         QVERIFY2(failures.isEmpty(), qPrintable(failures.join(u'\n')));
+    }
+    // The first-run prompt on the kit: Link's shared strings, the main
+    // action rightmost and in Wheel's accent, both options.
+    void installPromptUsesTheKit() {
+        const QJsonObject strings = ArcadeLink::ArcadeInstall::strings();
+        const QJsonObject notInstalled = strings.value(QStringLiteral("notInstalled")).toObject();
+        QVERIFY(!notInstalled.isEmpty());
+        QStringList buttons;
+        for (const auto &name : notInstalled.value(QStringLiteral("buttons")).toArray()) buttons << name.toString();
+        const auto labels = notInstalled.value(QStringLiteral("options")).toArray();
+        const QVariantList options{QVariantMap{{QStringLiteral("label"), labels.at(0).toString()}, {QStringLiteral("checked"), true}},
+                                   QVariantMap{{QStringLiteral("label"), labels.at(1).toString()}, {QStringLiteral("checked"), true}}};
+        QQmlApplicationEngine engine;
+        engine.setInitialProperties({{QStringLiteral("heading"), QStringLiteral("Install Arcade Wheel?")},
+                                     {QStringLiteral("paragraphs"), QStringList{QStringLiteral("Arcade Wheel will be installed for you.")}},
+                                     {QStringLiteral("options"), options},
+                                     {QStringLiteral("buttons"), buttons}});
+        engine.loadFromModule("ArcadeWheel", "InstallPrompt");
+        QCOMPARE(engine.rootObjects().size(), 1);
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        QVERIFY(window);
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        auto *primary = itemNamed(window->contentItem(), QStringLiteral("installButton-0"));
+        auto *secondary = itemNamed(window->contentItem(), QStringLiteral("installButton-1"));
+        QVERIFY(primary); QVERIFY(secondary);
+        QCOMPARE(primary->property("variant").toString(), QStringLiteral("primary"));
+        // Opened in Wheel's amber, not fading from the kit's default accent.
+        const QQuickItem *fill = primary->property("background").value<QQuickItem *>();
+        QVERIFY(fill);
+        const QColor amber = fill->property("color").value<QColor>();
+        QVERIFY2(amber == QColor(QStringLiteral("#9e6506")) || amber == QColor(QStringLiteral("#f59e0b")),
+                 qPrintable(amber.name()));
+        QVERIFY(primary->mapToScene({0, 0}).x() > secondary->mapToScene({0, 0}).x());
+        QVERIFY(itemNamed(window->contentItem(), QStringLiteral("installOption-1")));
+        QStringList problems;
+        collectOverflow(window->contentItem(), QRectF(QPointF(0, 0), window->size()), &problems);
+        QVERIFY2(problems.isEmpty(), qPrintable(problems.join(u'\n')));
+        const QString shots = qEnvironmentVariable("ARCADE_WHEEL_SHOTS");
+        if (!shots.isEmpty()) {
+            QDir().mkpath(shots);
+            QVERIFY(window->grabWindow().save(QDir(shots).filePath(QStringLiteral("install-prompt.png"))));
+        }
+        QVERIFY(QMetaObject::invokeMethod(primary, "clicked"));
+        QCOMPARE(window->property("clicked").toInt(), 0);
     }
 };
 

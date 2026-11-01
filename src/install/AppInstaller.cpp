@@ -5,6 +5,9 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDialog>
+#include <QEventLoop>
+#include <QQmlApplicationEngine>
+#include <QQuickWindow>
 #include <QDialogButtonBox>
 #include <QEventLoop>
 #include <QElapsedTimer>
@@ -167,9 +170,45 @@ Choice ask(const Engine::Detection &d, const QString &version, bool managed, con
     }
     Choice choice;
     choice.options.startAtLogin = loginEnabled(d.receipt);
-    QCheckBox *login = nullptr, *download = nullptr;
     const auto kind = AppInstaller::promptKind(d, version);
-    if (kind == u"notInstalled" || kind == u"older") {
+    const bool optionsShown = kind == u"notInstalled" || kind == u"older";
+    // The kit prompt (qml/install/InstallPrompt.qml), built only while it asks.
+    // Where the QML module is absent (the unit tests), the Qt Widgets prompt below.
+    {
+        QStringList paragraphs;
+        if (text.contains("body")) paragraphs << text.value("body").toString();
+        if (managed) paragraphs << format(Engine::strings().value("managedByTools").toString(), version);
+        const auto replaces = Engine::strings().value("replacesLegacy").toString();
+        if (!legacy.isEmpty() && !replaces.isEmpty()) paragraphs << format(replaces, version, legacy.first());
+        QVariantList options;
+        if (optionsShown) {
+            const auto labels = Engine::strings().value("notInstalled").toObject().value("options").toArray();
+            options << QVariantMap{{QStringLiteral("label"), labels.at(0).toString()}, {QStringLiteral("checked"), choice.options.startAtLogin}}
+                    << QVariantMap{{QStringLiteral("label"), labels.at(1).toString()}, {QStringLiteral("checked"), true}};
+        }
+        QStringList buttons;
+        for (const auto &name : text.value("buttons").toArray()) buttons << name.toString();
+        QQmlApplicationEngine engine;
+        engine.setInitialProperties({{QStringLiteral("heading"), text.value("title").toString()},
+                                     {QStringLiteral("paragraphs"), paragraphs},
+                                     {QStringLiteral("options"), options},
+                                     {QStringLiteral("buttons"), buttons}});
+        engine.loadFromModule("ArcadeWheel", "InstallPrompt");
+        if (auto *window = engine.rootObjects().isEmpty() ? nullptr : qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
+            QEventLoop loop;
+            QObject::connect(window, SIGNAL(finished()), &loop, SLOT(quit()));
+            loop.exec();
+            const QVariantList checks = window->property("checks").toList();
+            if (optionsShown && checks.size() >= 2) {
+                choice.options.startAtLogin = checks.at(0).toBool();
+                choice.options.removeDownload = checks.at(1).toBool();
+            }
+            choice.button = window->property("clicked").toInt();
+            return choice;
+        }
+    }
+    QCheckBox *login = nullptr, *download = nullptr;
+    if (optionsShown) {
         const auto labels = Engine::strings().value("notInstalled").toObject().value("options").toArray();
         login = new QCheckBox(labels.at(0).toString());
         login->setChecked(choice.options.startAtLogin);

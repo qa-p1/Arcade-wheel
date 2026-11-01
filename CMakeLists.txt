@@ -66,6 +66,7 @@ set(WHEEL_QML_FILES
     qml/settings/LinkActivity.qml
     qml/settings/ConnectedAppsPage.qml
     qml/settings/CenterGesturesPage.qml
+    qml/install/InstallPrompt.qml
     qml/components/WheelSlider.qml
     qml/components/WheelSwitch.qml
 )

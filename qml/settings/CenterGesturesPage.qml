@@ -1,131 +1,107 @@
+pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
-import "../components"
+import Arcade
 
-ScrollView {
+// Center gestures: a click, double-click, triple-click or long press in the
+// middle of the open wheel runs a saved group of actions.
+Column {
     id: page
     objectName: "centerGesturesPage"
-    clip: true
+    required property WheelController controller
     property string gestureId: "singleClick"
     readonly property var group: controller.config.centerGestures[gestureId]
     readonly property var actions: group.actions || []
+    readonly property string triggerKey: controller.shortcutForKit(controller.config.trigger.shortcut)
     signal editAction(string gesture, int slot, var action)
-    contentWidth: availableWidth
+    spacing: Theme.space32
 
-    ColumnLayout {
-        width: page.availableWidth - 60
-        x: 30
-        y: 8
-        spacing: 18
-        Text {
-            text: "Your workspace, in a click"
-            color: "#e8e3ef"; font.pixelSize: 19; font.weight: Font.Medium
-        }
-        Text {
-            text: "Hold " + controller.config.trigger.shortcut + " and use the center of the wheel to run a group of apps or actions. Each gesture has its own saved setup."
-            color: "#91889f"; font.pixelSize: 13; wrapMode: Text.WordWrap; Layout.fillWidth: true
-        }
-        RowLayout {
-            spacing: 8
-            Repeater {
-                model: [
-                    {key: "singleClick", title: "Single-click"},
-                    {key: "doubleClick", title: "Double-click"},
-                    {key: "tripleClick", title: "Triple-click"},
-                    {key: "longPress", title: "Long press"}
-                ]
-                delegate: UiButton {
-                    required property var modelData
-                    text: modelData.title
-                    accent: page.gestureId === modelData.key
-                    onClicked: page.gestureId = modelData.key
-                }
+    ListSection {
+        width: parent.width
+        title: "Gesture"
+        note: "Hold " + page.triggerKey + " and use the middle of the wheel to run a group of apps or actions. Each gesture has its own setup."
+        ListRow {
+            title: "Edit the setup for"
+            SegmentedControl {
+                objectName: "gesturePicker"
+                options: [{ value: "singleClick", label: "Click" }, { value: "doubleClick", label: "Double-click" },
+                          { value: "tripleClick", label: "Triple-click" }, { value: "longPress", label: "Long press" }]
+                value: page.gestureId
+                onActivated: value => page.gestureId = value
             }
         }
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: groupContent.implicitHeight + 36
-            radius: 14; color: "#19171f"; border.color: "#302b3c"
-            ColumnLayout {
-                id: groupContent
-                anchors.left: parent.left; anchors.right: parent.right
-                anchors.top: parent.top; anchors.margins: 18
-                spacing: 14
-                RowLayout {
-                    Layout.fillWidth: true
-                    TextField {
-                        Layout.fillWidth: true
-                        text: page.group.name || ""
-                        placeholderText: "Setup name"
-                        onEditingFinished: controller.setCenterGesture(page.gestureId, text, page.group.enabled)
-                    }
-                    Switch {
-                        text: "Enabled"
-                        checked: !!page.group.enabled
-                        onToggled: controller.setCenterGesture(page.gestureId, page.group.name, checked)
-                    }
-                }
-                Text {
-                    text: page.actions.length ? page.actions.length + " actions · launched together, in this order" : "Add the apps you want in this setup — a browser, terminal, editor, or any other action."
-                    color: "#938a9f"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
-                }
-                Repeater {
-                    model: page.actions
-                    delegate: Rectangle {
-                        required property var modelData
-                        required property int index
-                        Layout.fillWidth: true; implicitHeight: 64
-                        radius: 9; color: "#22202b"
-                        RowLayout {
-                            anchors.fill: parent; anchors.margins: 10; spacing: 10
-                            Image {
-                                source: "image://icons/" + encodeURIComponent(modelData.icon || "applications-other") + "?v=" + controller.iconGeneration
-                                sourceSize: Qt.size(64,64)
-                                Layout.preferredWidth: 30; Layout.preferredHeight: 30
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth: true; spacing: 3
-                                Text { text: modelData.name; color: "#e4deeb"; font.pixelSize: 13; Layout.fillWidth: true; elide: Text.ElideRight }
-                                Text {
-                                    readonly property string unavailable: controller.actionUnavailableReason(modelData)
-                                    text: unavailable || modelData.type
-                                    color: unavailable ? "#dfa0a9" : "#8f849f"
-                                    font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight
-                                }
-                            }
-                            UiButton { text: "Edit"; compact: true; onClicked: page.editAction(page.gestureId, index, modelData) }
-                            UiButton { text: "↑"; compact: true; enabled: index > 0; onClicked: controller.moveCenterGestureAction(page.gestureId, index, index-1) }
-                            UiButton { text: "↓"; compact: true; enabled: index+1 < page.actions.length; onClicked: controller.moveCenterGestureAction(page.gestureId, index, index+1) }
-                            UiButton { text: "Remove"; compact: true; onClicked: controller.removeCenterGestureAction(page.gestureId, index) }
-                        }
-                    }
-                }
-                UiButton {
-                    text: "+ Add app or action"; accent: true
-                    enabled: page.actions.length < 16
-                    onClicked: page.editAction(page.gestureId, -1, {})
-                }
+        ListRow {
+            title: "Setup name"
+            TextField {
+                width: 220
+                text: page.group.name || ""
+                placeholderText: "Setup name"
+                onEditingFinished: page.controller.setCenterGesture(page.gestureId, text, page.group.enabled)
             }
         }
-        Text {
-            text: "The wheel closes as soon as the setup runs. Releasing " + controller.config.trigger.shortcut + " afterward won't launch anything twice. Move out of the center to abandon a gesture. Without a single-click setup, a single click closes the wheel."
-            color: "#91889f"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true
+        SwitchRow {
+            objectName: "gestureEnabled"
+            title: "Run this setup"
+            subtitle: "Off keeps the actions but ignores the gesture."
+            checked: !!page.group.enabled
+            onToggled: on => page.controller.setCenterGesture(page.gestureId, page.group.name, on)
         }
-        SettingSlider {
-            Layout.fillWidth: true
+    }
+    ListSection {
+        width: parent.width
+        title: "Actions"
+        meta: page.actions.length ? page.actions.length + " of 16" : ""
+        note: page.actions.length ? "They run together, in this order. The wheel closes as soon as the setup runs."
+                                  : "Add the apps you want in this setup: a browser, a terminal, an editor or any other action."
+        Repeater {
+            model: page.actions
+            delegate: ListRow {
+                id: gestureRow
+                required property var modelData
+                required property int index
+                readonly property string unavailable: page.controller.actionUnavailableReason(modelData)
+                width: parent.width
+                minimumHeight: Theme.rowDialog
+                title: modelData.name
+                subtitle: unavailable || modelData.type
+                leading: Component {
+                    Image {
+                        width: Theme.tileSm; height: Theme.tileSm
+                        sourceSize: Qt.size(64, 64)
+                        fillMode: Image.PreserveAspectFit
+                        source: "image://icons/" + encodeURIComponent(gestureRow.modelData.icon || "applications-other") + "?v=" + page.controller.iconGeneration
+                    }
+                }
+                Button { text: "Edit"; small: true; onClicked: page.editAction(page.gestureId, gestureRow.index, gestureRow.modelData) }
+                Button { iconName: "chevronDown"; rotation: 180; small: true; tooltip: "Move earlier"; enabled: gestureRow.index > 0; onClicked: page.controller.moveCenterGestureAction(page.gestureId, gestureRow.index, gestureRow.index - 1) }
+                Button { iconName: "chevronDown"; small: true; tooltip: "Move later"; enabled: gestureRow.index + 1 < page.actions.length; onClicked: page.controller.moveCenterGestureAction(page.gestureId, gestureRow.index, gestureRow.index + 1) }
+                Button { iconName: "trash"; small: true; variant: "danger"; tooltip: "Remove"; onClicked: page.controller.removeCenterGestureAction(page.gestureId, gestureRow.index) }
+            }
+        }
+        ListRow {
+            title: page.actions.length ? "Add another" : "Add the first action"
+            Button {
+                objectName: "addGestureAction"
+                text: "Add app or action"; iconName: "plus"; variant: "primary"
+                enabled: page.actions.length < 16
+                onClicked: page.editAction(page.gestureId, -1, {})
+            }
+        }
+    }
+    ListSection {
+        width: parent.width
+        title: "Timing"
+        note: "Releasing " + page.triggerKey + " after a setup runs never launches anything twice. Move out of the middle to abandon a gesture. Without a click setup, a click closes the wheel."
+        WheelSlider {
+            controller: page.controller; section: "centerGestures"; settingKey: "clickIntervalMs"
             title: "Time between clicks"
-            detail: "Single-click waits this long when double- or triple-click is enabled; double-click waits only when triple-click is enabled. Release the trigger after clicking to run the pending setup immediately."
-            section: "centerGestures"; settingKey: "clickIntervalMs"
-            fromValue: 160; toValue: 500; stepValue: 10; unit: " ms"
+            subtitle: "A click waits this long when double- or triple-click is on; a double-click waits only when triple-click is on. Release the trigger to run a waiting setup at once."
+            from: 160; to: 500; stepSize: 10; unit: "ms"
         }
-        SettingSlider {
-            Layout.fillWidth: true
+        WheelSlider {
+            controller: page.controller; section: "centerGestures"; settingKey: "longPressMs"
             title: "Long press duration"
-            detail: "Hold the left mouse button in the center for this long."
-            section: "centerGestures"; settingKey: "longPressMs"
-            fromValue: 250; toValue: 1500; stepValue: 50; unit: " ms"
+            subtitle: "Hold the left mouse button in the middle for this long."
+            from: 250; to: 1500; stepSize: 50; unit: "ms"
         }
-        Item { Layout.preferredHeight: 30 }
     }
 }

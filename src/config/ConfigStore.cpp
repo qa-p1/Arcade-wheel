@@ -1,5 +1,6 @@
 #include "config/ConfigStore.h"
 
+#include <QColor>
 #include <QDir>
 #include <QDateTime>
 #include <QFile>
@@ -166,7 +167,8 @@ QJsonObject ConfigStore::defaults(const QVector<DiscoveredApplication> &applicat
 
     return {{QStringLiteral("schemaVersion"), SchemaVersion},
             {QStringLiteral("general"), QJsonObject{{QStringLiteral("startOnLogin"), false},
-                                                      {QStringLiteral("showNotifications"), true}}},
+                                                      {QStringLiteral("showNotifications"), true},
+                                                      {QStringLiteral("theme"), QStringLiteral("system")}}},
             {QStringLiteral("link"), QJsonObject{{QStringLiteral("enabled"), true},
                                                    {QStringLiteral("disabledPeers"), QJsonArray{}}}},
             {QStringLiteral("trigger"), QJsonObject{{QStringLiteral("shortcut"), QStringLiteral("F8")},
@@ -182,7 +184,9 @@ QJsonObject ConfigStore::defaults(const QVector<DiscoveredApplication> &applicat
                                                          {QStringLiteral("dim"), 0.08},
                                                          {QStringLiteral("animationSpeed"), 1.0},
                                                          {QStringLiteral("selectedScale"), 1.06},
-                                                         {QStringLiteral("reduceMotion"), false}}},
+                                                         {QStringLiteral("reduceMotion"), false},
+                                                         {QStringLiteral("customAccent"), false},
+                                                         {QStringLiteral("accentColor"), QStringLiteral("#f59e0b")}}},
             {QStringLiteral("behaviour"), QJsonObject{{QStringLiteral("wrapDecks"), true},
                                                         {QStringLiteral("deadZone"), 64},
                                                         {QStringLiteral("selectionSensitivity"), 1.0},
@@ -226,10 +230,29 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
             if (appearance.value(it.key()) == it.value()) appearance.insert(it.key(),newStyle.value(it.key()));
         config.insert(QStringLiteral("appearance"),appearance);
     }
+    {
+        // Before 0.5 the ring used appearance.accentColor whenever it was set
+        // (only a hand-edited or imported file had one): keep that colour.
+        auto appearance = config.value(QStringLiteral("appearance")).toObject();
+        if (!appearance.contains(QStringLiteral("customAccent")))
+            appearance.insert(QStringLiteral("customAccent"),
+                              QColor::isValidColorName(appearance.value(QStringLiteral("accentColor")).toString()));
+        config.insert(QStringLiteral("appearance"), appearance);
+    }
     const auto baseline = defaults();
     for (const auto &section : {"general", "link", "trigger", "appearance", "behaviour"}) {
         const auto key = QString::fromLatin1(section);
         config.insert(key, mergeDefaults(baseline.value(key).toObject(), config.value(key).toObject()));
+    }
+    {
+        auto general = config.value(QStringLiteral("general")).toObject();
+        const QString theme = general.value(QStringLiteral("theme")).toString();
+        if (theme != QStringLiteral("light") && theme != QStringLiteral("dark")) general.insert(QStringLiteral("theme"), QStringLiteral("system"));
+        config.insert(QStringLiteral("general"), general);
+        auto appearance = config.value(QStringLiteral("appearance")).toObject();
+        if (!QColor::isValidColorName(appearance.value(QStringLiteral("accentColor")).toString()))
+            appearance.insert(QStringLiteral("accentColor"), QStringLiteral("#f59e0b"));
+        config.insert(QStringLiteral("appearance"), appearance);
     }
 
     QJsonArray decks = config.value(QStringLiteral("decks")).toArray();

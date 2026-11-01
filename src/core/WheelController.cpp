@@ -5,6 +5,14 @@
 #include "core/WheelLogic.h"
 #include "link/WheelInvoke.h"
 
+#include <ArcadeInstall.h>
+#include <ArcadePaths.h>
+
+#include <QClipboard>
+#include <QDir>
+#include <QFileInfo>
+#include <QStandardPaths>
+#include <QCoreApplication>
 #include <QCursor>
 #include <QDesktopServices>
 #include <QEventLoop>
@@ -816,6 +824,43 @@ QString WheelController::shortcutFromKey(int key, int modifiers) const
     return sequence;
 }
 
+namespace {
+// Qt's portable text calls the Command key "Ctrl" and the Control key "Meta"
+// on macOS; the kit always names physical keys ("Ctrl" is Control, "Super"
+// is Command or the Windows key).
+QString swapModifierNames(const QString &sequence, bool toKit)
+{
+    QStringList parts = sequence.split(QLatin1Char('+'));
+    for (QString &part : parts) {
+#ifdef Q_OS_MACOS
+        if (part == QStringLiteral("Ctrl")) part = toKit ? QStringLiteral("Super") : QStringLiteral("Meta");
+        else if (part == QStringLiteral("Meta") && toKit) part = QStringLiteral("Ctrl");
+        else if (part == QStringLiteral("Super") && !toKit) part = QStringLiteral("Ctrl");
+#else
+        if (toKit && part == QStringLiteral("Meta")) part = QStringLiteral("Super");
+        else if (!toKit && part == QStringLiteral("Super")) part = QStringLiteral("Meta");
+#endif
+        if (!toKit && part == QStringLiteral("Enter")) part = QStringLiteral("Return");
+        else if (toKit && part == QStringLiteral("Return")) part = QStringLiteral("Enter");
+        else if (toKit && part == QStringLiteral("Del")) part = QStringLiteral("Delete");
+    }
+    return parts.join(QLatin1Char('+'));
+}
+}
+
+QString WheelController::shortcutFromKit(const QString &sequence) const
+{
+    if (sequence.isEmpty()) return {};
+    const QKeySequence keys = QKeySequence::fromString(swapModifierNames(sequence, false), QKeySequence::PortableText);
+    if (keys.count() != 1) return {};
+    return shortcutFromKey(keys[0].key(), int(keys[0].keyboardModifiers()));
+}
+
+QString WheelController::shortcutForKit(const QString &shortcut) const
+{
+    return swapModifierNames(shortcut, true);
+}
+
 void WheelController::setShortcutRecording(bool recording)
 {
     if (m_recordingShortcut == recording) return;
@@ -1011,4 +1056,63 @@ void WheelController::moveCenterGestureAction(const QString &gesture, int from, 
     updated.insert("centerGestures", gestures);
     cancelCenterGesture();
     commit(updated);
+}
+
+QString WheelController::logsPath() const
+{
+    // Where main.cpp captures stderr (the folder the manifest advertises).
+    return QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/logs");
+}
+
+QString WheelController::channel() const
+{
+    static const QString cached = [] {
+        QJsonObject receipt; // a missing receipt reads as empty: not installed
+        if (!ArcadeLink::ReceiptStore::discover().read(QStringLiteral("arcade.wheel"), &receipt)) return QString();
+        return receipt.value(QStringLiteral("channel")).toString();
+    }();
+    return cached;
+}
+
+void WheelController::openLogsFolder()
+{
+    QDir().mkpath(logsPath());
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(logsPath())))
+        reportError(QStringLiteral("Couldn't open the logs folder. It is %1.").arg(QDir::toNativeSeparators(logsPath())));
+}
+
+void WheelController::openUserGuide()
+{
+    QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/qa-p1/arcade-wheel/blob/main/docs/user/index.md")));
+}
+
+void WheelController::openLicences()
+{
+    // The packaged copy (Linux share/, macOS Resources/), else the licence online.
+    const QString app = QCoreApplication::applicationDirPath();
+    for (const QString &folder : {app + QStringLiteral("/../share/doc/arcade-wheel"), app + QStringLiteral("/../Resources/licenses")}) {
+        if (!QFileInfo(folder + QStringLiteral("/LICENSE")).isFile()) continue;
+        QDesktopServices::openUrl(QUrl::fromLocalFile(QDir(folder).absolutePath()));
+        return;
+    }
+    QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/qa-p1/arcade-wheel/blob/main/LICENSE")));
+}
+
+QString WheelController::diagnostics() const
+{
+    auto header = ArcadeLink::DiagnosticsHeader::create(QStringLiteral("arcade.wheel"), QCoreApplication::applicationVersion(),
+                                                        channel().isEmpty() ? QStringLiteral("not installed") : channel());
+    header.linkEnabled = m_config.value(QStringLiteral("link")).toObject().value(QStringLiteral("enabled")).toBool(true);
+    header.peersFrom(ArcadeLink::Locations::discover());
+    QString text = header.render();
+    text += QStringLiteral("Shortcut: %1 (%2)\n").arg(m_config.value(QStringLiteral("trigger")).toObject().value(QStringLiteral("shortcut")).toString(),
+                                                        m_triggerStatus.isEmpty() ? QStringLiteral("unknown") : m_triggerStatus);
+    text += QStringLiteral("Decks: %1\n").arg(deckCount());
+    text += QStringLiteral("Platform: %1\n").arg(QGuiApplication::platformName());
+    return text;
+}
+
+void WheelController::copyDiagnostics()
+{
+    QGuiApplication::clipboard()->setText(diagnostics());
 }

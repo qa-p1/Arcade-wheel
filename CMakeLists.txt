@@ -13,6 +13,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Widgets Network)
+qt_standard_project_setup(REQUIRES 6.8)
+set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml")
 
 set(ARCADE_LINK_BUILD_TESTS OFF CACHE BOOL "Use Wheel's test registration" FORCE)
 add_subdirectory(src/link/qt)
@@ -34,6 +36,45 @@ add_library(arcade_core STATIC
 )
 target_include_directories(arcade_core PUBLIC src)
 target_link_libraries(arcade_core PUBLIC arcade_link_qt Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Widgets Qt6::Network)
+# WheelController's metatypes, for the QML_FOREIGN registration in wheel_ui.
+qt_extract_metatypes(arcade_core)
+
+# The Arcade design kit (vendored from Link) as a compiled static QML module,
+# so qmlcachegen compiles it ahead of time and qmllint knows its types.
+set(ARCADE_KIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/link/design/qml/Arcade")
+file(GLOB ARCADE_KIT_FILES CONFIGURE_DEPENDS "${ARCADE_KIT_DIR}/*.qml" "${ARCADE_KIT_DIR}/*.js")
+foreach(file IN LISTS ARCADE_KIT_FILES)
+    get_filename_component(name "${file}" NAME)
+    set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${name}")
+    if(name STREQUAL "Theme.qml" OR name STREQUAL "Fonts.qml")
+        set_source_files_properties("${file}" PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+    endif()
+endforeach()
+qt_add_library(arcade_kit STATIC)
+qt_add_qml_module(arcade_kit URI Arcade VERSION 1.0 QML_FILES ${ARCADE_KIT_FILES})
+# Fonts.qml loads ../../fonts/InterVariable.ttf next to the module (/qt/qml/Arcade).
+qt_add_resources(arcade_kit "arcade_inter" PREFIX "/qt/fonts" BASE "src/link/design/fonts"
+    FILES src/link/design/fonts/InterVariable.ttf)
+target_link_libraries(arcade_kit PRIVATE Qt6::Quick)
+
+# Wheel's own QML, a typed module (qmllint knows WheelController).
+set(WHEEL_QML_FILES
+    qml/wheel/WheelView.qml
+    qml/wheel/Overlay.qml
+    qml/settings/SettingsWindow.qml
+    qml/settings/ActionPicker.qml
+    qml/settings/LinkActivity.qml
+    qml/settings/ConnectedAppsPage.qml
+    qml/settings/CenterGesturesPage.qml
+    qml/components/WheelSlider.qml
+    qml/components/WheelSwitch.qml
+)
+qt_add_library(wheel_ui STATIC)
+qt_add_qml_module(wheel_ui URI ArcadeWheel VERSION 1.0
+    QML_FILES ${WHEEL_QML_FILES}
+    SOURCES src/ui/QmlTypes.h
+    IMPORTS Arcade)
+target_link_libraries(wheel_ui PRIVATE arcade_core arcade_kit Qt6::Quick)
 
 qt_add_executable(arcade-wheel src/main.cpp)
 set_target_properties(arcade-wheel PROPERTIES
@@ -45,7 +86,7 @@ set_target_properties(arcade-wheel PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
 )
 target_compile_definitions(arcade-wheel PRIVATE ARCADE_VERSION="${PROJECT_VERSION}")
-target_link_libraries(arcade-wheel PRIVATE arcade_core Qt6::Widgets Qt6::QuickControls2 Qt6::Network)
+target_link_libraries(arcade-wheel PRIVATE arcade_core wheel_uiplugin arcade_kitplugin Qt6::Widgets Qt6::QuickControls2 Qt6::Network)
 
 if(WIN32)
     target_sources(arcade-wheel PRIVATE
@@ -92,19 +133,12 @@ set(ARCADE_ASSET_FILES
     assets/arcade-wheel.svg
     assets/arcade-wheel.png
 )
-qt_add_resources(arcade-wheel arcade_qml PREFIX "/" FILES
-    qml/wheel/WheelView.qml
-    qml/wheel/Overlay.qml
-    qml/settings/Settings.qml
-    qml/settings/ActionPicker.qml
-    qml/settings/LinkActivity.qml
-    qml/settings/ConnectedAppsPage.qml
-    qml/settings/CenterGesturesPage.qml
-    qml/components/UiButton.qml
-    qml/components/SettingSlider.qml
-    qml/components/SettingToggle.qml
-    ${ARCADE_ASSET_FILES}
-)
+qt_add_resources(arcade-wheel arcade_assets PREFIX "/" FILES ${ARCADE_ASSET_FILES})
+# The QML gate (STANDARD §10): qmllint over Wheel's module at zero warnings.
+add_custom_target(qmllint_gate
+    COMMAND $<TARGET_FILE:Qt6::qmllint> "@${CMAKE_BINARY_DIR}/.rcc/qmllint/wheel_ui.rsp" --max-warnings 0
+    COMMENT "qmllint (Wheel QML, zero warnings)" VERBATIM)
+add_dependencies(qmllint_gate wheel_ui)
 
 install(TARGETS arcade-wheel RUNTIME DESTINATION bin BUNDLE DESTINATION .)
 install(FILES LICENSE README.md DESTINATION share/doc/arcade-wheel)

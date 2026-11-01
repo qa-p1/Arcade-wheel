@@ -17,7 +17,12 @@ Arcade Wheel is a small background launcher that works like a game weapon wheel.
 
 It targets **Linux Wayland (especially Hyprland)** on x86_64, **Windows** (x64), and **macOS 13+** (Apple Silicon and Intel). It is written in C++20 with Qt 6 and Qt Quick.
 
-<p align="center"><img src="docs/user/images/settings.png" width="720" alt="Arcade Wheel Settings in an isolated X11 session"></p>
+<p align="center"><img src="docs/user/images/wheel.png" width="640" alt="The wheel open over the desktop, aiming at LibreOffice Writer"></p>
+
+<p align="center">
+  <img src="docs/user/images/settings.png" width="420" alt="Settings, Your wheel page, light theme">
+  <img src="docs/user/images/settings-dark.png" width="420" alt="Settings, Your wheel page, dark theme">
+</p>
 
 ## Download and install
 

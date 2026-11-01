@@ -1,3 +1,4 @@
+#include "core/IconImageProvider.h"
 #include "core/IconTheme.h"
 
 #include <QDir>
@@ -114,6 +115,30 @@ private slots:
         QVERIFY(QIcon::fromTheme("arcade-later").isNull()); // Qt keeps the failed lookup
         IconTheme::reloadSearchPaths();
         QVERIFY(!QIcon::fromTheme("arcade-later").isNull());
+    }
+    void symbolicOnlyThemesStillDrawActionIcons()
+    {
+        // Current Adwaita has media-playback-start-symbolic and no full-colour icon.
+        QTemporaryDir data;
+        const QDir theme(data.path() + "/SymbolicOnly");
+        QVERIFY(theme.mkpath("16x16/actions"));
+        QFile index(theme.filePath("index.theme"));
+        QVERIFY(index.open(QIODevice::WriteOnly));
+        index.write("[Icon Theme]\nName=SymbolicOnly\nDirectories=16x16/actions\n\n[16x16/actions]\nSize=16\nType=Fixed\n");
+        index.close();
+        QImage glyph(16, 16, QImage::Format_ARGB32);
+        glyph.fill(Qt::black);
+        QVERIFY(glyph.save(theme.filePath("16x16/actions/arcade-play-symbolic.png")));
+        QIcon::setThemeSearchPaths({data.path()});
+        QIcon::setThemeName("SymbolicOnly");
+
+        IconImageProvider provider;
+        QSize size;
+        const QImage drawn = provider.requestImage("arcade-play?v=1", &size, QSize(32, 32));
+        QCOMPARE(size, QSize(32, 32));
+        const QColor centre = drawn.pixelColor(16, 16);
+        QCOMPARE(centre.alpha(), 255);
+        QCOMPARE(centre.name(), QStringLiteral("#7c8596")); // tinted, not black
     }
 };
 

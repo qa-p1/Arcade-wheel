@@ -21,7 +21,7 @@ Short records of choices that are not obvious from the code. Newest first.
 - **Folders:** settings, cache and logs move from `Arcade Wheel/Arcade Wheel` to Link's
   `arcade/wheel` folders on the first start of 0.5, before anything reads them, through
   Link's copy-verify-remove migration. `config.json` becomes `settings.json`. Anything that
-  could not move is kept where it was and reported once. If `settings.json` is still missing,
+  could not move is kept where it was and noted in the log. If `settings.json` is still missing,
   Wheel starts from a copy of the old `config.json` and leaves the original in place, so a
   failed move never loses settings.
 - **Launcher rename:** Link's install engine writes the new launcher but leaves an entry

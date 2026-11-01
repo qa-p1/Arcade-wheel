@@ -1,5 +1,40 @@
 # Arcade Wheel: status
 
+## 2026-11-01: 0.5.0 (WHEEL.md overhaul)
+
+- Kit: Arcade Link v0.4.15's QML kit as a static module (`arcade_kit`), Inter, Wheel's amber.
+  `WheelController` is a typed QML type; the `qmllint_gate` target runs at 0 warnings. The overlay
+  keeps its geometry, motion and gestures; only colours, type, the label pill and the selected
+  slot's 2 px accent changed.
+- Settings is Template A with the ten standard pages. `tst_SettingsLayout` opens every page and the
+  action picker from 720×520 to 1920×1080, in light and dark, and fails when anything is clipped. The action picker
+  keeps its System, Media and Desktop categories with 7, 7 and 14 actions.
+- STANDARD §10 identity: `dev.arcade.Wheel` for the desktop file, Wayland app id, X11 class and
+  macOS bundle id. The folder move was checked with a real 0.4-style profile on Xvfb: settings,
+  the deck and the F9 trigger came across, the old folders were removed, and `--toggle`, `--hide`
+  and `--quit` worked. A failed move is unit-tested (settings start from a copy of the old file).
+- Performance against a 0.4.5 build from `main`, same machine and Qt, Xvfb, three runs each:
+  the wheel appears in 69 ms in both; idle CPU is 0 in both. Memory (PSS) is 114 MB idle against
+  110, 181 MB with the wheel shown against 173, 246 MB with Settings against 236. Most of it is the
+  bundled Inter (the standard's font; 0.4.5 used whatever font the desktop had) and the kit's
+  theme bindings. No timers or polling were added.
+- Screenshots in `docs/user/images` were taken on Xvfb with xcompmgr and an isolated profile; the
+  sidebar's "Shortcut needs attention" is real there, because Xvfb has no shortcut portal.
+- Open, for the owner:
+  - Remote branches are never deleted from these sessions. Already merged into `main` and safe to
+    delete: `arcade/docs-polish`, `arcade/icons-layout`, `arcade/link`, `arcade/readme-standard`,
+    `arcade/tools-hub`, `claude/epic-ramanujan-afo4yy`, `claude/hotfix-0.4.5-no-vulkan`,
+    `claude/trigger-release-and-idle-memory`, `feature/shelf-action-onboarding`. Not merged:
+    `arcade/wheel-win-layout-diag`, two scratch commits that only change `ci.yml` (no logs worth
+    keeping); WHEEL.md asks for it to be deleted.
+  - macOS: the bundle id changed from `com.arcadewheel.ArcadeWheel`. A login item registered by
+    0.4 may stay listed in System Settings, and Settings shows start at login as off until it is
+    turned on again. Not checked on a real Mac.
+  - Tools 0.4.2 writes Wheel's login entry under the old name; Tools needs `dev.arcade.Wheel` for
+    Wheel 0.5 and later (Tools 0.4.3).
+  - Not checked on a real desktop: Windows and macOS (CI runners only), the new macOS volume and
+    power actions (System Events asks for permission once), and the new Hyprland desktop actions.
+
 ## Release status (2026-10-18)
 
 - Latest release: [0.4.5](https://github.com/qa-p1/Arcade-wheel/releases/latest) (tag `v0.4.5+build.<CI run>`), published 2026-10-25 (rendering as in 0.4.3: 0.4.4's Vulkan renderer crashed on start with the bundled Qt 6.8, and its idle graphics release could leave the wheel transparent; see CHANGELOG.md).
@@ -81,5 +116,7 @@ checks require `ARCADE_LINK_CLI`; without it those cases report skips.
 | [architecture](dev/architecture.md) | Core classes, config schema, trigger path, gestures, coordinates |
 | [link](dev/link.md) | Peer actions, `wheel.*` actions, Settings, verification, platform table |
 | [packaging](dev/packaging.md) | Packages, release publishing, vendored files |
-| [testing](dev/testing.md) | Release checks to run on a real desktop |
+| [testing](dev/testing.md) | `scripts/check` and the release checks to run on a real desktop |
+| [decisions](dev/decisions.md) | Choices that aren't obvious from the code |
+| [user guide](user/index.md) | Install, use and troubleshoot Wheel |
 | [CHANGELOG](../CHANGELOG.md) | Changes by version |

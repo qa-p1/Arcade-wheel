@@ -16,4 +16,6 @@ Arcade Wheel is a radial launcher for desktop actions. Hold its trigger, move to
 
 Start with [installation and first run](getting-started.md), or browse [features](features.md), [shortcuts](shortcuts.md), [Arcade app connections](with-other-apps.md), [common questions](faq.md) and [troubleshooting](troubleshooting.md).
 
-![Arcade Wheel Settings in an isolated X11 session](images/settings.png)
+![The wheel open over the desktop, aiming at LibreOffice Writer](images/wheel.png)
+
+![Settings, Your wheel page](images/settings.png)

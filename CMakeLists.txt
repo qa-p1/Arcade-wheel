@@ -74,6 +74,7 @@ qt_add_qml_module(wheel_ui URI ArcadeWheel VERSION 1.0
     QML_FILES ${WHEEL_QML_FILES}
     SOURCES src/ui/QmlTypes.h
     IMPORTS Arcade)
+target_include_directories(wheel_ui PRIVATE src/ui)
 target_link_libraries(wheel_ui PRIVATE arcade_core arcade_kit Qt6::Quick)
 
 qt_add_executable(arcade-wheel src/main.cpp)
@@ -156,6 +157,9 @@ if(BUILD_TESTING)
         target_link_libraries(test_${test_name} PRIVATE arcade_core Qt6::Test)
         add_test(NAME ${test_name} COMMAND test_${test_name})
     endforeach()
+    # The controller tests drive the real overlay and Settings QML.
+    target_link_libraries(test_WheelController PRIVATE wheel_uiplugin arcade_kitplugin Qt6::QuickControls2)
+    set_tests_properties(WheelController PROPERTIES ENVIRONMENT "QT_QUICK_CONTROLS_STYLE=Basic")
     # Arcade Link conformance vectors, vendored from Arcade-link/spec/vectors.
     qt_add_executable(test_LinkVectors tests/tst_LinkVectors.cpp)
     target_link_libraries(test_LinkVectors PRIVATE arcade_core Qt6::Test)
@@ -172,12 +176,12 @@ if(BUILD_TESTING)
     set_tests_properties(AppInstaller PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     # Every Settings page at common window sizes; ARCADE_WHEEL_SHOTS=DIR saves PNGs.
     qt_add_executable(test_SettingsLayout tests/tst_SettingsLayout.cpp)
-    target_link_libraries(test_SettingsLayout PRIVATE arcade_core Qt6::Test Qt6::QuickControls2)
+    target_link_libraries(test_SettingsLayout PRIVATE arcade_core wheel_uiplugin arcade_kitplugin Qt6::Test Qt6::QuickControls2)
     qt_add_resources(test_SettingsLayout layout_assets PREFIX "/" FILES ${ARCADE_ASSET_FILES})
     # The QtTest log also goes to Testing/Temporary, which CI uploads on failure.
     add_test(NAME SettingsLayout COMMAND test_SettingsLayout -o -,txt
         -o "${CMAKE_BINARY_DIR}/Testing/Temporary/SettingsLayout.txt,txt")
-    set(settings_layout_env "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Material;QT_QUICK_CONTROLS_MATERIAL_THEME=Dark;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")
+    set(settings_layout_env "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic;ARCADE_WHEEL_DISABLE_GLOBAL_SHORTCUT=1")
     if(WIN32)
         # The offscreen platform finds no fonts on Windows unless pointed at the
         # system folder; its fallback glyphs are one em wide and every label overflows.

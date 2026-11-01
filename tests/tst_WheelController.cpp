@@ -12,6 +12,10 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <QtQml/qqmlextensionplugin.h>
+
+Q_IMPORT_QML_PLUGIN(ArcadePlugin)
+Q_IMPORT_QML_PLUGIN(ArcadeWheelPlugin)
 
 class ControllerBackend final : public PlatformBackend {
 public:
@@ -201,10 +205,9 @@ private slots:
         WheelController controller(&backend,nullptr,dir.filePath("config.json"));
         controller.initialize(); addGroup(controller,"doubleClick",{"test.desktop","second.desktop"});
         QQuickView overlay;
-        overlay.rootContext()->setContextProperty("controller",&controller);
-        overlay.setSource(QUrl::fromLocalFile(QFINDTESTDATA("../qml/wheel/Overlay.qml")));
+        overlay.setInitialProperties({{"controller",QVariant::fromValue(&controller)}});
+        overlay.loadFromModule("ArcadeWheel","Overlay");
         QCOMPARE(overlay.status(),QQuickView::Ready);
-        overlay.rootObject()->setProperty("controller",QVariant::fromValue(static_cast<QObject *>(&controller)));
         overlay.setResizeMode(QQuickView::SizeRootObjectToView);
         controller.setOverlayView(&overlay); controller.pressTrigger(); QTest::qWait(50);
         const QPointF center(overlay.width()/2.0,overlay.height()/2.0);
@@ -225,11 +228,11 @@ private slots:
             controller.removeCenterGestureAction("doubleClick",2);
             QCOMPARE(backend.configures,registrations);
             QQuickView settings;
-            settings.rootContext()->setContextProperty("controller",&controller);
-            settings.setSource(QUrl::fromLocalFile(QFINDTESTDATA("../qml/settings/Settings.qml")));
+            settings.setInitialProperties({{"controller",QVariant::fromValue(&controller)}});
+            settings.loadFromModule("ArcadeWheel","SettingsWindow");
             QCOMPARE(settings.status(),QQuickView::Ready);
-            settings.rootObject()->setProperty("currentPage","Center gestures");
-            QVERIFY(settings.rootObject()->findChild<QObject *>("centerGesturesPage"));
+            QVERIFY(QMetaObject::invokeMethod(settings.rootObject(),"showPage",Q_ARG(QVariant,4)));
+            QTRY_VERIFY(settings.rootObject()->findChild<QObject *>("centerGesturesPage"));
         }
         ControllerBackend backend; WheelController controller(&backend,nullptr,path); controller.initialize();
         QCOMPARE(backend.configured.value("shortcut").toString(),QString("Tab"));
@@ -257,10 +260,9 @@ private slots:
         WheelController controller(&backend,nullptr,dir.filePath("config.json"));
         controller.initialize(); controller.createDeck(); controller.selectDeck(0);
         QQuickView overlay;
-        overlay.rootContext()->setContextProperty("controller",&controller);
-        overlay.setSource(QUrl::fromLocalFile(QFINDTESTDATA("../qml/wheel/Overlay.qml")));
+        overlay.setInitialProperties({{"controller",QVariant::fromValue(&controller)}});
+        overlay.loadFromModule("ArcadeWheel","Overlay");
         QCOMPARE(overlay.status(),QQuickView::Ready);
-        overlay.rootObject()->setProperty("controller",QVariant::fromValue(static_cast<QObject *>(&controller)));
         overlay.setResizeMode(QQuickView::SizeRootObjectToView);
         controller.setOverlayView(&overlay); controller.pressTrigger();
         QTest::qWait(50);
@@ -275,19 +277,19 @@ private slots:
         WheelController controller(&backend,nullptr,dir.filePath("config.json"));
         controller.initialize(); QQuickView overlay; controller.setOverlayView(&overlay);
         QQuickView settings;
-        settings.rootContext()->setContextProperty("controller",&controller);
-        settings.setSource(QUrl::fromLocalFile(QFINDTESTDATA("../qml/settings/Settings.qml")));
+        settings.setInitialProperties({{"controller",QVariant::fromValue(&controller)}});
+        settings.loadFromModule("ArcadeWheel","SettingsWindow");
         QCOMPARE(settings.status(),QQuickView::Ready);
-        settings.rootObject()->setProperty("currentPage","Trigger");
+        QVERIFY(QMetaObject::invokeMethod(settings.rootObject(),"showPage",Q_ARG(QVariant,1)));
         settings.show();
-        auto *field=settings.rootObject()->findChild<QQuickItem *>("shortcutField");
-        QVERIFY(field);
+        QQuickItem *field=nullptr;
+        QTRY_VERIFY((field=settings.rootObject()->findChild<QQuickItem *>("shortcutRecorder")));
         field->forceActiveFocus();
         QCoreApplication::processEvents();
         QVERIFY(!backend.recording);
-        QVERIFY(QMetaObject::invokeMethod(field,"beginRecording"));
+        QVERIFY(field->setProperty("recording",true));
         QVERIFY(backend.recording);
-        QVERIFY(QMetaObject::invokeMethod(field,"cancelRecording"));
+        QVERIFY(field->setProperty("recording",false));
         settings.rootObject()->forceActiveFocus();
         controller.pressTrigger();
         field->forceActiveFocus();
@@ -304,8 +306,8 @@ private slots:
             {"payload", QVariantMap{{"command", "/usr/bin/printf literal"}}}};
         QVERIFY(controller.beginLinkAction(draft, "Arcade Lens"));
         const auto before = controller.config();
-        QQuickView settings; settings.rootContext()->setContextProperty("controller", &controller);
-        settings.setSource(QUrl::fromLocalFile(QFINDTESTDATA("../qml/settings/Settings.qml")));
+        QQuickView settings; settings.setInitialProperties({{"controller", QVariant::fromValue(&controller)}});
+        settings.loadFromModule("ArcadeWheel", "SettingsWindow");
         QCOMPARE(settings.status(), QQuickView::Ready); settings.show();
         auto *picker = settings.rootObject()->findChild<QObject *>("actionPicker");
         QVERIFY(picker); QTRY_VERIFY(picker->property("visible").toBool());

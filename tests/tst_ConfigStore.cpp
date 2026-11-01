@@ -225,9 +225,10 @@ private slots:
         const QString exportPath = directory.filePath(QStringLiteral("exported.json"));
         ConfigStore store(runtimePath);
         QJsonObject original = ConfigStore::defaults();
-        original.insert(QStringLiteral("general"),
-                        QJsonObject{{QStringLiteral("startOnLogin"), true},
-                                    {QStringLiteral("showNotifications"), false}});
+        QJsonObject general = original.value(QStringLiteral("general")).toObject();
+        general.insert(QStringLiteral("startOnLogin"), true);
+        general.insert(QStringLiteral("showNotifications"), false);
+        original.insert(QStringLiteral("general"), general);
         QVERIFY2(store.exportTo(original, exportPath), "Export should write a valid JSON file");
 
         QJsonObject imported;

@@ -61,9 +61,13 @@ Item {
         const step = Math.PI*2 / Math.max(1,slotCount)
         return Math.floor(((Math.atan2(dy,dx)+Math.PI/2+step/2+Math.PI*2) % (Math.PI*2))/step)
     }
+    // Each slot runs its own entrance, exit or settle on these.
+    signal slotsEnter()
+    signal slotsLeave()
+    signal slotsSettle()
     function replayEntrance() {
         closeTimer.stop()
-        for (let i=0; i<slots.count; ++i) slots.itemAt(i).enter()
+        slotsEnter()
     }
     readonly property var actions: deck && deck.actions ? deck.actions : []
     readonly property int slotCount: Math.min(8, actions.length)
@@ -102,13 +106,13 @@ Item {
     onOpenedChanged: {
         if (opened) replayEntrance()
         else {
-            for (let i=0;i<slots.count;++i) slots.itemAt(i).leave()
+            slotsLeave()
             closeTimer.restart()
         }
     }
     onReduceMotionChanged: {
         deckAnimation.stop(); deckPhase=1
-        for (let i=0;i<slots.count;++i) slots.itemAt(i).settle()
+        slotsSettle()
     }
     Component.onCompleted: if (opened) Qt.callLater(replayEntrance)
     Timer { id: closeTimer; interval: root.duration(95); onTriggered: if (!root.opened) root.closeFinished() }
@@ -148,6 +152,12 @@ Item {
                     else exitAnimation.restart()
                 }
                 function settle() { entrance.stop(); exitAnimation.stop(); progress=root.opened ? 1 : 0 }
+                Connections {
+                    target: root
+                    function onSlotsEnter() { slot.enter() }
+                    function onSlotsLeave() { slot.leave() }
+                    function onSlotsSettle() { slot.settle() }
+                }
                 Behavior on highlight { NumberAnimation { duration: root.duration(105); easing.type: Easing.OutCubic } }
                 SequentialAnimation {
                     id: entrance

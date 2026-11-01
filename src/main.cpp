@@ -35,12 +35,16 @@
 #include <QQuickItem>
 #include <QQuickView>
 #include <QQuickStyle>
+#include <QtQml/qqmlextensionplugin.h>
 #include <QStandardPaths>
 #include <QSystemTrayIcon>
 #include <QThread>
 #include <QTimer>
 #include <QTemporaryDir>
 #include <memory>
+
+Q_IMPORT_QML_PLUGIN(ArcadePlugin)
+Q_IMPORT_QML_PLUGIN(ArcadeWheelPlugin)
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
@@ -76,8 +80,9 @@ static bool readSettingsForExport(QJsonObject *config, QString *error)
 int main(int argc, char **argv)
 {
     ArcadeLink::onStartup();
-    QQuickStyle::setStyle(QStringLiteral("Material"));
-    qputenv("QT_QUICK_CONTROLS_MATERIAL_THEME", "Dark");
+    // The kit draws every control itself on Qt Quick Templates; Basic is the
+    // lightest fallback for anything it does not cover.
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
     QApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("Arcade Wheel"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("arcadewheel.org"));
@@ -336,12 +341,18 @@ int main(int argc, char **argv)
                      Qt::WindowDoesNotAcceptFocus);
     overlay.setResizeMode(QQuickView::SizeRootObjectToView);
     overlay.engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);
-    overlay.rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
-    overlay.setSource(QUrl(QStringLiteral("qrc:/qml/wheel/Overlay.qml")));
+    overlay.setInitialProperties({{QStringLiteral("controller"), QVariant::fromValue(&controller)}});
+    overlay.loadFromModule("ArcadeWheel", "Overlay");
     if (overlay.status() == QQuickView::Error) return 1;
-    if (overlay.rootObject())
-        overlay.rootObject()->setProperty("controller", QVariant::fromValue(static_cast<QObject *>(&controller)));
     controller.setOverlayView(&overlay);
+    // Inter at 13 px (the kit's body size) for every window, Qt Widgets menus
+    // and dialogs included. The kit's Fonts singleton has already loaded it
+    // from the resources.
+    if (auto *fonts = overlay.engine()->singletonInstance<QObject *>("Arcade", "Fonts")) {
+        QFont font(fonts->property("sans").toString());
+        font.setPixelSize(13);
+        QApplication::setFont(font);
+    }
 
     // Settings holds its own QML engine, about 80 MiB. Keep it for a quick
     // reopen, then let it go.
@@ -360,14 +371,15 @@ int main(int argc, char **argv)
         releaseSettings.stop();
         if (!settings) {
             settings = std::make_unique<QQuickView>();
-            settings->setTitle(QStringLiteral("Arcade Wheel · Settings"));
-            settings->setColor(QColor(QStringLiteral("#0d1118")));
-            settings->setMinimumSize(QSize(800, 560));
-            settings->resize(1240, 820);
+            settings->setTitle(QStringLiteral("Settings — Arcade Wheel"));
+            // The editor needs room for the deck list, preview and slots;
+            // the kit's own minimum is 720 x 520.
+            settings->setMinimumSize(QSize(720, 520));
+            settings->resize(1080, 720);
             settings->setResizeMode(QQuickView::SizeRootObjectToView);
             settings->engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);
-            settings->rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
-            settings->setSource(QUrl(QStringLiteral("qrc:/qml/settings/Settings.qml")));
+            settings->setInitialProperties({{QStringLiteral("controller"), QVariant::fromValue(&controller)}});
+            settings->loadFromModule("ArcadeWheel", "SettingsWindow");
             if (settings->status() == QQuickView::Error) {
                 app.exit(1);
                 return;
@@ -399,12 +411,12 @@ int main(int argc, char **argv)
         releaseActivity.stop();
         if (!activity) {
             activity = std::make_unique<QQuickView>();
-            activity->setTitle(QStringLiteral("Arcade Wheel · Activity"));
+            activity->setTitle(QStringLiteral("Activity — Arcade Wheel"));
             activity->setResizeMode(QQuickView::SizeRootObjectToView);
             activity->resize(540, 320);
             activity->engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);
-            activity->rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
-            activity->setSource(QUrl(QStringLiteral("qrc:/qml/settings/LinkActivity.qml")));
+            activity->setInitialProperties({{QStringLiteral("controller"), QVariant::fromValue(&controller)}});
+            activity->loadFromModule("ArcadeWheel", "LinkActivity");
             QObject::connect(activity.get(), &QWindow::visibleChanged, &releaseActivity, [&](bool visible) {
                 if (!visible) releaseActivity.start();
             });
@@ -416,11 +428,11 @@ int main(int argc, char **argv)
     tray.setToolTip(QStringLiteral("Arcade Wheel"));
     tray.setIcon(appIcon);
     QMenu menu;
-    auto *wheelAction = menu.addAction(QStringLiteral("Show Wheel"));
+    auto *wheelAction = menu.addAction(QStringLiteral("Open wheel"));
     QObject::connect(wheelAction, &QAction::triggered, &controller, &WheelController::showWheel);
-    auto *openAction = menu.addAction(QStringLiteral("Open Settings"));
-    auto *restartAction = menu.addAction(QStringLiteral("Restart Arcade Wheel"));
+    auto *openAction = menu.addAction(QStringLiteral("Settings"));
     menu.addSeparator();
+    auto *restartAction = menu.addAction(QStringLiteral("Restart Arcade Wheel"));
     auto *quitAction = menu.addAction(QStringLiteral("Quit Arcade Wheel"));
     QObject::connect(openAction, &QAction::triggered, &app, showSettings);
     QObject::connect(quitAction, &QAction::triggered, &app, &QCoreApplication::quit);

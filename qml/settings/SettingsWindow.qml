@@ -106,6 +106,7 @@ Rectangle {
 
     Sidebar {
         id: sidebar
+        objectName: "sidebar"
         height: parent.height
         appName: "Arcade Wheel"
         version: Qt.application.version
@@ -387,6 +388,8 @@ Rectangle {
                 Surface {
                     id: actionsPanel
                     objectName: "actionsPanel"
+                    // An in-page panel, not an overlay: no pop shadow.
+                    shadow: false
                     width: wheelPage.stacked ? parent.width : 300
                     height: panelContent.implicitHeight + Theme.space16 * 2
                     radius: Theme.radiusLg

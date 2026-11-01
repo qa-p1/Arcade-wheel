@@ -92,7 +92,7 @@ QJsonArray WheelLink::actions()
 QJsonArray WheelLink::menuItems()
 {
     return {QJsonObject{{QStringLiteral("id"), QStringLiteral("show-wheel")},
-                        {QStringLiteral("title"), QStringLiteral("Show Wheel")},
+                        {QStringLiteral("title"), QStringLiteral("Open wheel")},
                         {QStringLiteral("kind"), QStringLiteral("action")},
                         {QStringLiteral("enabled"), true},
                         {QStringLiteral("effects"), QJsonArray{QStringLiteral("opens-ui")}}}};

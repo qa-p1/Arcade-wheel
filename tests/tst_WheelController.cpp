@@ -325,6 +325,38 @@ private slots:
         QCOMPARE(controller.currentDeck().value("actions").toList().first().toMap().value("payload").toMap().value("command").toString(),
             QStringLiteral("/usr/bin/printf literal"));
     }
+    void pickerSavesTheChosenListAction_data() {
+        QTest::addColumn<QString>("type");
+        QTest::addColumn<QString>("combo");
+        QTest::addColumn<int>("index");
+        QTest::addColumn<QString>("id");
+        QTest::addColumn<QString>("name");
+        QTest::addRow("system") << "system" << "systemCombo" << 4 << "reboot" << "Restart";
+        QTest::addRow("media") << "media" << "mediaCombo" << 6 << "mute" << "Mute / unmute";
+        QTest::addRow("desktop") << "desktop" << "desktopCombo" << 4 << "killactive" << "Close window";
+    }
+    void pickerSavesTheChosenListAction() {
+        QFETCH(QString, type); QFETCH(QString, combo); QFETCH(int, index); QFETCH(QString, id); QFETCH(QString, name);
+        QTemporaryDir dir; ControllerBackend backend;
+        WheelController controller(&backend, nullptr, dir.filePath("config.json")); controller.initialize();
+        QQuickView settings; settings.setInitialProperties({{"controller", QVariant::fromValue(&controller)}});
+        settings.loadFromModule("ArcadeWheel", "SettingsWindow");
+        QCOMPARE(settings.status(), QQuickView::Ready); settings.show();
+        auto *picker = settings.rootObject()->findChild<QObject *>("actionPicker");
+        QVERIFY(picker);
+        const QVariantMap deck = controller.currentDeck();
+        const QVariant emptySlot = QVariantMap{{"type", "none"}};
+        QVERIFY(QMetaObject::invokeMethod(picker, "editAction", Q_ARG(QVariant, deck.value("id")), Q_ARG(QVariant, 0),
+                                          Q_ARG(QVariant, emptySlot)));
+        picker->setProperty("selectedType", type);
+        auto *box = picker->findChild<QObject *>(combo);
+        QVERIFY(box); QVERIFY(box->setProperty("currentIndex", index));
+        QVERIFY(QMetaObject::invokeMethod(picker, "saveAction"));
+        const auto saved = controller.currentDeck().value("actions").toList().first().toMap();
+        QCOMPARE(saved.value("type").toString(), type);
+        QCOMPARE(saved.value("payload").toMap().value("id").toString(), id);
+        QCOMPARE(saved.value("name").toString(), name);
+    }
     void shortcutAndOverrideSurviveRestart() {
         QTemporaryDir dir;
         const auto path=dir.filePath("config.json");

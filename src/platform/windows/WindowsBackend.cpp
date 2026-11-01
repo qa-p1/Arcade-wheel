@@ -888,6 +888,8 @@ bool WindowsBackend::performSystemAction(const QString &id, QString *error)
         succeeded = LockWorkStation();
     } else if (id == QLatin1String("suspend")) {
         succeeded = SetSuspendState(FALSE, FALSE, FALSE);
+    } else if (id == QLatin1String("hibernate")) {
+        succeeded = SetSuspendState(TRUE, FALSE, FALSE);
     } else if (id == QLatin1String("logout")) {
         succeeded = ExitWindowsEx(EWX_LOGOFF, SHTDN_REASON_MAJOR_APPLICATION |
                                                SHTDN_REASON_FLAG_USER_DEFINED);
@@ -900,6 +902,14 @@ bool WindowsBackend::performSystemAction(const QString &id, QString *error)
         succeeded = ExitWindowsEx(EWX_POWEROFF | EWX_SHUTDOWN,
                                   SHTDN_REASON_MAJOR_APPLICATION |
                                       SHTDN_REASON_FLAG_USER_DEFINED);
+    } else if (id == QLatin1String("reboot")) {
+        ShutdownPrivilege privilege;
+        if (!privilege.enabled()) {
+            assignError(error, QStringLiteral("Windows did not grant this process shutdown permission."));
+            return false;
+        }
+        succeeded = ExitWindowsEx(EWX_REBOOT, SHTDN_REASON_MAJOR_APPLICATION |
+                                                  SHTDN_REASON_FLAG_USER_DEFINED);
     } else if (id == QLatin1String("screenshot")) {
         succeeded = sendKeyboardChord({VK_LWIN, VK_SHIFT, 'S'});
     } else if (id == QLatin1String("media:play-pause")) {
@@ -908,6 +918,14 @@ bool WindowsBackend::performSystemAction(const QString &id, QString *error)
         succeeded = sendKeyboardChord({VK_MEDIA_NEXT_TRACK});
     } else if (id == QLatin1String("media:previous")) {
         succeeded = sendKeyboardChord({VK_MEDIA_PREV_TRACK});
+    } else if (id == QLatin1String("media:stop")) {
+        succeeded = sendKeyboardChord({VK_MEDIA_STOP});
+    } else if (id == QLatin1String("media:volume-up")) {
+        succeeded = sendKeyboardChord({VK_VOLUME_UP});
+    } else if (id == QLatin1String("media:volume-down")) {
+        succeeded = sendKeyboardChord({VK_VOLUME_DOWN});
+    } else if (id == QLatin1String("media:mute")) {
+        succeeded = sendKeyboardChord({VK_VOLUME_MUTE});
     } else if (id.startsWith(QLatin1String("desktop:"))) {
         assignError(error, QStringLiteral("Windows does not provide a stable public API for this desktop action."));
         return false;

@@ -124,6 +124,37 @@ private slots:
         QCOMPARE(backend.launchCalls, 1);
         QCOMPARE(error, QStringLiteral("Platform rejected launch"));
     }
+
+    // Media and desktop actions reach the backend under their prefixed ids,
+    // system actions under their own.
+    void systemMediaAndDesktopIdsReachTheBackend_data()
+    {
+        QTest::addColumn<QString>("type");
+        QTest::addColumn<QString>("id");
+        QTest::addColumn<QString>("backendId");
+        for (const char *id : {"lock", "suspend", "hibernate", "logout", "reboot", "poweroff", "screenshot"})
+            QTest::addRow("system-%s", id) << QStringLiteral("system") << QString::fromLatin1(id) << QString::fromLatin1(id);
+        for (const char *id : {"play-pause", "next", "previous", "stop", "volume-up", "volume-down", "mute"})
+            QTest::addRow("media-%s", id) << QStringLiteral("media") << QString::fromLatin1(id)
+                                          << QStringLiteral("media:") + QString::fromLatin1(id);
+        for (const char *id : {"killactive", "centerwindow", "workspace-last", "movetoworkspace-next"})
+            QTest::addRow("desktop-%s", id) << QStringLiteral("desktop") << QString::fromLatin1(id)
+                                            << QStringLiteral("desktop:") + QString::fromLatin1(id);
+    }
+    void systemMediaAndDesktopIdsReachTheBackend()
+    {
+        QFETCH(QString, type);
+        QFETCH(QString, id);
+        QFETCH(QString, backendId);
+        FakePlatformBackend backend;
+        ActionDispatcher dispatcher(&backend);
+        const QJsonObject action{{QStringLiteral("type"), type},
+                                 {QStringLiteral("payload"), QJsonObject{{QStringLiteral("id"), id}}}};
+        QString error;
+        QVERIFY2(dispatcher.execute(action, true, &error), qPrintable(error));
+        QCOMPARE(backend.systemActionCalls, 1);
+        QCOMPARE(backend.lastSystemAction, backendId);
+    }
 };
 
 QTEST_APPLESS_MAIN(ActionDispatcherTest)

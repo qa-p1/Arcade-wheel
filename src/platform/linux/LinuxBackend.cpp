@@ -1199,8 +1199,35 @@ bool LinuxBackend::movePointer(const QPointF &position)
 
 bool LinuxBackend::performSystemAction(const QString &id, QString *error)
 {
+    // Output volume: PipeWire's wpctl, else PulseAudio's pactl (also served
+    // by pipewire-pulse).
+    if (id == QStringLiteral("media:volume-up") || id == QStringLiteral("media:volume-down")
+        || id == QStringLiteral("media:mute")) {
+        const QString action = id.mid(QStringLiteral("media:").size());
+        const QString wpctl = QStandardPaths::findExecutable(QStringLiteral("wpctl"));
+        if (!wpctl.isEmpty()) {
+            const QString sink = QStringLiteral("@DEFAULT_AUDIO_SINK@");
+            if (action == QStringLiteral("mute"))
+                return launchDetached(wpctl, {QStringLiteral("set-mute"), sink, QStringLiteral("toggle")}, {}, error);
+            return launchDetached(wpctl, {QStringLiteral("set-volume"), QStringLiteral("-l"), QStringLiteral("1.0"), sink,
+                                          action == QStringLiteral("volume-up") ? QStringLiteral("5%+") : QStringLiteral("5%-")},
+                                  {}, error);
+        }
+        const QString pactl = QStandardPaths::findExecutable(QStringLiteral("pactl"));
+        if (!pactl.isEmpty()) {
+            const QString sink = QStringLiteral("@DEFAULT_SINK@");
+            if (action == QStringLiteral("mute"))
+                return launchDetached(pactl, {QStringLiteral("set-sink-mute"), sink, QStringLiteral("toggle")}, {}, error);
+            return launchDetached(pactl, {QStringLiteral("set-sink-volume"), sink,
+                                          action == QStringLiteral("volume-up") ? QStringLiteral("+5%") : QStringLiteral("-5%")},
+                                  {}, error);
+        }
+        if (error) *error = QStringLiteral("No volume control is available. Install wpctl (PipeWire) or pactl (PulseAudio).");
+        return false;
+    }
+
     if (id == QStringLiteral("media:play-pause") || id == QStringLiteral("media:next")
-        || id == QStringLiteral("media:previous")) {
+        || id == QStringLiteral("media:previous") || id == QStringLiteral("media:stop")) {
         const QString action = id.mid(QStringLiteral("media:").size());
         const QString playerctl = QStandardPaths::findExecutable(QStringLiteral("playerctl"));
         if (!playerctl.isEmpty()) return launchDetached(playerctl, {action}, {}, error);
@@ -1208,6 +1235,7 @@ bool LinuxBackend::performSystemAction(const QString &id, QString *error)
         QString method;
         if (action == QStringLiteral("play-pause")) method = QStringLiteral("PlayPause");
         else if (action == QStringLiteral("next")) method = QStringLiteral("Next");
+        else if (action == QStringLiteral("stop")) method = QStringLiteral("Stop");
         else method = QStringLiteral("Previous");
         const QDBusReply<QStringList> names = m_bus.interface()->registeredServiceNames();
         if (names.isValid()) {
@@ -1267,10 +1295,15 @@ bool LinuxBackend::performSystemAction(const QString &id, QString *error)
             {QStringLiteral("movefocus-up"), QStringLiteral("dispatch movefocus u")},
             {QStringLiteral("movefocus-down"), QStringLiteral("dispatch movefocus d")},
             {QStringLiteral("workspace-next"), QStringLiteral("dispatch workspace e+1")},
-            {QStringLiteral("workspace-previous"), QStringLiteral("dispatch workspace e-1")}
+            {QStringLiteral("workspace-previous"), QStringLiteral("dispatch workspace e-1")},
+            {QStringLiteral("workspace-last"), QStringLiteral("dispatch workspace previous")},
+            {QStringLiteral("movetoworkspace-next"), QStringLiteral("dispatch movetoworkspace e+1")},
+            {QStringLiteral("movetoworkspace-previous"), QStringLiteral("dispatch movetoworkspace e-1")},
+            {QStringLiteral("centerwindow"), QStringLiteral("dispatch centerwindow")},
+            {QStringLiteral("killactive"), QStringLiteral("dispatch killactive")}
         };
         if (!allowed.contains(action)) {
-            if (error) *error = QStringLiteral("Unsupported Hyprland action. Allowed actions: togglefloating, fullscreen, pin, movefocus-left/right/up/down, workspace-next, workspace-previous.");
+            if (error) *error = QStringLiteral("Unsupported Hyprland action. Allowed actions: togglefloating, fullscreen, pin, movefocus-left/right/up/down, workspace-next, workspace-previous, workspace-last, movetoworkspace-next, movetoworkspace-previous, centerwindow, killactive.");
             return false;
         }
         QString response;
@@ -1302,6 +1335,15 @@ bool LinuxBackend::performSystemAction(const QString &id, QString *error)
             return false;
         }
         return launchDetached(systemctl, {QStringLiteral("suspend")}, {}, error);
+    }
+
+    if (id == QStringLiteral("hibernate") || id == QStringLiteral("reboot")) {
+        const QString systemctl = QStandardPaths::findExecutable(QStringLiteral("systemctl"));
+        if (systemctl.isEmpty()) {
+            if (error) *error = QStringLiteral("systemctl is unavailable; this desktop does not expose a supported %1 command.").arg(id);
+            return false;
+        }
+        return launchDetached(systemctl, {id}, {}, error);
     }
 
     if (id == QStringLiteral("poweroff")) {

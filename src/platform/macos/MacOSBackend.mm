@@ -232,6 +232,23 @@ bool MacOSBackend::launchApplication(const QString &id, bool focusExisting, QStr
     return false;
 }
 
+namespace {
+// AppleScript for the actions macOS exposes to scripts; empty when it has none.
+QString macScript(const QString &id)
+{
+    if (id == QStringLiteral("logout")) return QStringLiteral("tell application \"System Events\" to log out");
+    if (id == QStringLiteral("reboot")) return QStringLiteral("tell application \"System Events\" to restart");
+    if (id == QStringLiteral("poweroff")) return QStringLiteral("tell application \"System Events\" to shut down");
+    if (id == QStringLiteral("media:volume-up"))
+        return QStringLiteral("set volume output volume ((output volume of (get volume settings)) + 6)");
+    if (id == QStringLiteral("media:volume-down"))
+        return QStringLiteral("set volume output volume ((output volume of (get volume settings)) - 6)");
+    if (id == QStringLiteral("media:mute"))
+        return QStringLiteral("set volume output muted (not (output muted of (get volume settings)))");
+    return {};
+}
+} // namespace
+
 bool MacOSBackend::performSystemAction(const QString &id, QString *error)
 {
     bool started = false;
@@ -239,6 +256,9 @@ bool MacOSBackend::performSystemAction(const QString &id, QString *error)
         started = QProcess::startDetached(QStringLiteral("/usr/sbin/screencapture"), {QStringLiteral("-i"), QStringLiteral("-c")});
     else if (id == QStringLiteral("suspend"))
         started = QProcess::startDetached(QStringLiteral("/usr/bin/pmset"), {QStringLiteral("sleepnow")});
+    else if (const QString script = macScript(id); !script.isEmpty())
+        // System Events asks once for permission to control it (Automation).
+        started = QProcess::startDetached(QStringLiteral("/usr/bin/osascript"), {QStringLiteral("-e"), script});
     else {
         assignError(error, QStringLiteral("This system or media action is not available on macOS: %1").arg(id));
         return false;

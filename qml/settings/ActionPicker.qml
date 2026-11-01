@@ -81,14 +81,37 @@ T.Popup {
     readonly property var systemActions: [
         { id: "lock", name: "Lock screen", icon: "system-lock-screen" },
         { id: "suspend", name: "Suspend", icon: "system-suspend" },
+        { id: "hibernate", name: "Hibernate", icon: "system-suspend-hibernate" },
         { id: "logout", name: "Log out", icon: "system-log-out" },
+        { id: "reboot", name: "Restart", icon: "system-reboot" },
         { id: "poweroff", name: "Power off", icon: "system-shutdown" },
         { id: "screenshot", name: "Screenshot", icon: "camera-photo" }
     ]
     readonly property var mediaActions: [
         { id: "play-pause", name: "Play / pause", icon: "media-playback-start" },
         { id: "next", name: "Next track", icon: "media-skip-forward" },
-        { id: "previous", name: "Previous track", icon: "media-skip-backward" }
+        { id: "previous", name: "Previous track", icon: "media-skip-backward" },
+        { id: "stop", name: "Stop", icon: "media-playback-stop" },
+        { id: "volume-up", name: "Volume up", icon: "audio-volume-high" },
+        { id: "volume-down", name: "Volume down", icon: "audio-volume-low" },
+        { id: "mute", name: "Mute / unmute", icon: "audio-volume-muted" }
+    ]
+    // The window and workspace actions the Linux backend runs in a Hyprland session.
+    readonly property var desktopActions: [
+        { id: "fullscreen", name: "Toggle fullscreen", icon: "view-fullscreen" },
+        { id: "togglefloating", name: "Toggle floating", icon: "window-restore" },
+        { id: "pin", name: "Pin window on all workspaces", icon: "window-pin" },
+        { id: "centerwindow", name: "Center window", icon: "zoom-fit-best" },
+        { id: "killactive", name: "Close window", icon: "window-close" },
+        { id: "movefocus-left", name: "Focus window on the left", icon: "go-previous" },
+        { id: "movefocus-right", name: "Focus window on the right", icon: "go-next" },
+        { id: "movefocus-up", name: "Focus window above", icon: "go-up" },
+        { id: "movefocus-down", name: "Focus window below", icon: "go-down" },
+        { id: "workspace-next", name: "Next workspace", icon: "go-next" },
+        { id: "workspace-previous", name: "Previous workspace", icon: "go-previous" },
+        { id: "workspace-last", name: "Last used workspace", icon: "view-refresh" },
+        { id: "movetoworkspace-next", name: "Move window to next workspace", icon: "go-last" },
+        { id: "movetoworkspace-previous", name: "Move window to previous workspace", icon: "go-first" }
     ]
     readonly property bool canSave: (!linkMode || slotIndex >= 0)
         && (selectedType === "arcade" ? !!arcadePayload.app && !!arcadePayload.action
@@ -116,7 +139,6 @@ T.Popup {
         commandField.text = action && action.payload ? (action.payload.command || "") : ""
         urlField.text = action && action.payload ? (action.payload.url || "") : ""
         fileField.text = action && action.payload ? (action.payload.path || "") : ""
-        desktopField.text = action && action.payload ? (action.payload.id || "") : ""
         providerField.text = action && action.payload ? (action.payload.providerId || "") : ""
         toolField.text = action && action.payload ? (action.payload.toolId || "") : ""
         arcadePayload = action && action.type === "arcade" && action.payload ? JSON.parse(JSON.stringify(action.payload)) : ({})
@@ -124,10 +146,13 @@ T.Popup {
         appSearch.text = ""
         systemCombo.currentIndex = 0
         mediaCombo.currentIndex = 0
+        desktopCombo.currentIndex = 0
         for (let i = 0; i < systemActions.length; i++)
             if (action && action.payload && systemActions[i].id === action.payload.id) systemCombo.currentIndex = i
         for (let i = 0; i < mediaActions.length; i++)
             if (action && action.payload && mediaActions[i].id === action.payload.id) mediaCombo.currentIndex = i
+        for (let i = 0; i < desktopActions.length; i++)
+            if (action && action.payload && desktopActions[i].id === action.payload.id) desktopCombo.currentIndex = i
         open()
     }
 
@@ -172,9 +197,10 @@ T.Popup {
             icon = item.icon
             if (!title) title = item.name
         } else if (selectedType === "desktop") {
-            payload.id = desktopField.text.trim()
-            icon = "preferences-desktop"
-            if (!title) title = "Desktop action"
+            let item = desktopActions[desktopCombo.currentIndex]
+            payload.id = item.id
+            icon = item.icon
+            if (!title) title = item.name
         } else if (selectedType === "arcade") {
             payload = JSON.parse(JSON.stringify(arcadePayload))
             if (!payload.app || !payload.action) return
@@ -349,7 +375,7 @@ T.Popup {
                         Layout.fillWidth: true
                         spacing: Theme.space4
                         FieldLabel { text: "Action name" }
-                        TextField { id: nameField; Layout.fillWidth: true; placeholderText: "Name shown in the wheel center" }
+                        TextField { id: nameField; objectName: "nameField"; Layout.fillWidth: true; placeholderText: "Name shown in the wheel center" }
                     }
 
                     ColumnLayout {
@@ -449,22 +475,22 @@ T.Popup {
                         Layout.fillWidth: true
                         spacing: Theme.space4
                         FieldLabel { text: "System action" }
-                        ComboBox { id: systemCombo; Layout.fillWidth: true; model: picker.systemActions.map(function(x) { return x.name }) }
+                        ComboBox { id: systemCombo; objectName: "systemCombo"; Layout.fillWidth: true; model: picker.systemActions.map(function(x) { return x.name }) }
                     }
                     ColumnLayout {
                         visible: picker.selectedType === "media"
                         Layout.fillWidth: true
                         spacing: Theme.space4
                         FieldLabel { text: "Media action" }
-                        ComboBox { id: mediaCombo; Layout.fillWidth: true; model: picker.mediaActions.map(function(x) { return x.name }) }
+                        ComboBox { id: mediaCombo; objectName: "mediaCombo"; Layout.fillWidth: true; model: picker.mediaActions.map(function(x) { return x.name }) }
                     }
                     ColumnLayout {
                         visible: picker.selectedType === "desktop"
                         Layout.fillWidth: true
                         spacing: Theme.space4
-                        FieldLabel { text: "Desktop action ID" }
-                        TextField { id: desktopField; Layout.fillWidth: true; placeholderText: "example: fullscreen" }
-                        FieldNote { text: "Supported desktop actions depend on the platform backend." }
+                        FieldLabel { text: "Window or workspace action" }
+                        ComboBox { id: desktopCombo; objectName: "desktopCombo"; Layout.fillWidth: true; model: picker.desktopActions.map(function(x) { return x.name }) }
+                        FieldNote { text: "Desktop actions run in a Hyprland session on Linux." }
                     }
                     ColumnLayout {
                         visible: picker.selectedType === "arcade"

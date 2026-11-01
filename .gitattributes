@@ -4,6 +4,7 @@ src/link/spec/** -text
 src/link/fixtures/** -text
 src/link/assets/strings/** -text
 src/link/tools/** -text
+src/link/design/** -text
 src/link/Cargo.toml -text
 src/link/SPEC.md -text
 scripts/arcade-release.py -text

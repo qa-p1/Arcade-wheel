@@ -14,8 +14,7 @@ private slots:
 
         for (const int count : {4, 6, 8}) {
             for (int slot = 0; slot < count; ++slot) {
-                const QByteArray label = QByteArray("count_") + QByteArray::number(count)
-                                         + "_slot_" + QByteArray::number(slot);
+                const QByteArray label = QByteArray("count_") + QByteArray::number(count) + "_slot_" + QByteArray::number(slot);
                 QTest::newRow(label.constData()) << count << slot;
             }
         }
@@ -49,7 +48,7 @@ private slots:
         QCOMPARE(WheelLogic::selectedSlot(origin + QPointF(32.0, 0.0), origin, 6, 32.0), -1);
         const qreal slotOneAngle = -M_PI_2 + 2.0 * M_PI / 6.0;
         const QPointF justOutside = origin + QPointF(32.01 * std::cos(slotOneAngle),
-                                                    32.01 * std::sin(slotOneAngle));
+                                                     32.01 * std::sin(slotOneAngle));
         QCOMPARE(WheelLogic::selectedSlot(justOutside, origin, 6, 32.0), 1);
         // Negative dead-zone input is clamped to zero.
         QCOMPARE(WheelLogic::selectedSlot(origin + QPointF(0.0, -1.0), origin, 6, -5.0), 0);

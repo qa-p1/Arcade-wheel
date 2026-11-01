@@ -2,6 +2,20 @@
 
 All notable changes to Arcade Wheel are documented here.
 
+## 0.5.0 — 2026-11-01
+
+### Changes
+
+- **A new Settings window** on the shared Arcade kit, with Inter, Wheel's amber accent and light, dark or system themes that switch live. Ten pages in the standard order: General, Shortcuts, Your wheel, Actions, Center gestures, Appearance, Behaviour, Installed applications, Connected apps and About. Your wheel has a live preview next to the list of actions.
+- **More actions in the same categories.** System adds hibernate and restart; Media adds stop, volume up, volume down and mute; Desktop (Hyprland) adds float, pin, center and close the window, focus in each direction, the next, previous and last workspace, and moving the window to the next or previous workspace.
+- **The wheel looks as before**, with the kit's colours and type: amber for the selected slot, slot names on a small pill, and the hub and slots readable in light and dark.
+- **Action icons on current GNOME.** Adwaita now has only symbolic versions of many action icons, so play, lock, screenshot and website slots showed a generic program icon. Wheel uses the symbolic icon instead.
+- **The install prompt** uses the kit too, with the same choices as before.
+- **New folders and names.** Settings move to `~/.config/arcade/wheel/settings.json` (Windows `%APPDATA%\Arcade\Wheel`, macOS `~/Library/Application Support/Arcade/Wheel`) and logs to `~/.cache/arcade/wheel/logs` on the first start. Anything that can't be moved stays where it is and is noted in the log; settings then start from a copy. The launcher, login entry and window class are now `dev.arcade.Wheel`; installed launchers and login entries are moved and keep their on or off state. New app icons from the kit and a monochrome tray icon. The tray menu reads **Open wheel**, **Settings**, **Restart Arcade Wheel**, **Quit Arcade Wheel**.
+- **Command line:** `--hide` closes the wheel, `--toggle` opens or closes it, `--status` prints one line of JSON with the version and Link state and exits 1 when Wheel isn't running, and `--help` lists the commands.
+- **Releases** are tagged `v0.5.0` instead of `v0.5.0+build.N`; the build number is in the release notes. See [Packaging and releases](docs/dev/packaging.md).
+- Development: `scripts/check`, `dev`, `package` and `sync-design`; clang-format; qmllint at zero warnings; compiler warnings as errors in CI; developer docs in `docs/dev/`; Arcade Link v0.4.15.
+
 ## 0.4.5 — 2026-10-25
 
 ### Fixes
@@ -86,7 +100,7 @@ All notable changes to Arcade Wheel are documented here.
 
 ## 0.2.0 — 2026-10-04
 
-Builds of this version are published automatically from `main` as `v0.2.0+build.N`. See [Packaging and releases](docs/PACKAGING.md).
+Builds of this version are published automatically from `main` as `v0.2.0+build.N`. See [Packaging and releases](docs/dev/packaging.md).
 
 ### Added
 
@@ -133,5 +147,5 @@ Builds of this version are published automatically from `main` as `v0.2.0+build.
 - Rewrote the README for the open-source release: features, requirements (Qt 6.8+), build, usage, CLI reference, configuration, platform notes, layout, and contributing.
 - Updated the architecture notes for schema version 3, center gesture recognition, and how the wheel is positioned.
 - Added single-click checks to the manual release checklist.
-- Added [packaging and release documentation](docs/PACKAGING.md) and download instructions to the README.
+- Added [packaging and release documentation](docs/dev/packaging.md) and download instructions to the README.
 - Added macOS to the architecture notes and the manual release checklist.

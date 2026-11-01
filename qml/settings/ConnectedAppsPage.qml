@@ -1,86 +1,80 @@
+pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
-import "../components"
+import Arcade
 
-ScrollView {
+// Connected apps on the shared Link page layout: the master switch, one row
+// per Arcade app (use it, or get it) and the Link diagnostics.
+Column {
     id: page
-    clip: true
-    contentWidth: availableWidth
-    ColumnLayout {
-        width: Math.max(0, Math.min(760, page.availableWidth - 60))
-        x: 30; y: 18; spacing: 14
-        SettingToggle {
+    required property WheelController controller
+    spacing: Theme.space32
+
+    ListSection {
+        width: parent.width
+        title: "Arcade Link"
+        SwitchRow {
             objectName: "linkMaster"
-            Layout.fillWidth: true
-            title: "Connect with other Arcade apps"
-            detail: "Discover actions and let other apps offer actions to your Wheel."
-            section: "link"; settingKey: "enabled"
+            title: "Work with other Arcade apps"
+            subtitle: "Find their actions, and let them add actions to your wheel."
+            checked: !!page.controller.config.link.enabled
+            onToggled: on => page.controller.updateSetting("link", "enabled", on)
         }
+    }
+    ListSection {
+        width: parent.width
+        title: "Apps"
+        note: page.controller.connectedApps.length ? "" : "Installed Arcade apps appear here."
         Repeater {
-            model: controller.connectedApps
-            delegate: Rectangle {
+            model: page.controller.connectedApps
+            delegate: ListRow {
+                id: peerRow
                 required property var modelData
                 objectName: "peer-" + modelData.id
-                Layout.fillWidth: true
-                implicitHeight: row.implicitHeight + 28
-                radius: 12; color: "#1C2027"; border.color: "#2A2F38"
-                ColumnLayout {
-                    id: row
-                    anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 14
-                    spacing: 8
-                    RowLayout {
-                        Layout.fillWidth: true; spacing: 10
-                        Image {
-                            source: "image://icons/" + encodeURIComponent(modelData.glyph)
-                            Layout.preferredWidth: 20; Layout.preferredHeight: 20
-                            sourceSize: Qt.size(40, 40)
-                        }
-                        ColumnLayout {
-                            Layout.fillWidth: true; spacing: 3
-                            Text { text: modelData.name; color: "#E7EAF0"; font.pixelSize: 14 }
-                            Text { text: modelData.state; color: "#9AA3B2"; font.pixelSize: 11 }
-                        }
-                        Switch {
-                            objectName: "peerToggle-" + modelData.id
-                            visible: modelData.installed && modelData.id !== "arcade.tools"
-                            text: "Use with Arcade Wheel"
-                            checked: modelData.enabled
-                            enabled: controller.config.link.enabled
-                            onToggled: controller.setPeerEnabled(modelData.id, checked)
-                        }
-                    }
-                    RowLayout {
-                        visible: !modelData.installed
-                        Layout.fillWidth: true
-                        Text { text: modelData.pitch; color: "#9AA3B2"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                        UiButton { text: "Get"; compact: true; onClicked: controller.getArcadeApp(modelData.id) }
-                    }
+                width: parent.width
+                title: modelData.name
+                subtitle: modelData.installed ? modelData.state : modelData.pitch
+                leading: Component { GlyphTile { appId: peerRow.modelData.id; size: Theme.tile } }
+                Switch {
+                    objectName: "peerToggle-" + peerRow.modelData.id
+                    visible: peerRow.modelData.installed && peerRow.modelData.id !== "arcade.tools"
+                    checked: peerRow.modelData.enabled
+                    enabled: !!page.controller.config.link.enabled
+                    onToggled: page.controller.setPeerEnabled(peerRow.modelData.id, checked)
+                }
+                LinkButton {
+                    visible: !peerRow.modelData.installed
+                    text: "Install"
+                    onClicked: page.controller.getArcadeApp(peerRow.modelData.id)
                 }
             }
         }
-        UiButton {
-            id: diagnostics
-            objectName: "linkDiagnosticsToggle"
-            property bool expanded: false
-            text: (expanded ? "▾ " : "▸ ") + "Diagnostics"
-            onClicked: expanded = !expanded
-        }
-        ColumnLayout {
-            visible: diagnostics.expanded
-            Layout.fillWidth: true; spacing: 8
-            Text { text: "Registry: " + controller.linkDiagnostics.registry; color: "#9AA3B2"; font.pixelSize: 11; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true }
-            Text { text: "Wheel endpoint: " + controller.linkDiagnostics.endpoint; color: "#9AA3B2"; font.pixelSize: 11; wrapMode: Text.WrapAnywhere; Layout.fillWidth: true }
-            Text { text: "Last error: " + (controller.linkDiagnostics.lastError || "None"); color: "#9AA3B2"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-            Repeater {
-                model: controller.connectedApps
-                Text {
-                    required property var modelData
-                    text: modelData.name + ": " + modelData.endpoint + " · Last error: " + (modelData.lastError || "None")
-                    color: "#9AA3B2"; font.pixelSize: 11; wrapMode: Text.WordWrap; Layout.fillWidth: true
-                }
+    }
+    ListSection {
+        id: diagnostics
+        objectName: "linkDiagnostics"
+        width: parent.width
+        title: "Diagnostics"
+        property bool expanded: false
+        ListRow {
+            title: diagnostics.expanded ? "Hide Link details" : "Show Link details"
+            subtitle: "Where Arcade Wheel listens, and the last error from each app."
+            Button {
+                objectName: "linkDiagnosticsToggle"
+                text: diagnostics.expanded ? "Hide" : "Show"
+                onClicked: diagnostics.expanded = !diagnostics.expanded
             }
         }
-        Item { Layout.preferredHeight: 24 }
+        ListRow { visible: diagnostics.expanded; title: "Registry"; subtitle: page.controller.linkDiagnostics.registry }
+        ListRow { visible: diagnostics.expanded; title: "Wheel endpoint"; subtitle: page.controller.linkDiagnostics.endpoint }
+        ListRow { visible: diagnostics.expanded; title: "Last error"; subtitle: page.controller.linkDiagnostics.lastError || "None" }
+        Repeater {
+            model: diagnostics.expanded ? page.controller.connectedApps : []
+            delegate: ListRow {
+                required property var modelData
+                width: parent.width
+                title: modelData.name
+                subtitle: modelData.endpoint + " · Last error: " + (modelData.lastError || "None")
+            }
+        }
     }
 }

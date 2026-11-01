@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Refreshes the vendored Link Qt module and design kit (src/link), Wheel's kit
+# icons and the Arcade glyphs from an Arcade Link tag (the first argument),
+# then checks them. Update ARCADE_LINK_REVISION in .github/workflows/ci.yml and
+# the Commit: lines in scripts/VENDORED and packaging/windows/VENDORED to the
+# same commit. Needs git and network access.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+tag="${1:?usage: scripts/sync-design vX.Y.Z}"
+work=$(mktemp -d)
+trap 'rm -rf -- "$work"' EXIT
+git clone -q --depth 1 --branch "$tag" https://github.com/qa-p1/Arcade-Link "$work/link"
+python3 "$work/link/tools/vendor_qt.py" --destination src/link --revision "$tag"
+icons="$work/link/design/app-icons/wheel"
+cp "$icons/icon.svg" assets/arcade-wheel.svg
+cp "$icons/png/512.png" assets/arcade-wheel.png
+cp "$icons/wheel.ico" packaging/icons/arcade-wheel.ico
+cp "$icons/macos/icon.icns" packaging/icons/arcade-wheel.icns
+cp "$work"/link/assets/glyphs/arcade.*.svg assets/arcade/
+python3 packaging/check-link-vendor.py --source "$work/link"
+python3 packaging/check-vendored-tools.py --source "$work/link"
+echo "Vendored Arcade Link $tag ($(git -C "$work/link" rev-parse HEAD))."

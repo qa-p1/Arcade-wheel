@@ -1,32 +1,40 @@
+pragma ComponentBehavior: Bound
 import QtQuick
+import Arcade
 
+// The full-screen overlay window's content: the dim and the ring at the
+// pointer. main.cpp sets `controller` before the view is shown.
 Item {
     id: root
-    property var controller
-    readonly property var appearance: controller ? controller.config.appearance : ({})
-    readonly property bool active: controller ? controller.overlayVisible : false
+    required property WheelController controller
+    readonly property var appearance: controller.config.appearance
+    readonly property bool active: controller.overlayVisible
     focus: true
-    Keys.onEscapePressed: if (controller) controller.cancelTrigger()
+    Keys.onEscapePressed: root.controller.cancelTrigger()
+    // This view has its own engine: it follows the app theme and Wheel's accent.
+    Binding { target: Theme; property: "appId"; value: "arcade.wheel" }
+    Binding { target: Theme; property: "mode"; value: root.controller.config.general.theme || "system" }
+    Binding { target: Theme; property: "reducedMotion"; value: !!root.appearance.reduceMotion }
     Rectangle {
         anchors.fill: parent
-        color: "#080810"
+        color: "black"
         opacity: root.active ? Math.max(0,Math.min(0.5,Number(root.appearance.dim || 0))) : 0
         Behavior on opacity { NumberAnimation { duration: root.appearance.reduceMotion ? 0 : 95 } }
     }
     WheelView {
         id: wheel
-        deck: root.controller ? root.controller.currentDeck : ({actions: []})
-        deckIndex: root.controller ? root.controller.currentDeckIndex : 0
-        deckCount: root.controller ? root.controller.deckCount : 1
-        iconGeneration: root.controller ? root.controller.iconGeneration : 0
-        selectedIndex: root.controller ? root.controller.selectedIndex : -1
+        deck: root.controller.currentDeck
+        deckIndex: root.controller.currentDeckIndex
+        deckCount: root.controller.deckCount
+        iconGeneration: root.controller.iconGeneration
+        selectedIndex: root.controller.selectedIndex
         appearance: root.appearance
         reduceMotion: !!root.appearance.reduceMotion
-        opened: root.controller ? root.controller.overlayRevealed : false
-        hubPressed: root.controller ? root.controller.centerGesturePressed : false
-        x: (root.controller ? root.controller.visualCenterX : root.width/2)-width/2
-        y: (root.controller ? root.controller.visualCenterY : root.height/2)-height/2
-        onCloseFinished: if(root.controller) root.controller.finishClose()
+        opened: root.controller.overlayRevealed
+        hubPressed: root.controller.centerGesturePressed
+        x: root.controller.visualCenterX-width/2
+        y: root.controller.visualCenterY-height/2
+        onCloseFinished: root.controller.finishClose()
     }
     MouseArea {
         property bool centerCapture: false
@@ -34,7 +42,7 @@ Item {
         enabled: root.active
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onEntered: if(root.controller) root.controller.pointerMoved(mouseX,mouseY)
+        onEntered: root.controller.pointerMoved(mouseX,mouseY)
         onPositionChanged: function(event) { root.controller.pointerMoved(event.x,event.y) }
         onPressed: function(event) {
             if (event.button === Qt.RightButton) { root.controller.cancelTrigger(); return }

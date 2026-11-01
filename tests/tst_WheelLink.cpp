@@ -63,8 +63,7 @@ private slots:
 #else
         const QString expected = QStringLiteral("Ctrl+Alt+Space");
 #endif
-        QCOMPARE(manifest.value(QStringLiteral("shortcuts")).toArray().first().toObject()
-                     .value(QStringLiteral("accelerator")).toString(), expected);
+        QCOMPARE(manifest.value(QStringLiteral("shortcuts")).toArray().first().toObject().value(QStringLiteral("accelerator")).toString(), expected);
     }
 
     void statusReportsTheOriginalLaunchMode_data()
@@ -76,13 +75,19 @@ private slots:
     void statusReportsTheOriginalLaunchMode()
     {
         QFETCH(bool, background);
-        QTemporaryDir dir; const auto previous = qgetenv("ARCADE_HOME");
+        QTemporaryDir dir;
+        const auto previous = qgetenv("ARCADE_HOME");
         qputenv("ARCADE_HOME", dir.filePath("arcade").toUtf8());
         {
-            LinkBackend backend; WheelController controller(&backend, nullptr, dir.filePath("config.json")); controller.initialize();
-            WheelLink link("1", nullptr, background); link.setController(&controller); link.apply(QJsonObject::fromVariantMap(controller.config()));
+            LinkBackend backend;
+            WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+            controller.initialize();
+            WheelLink link("1", nullptr, background);
+            link.setController(&controller);
+            link.apply(QJsonObject::fromVariantMap(controller.config()));
             QTRY_VERIFY(link.listening());
-            Error error; QJsonObject result;
+            Error error;
+            QJsonObject result;
             onWorker([&] {
                 auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
                 if (client) result = client->call("app.status", {}, &error).toObject();
@@ -94,18 +99,26 @@ private slots:
     }
     void hubMethodsRoundTripAndValidation()
     {
-        QTemporaryDir dir; QVERIFY(dir.isValid());
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
         const auto previous = qgetenv("ARCADE_HOME");
         qputenv("ARCADE_HOME", dir.filePath("arcade").toUtf8());
         {
-            LinkBackend backend; WheelController controller(&backend, nullptr, dir.filePath("config.json")); controller.initialize();
-            QQuickView overlay; controller.setOverlayView(&overlay);
-            WheelLink link("0.3.0"); link.setController(&controller);
+            LinkBackend backend;
+            WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+            controller.initialize();
+            QQuickView overlay;
+            controller.setOverlayView(&overlay);
+            WheelLink link("0.3.0");
+            link.setController(&controller);
             connect(&controller, &WheelController::configChanged, &link, [&] { link.apply(QJsonObject::fromVariantMap(controller.config())); });
-            link.apply(QJsonObject::fromVariantMap(controller.config())); link.setTrayState("hosted");
+            link.apply(QJsonObject::fromVariantMap(controller.config()));
+            link.setTrayState("hosted");
             QTRY_VERIFY(link.listening());
             QSignalSpy settings(&controller, &WheelController::settingsRequested), restarted(&controller, &WheelController::restartRequested);
-            Error error; QJsonObject description, status, rebound, imported; QJsonArray menu, outputs;
+            Error error;
+            QJsonObject description, status, rebound, imported;
+            QJsonArray menu, outputs;
             onWorker([&] {
                 auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "0.3.0", 1000, &error);
                 if (!client) return;
@@ -121,15 +134,19 @@ private slots:
                 if (!error.isError()) client->restart({}, &error);
             });
             QVERIFY2(!error.isError(), qPrintable(error.message));
-            QCOMPARE(settings.count(), 1); QTRY_COMPARE(restarted.count(), 1);
+            QCOMPARE(settings.count(), 1);
+            QTRY_COMPARE(restarted.count(), 1);
             const auto methods = description.value("methods").toArray();
             for (const auto &method : {"app.settings", "app.restart", "app.menu", "app.menu.invoke", "app.shortcuts.set", "app.settings.export", "app.settings.import"})
                 QVERIFY2(methods.contains(QString::fromLatin1(method)), method);
             QCOMPARE(menu, WheelLink::menuItems());
             QCOMPARE(status.value("status").toObject().value("tray").toString(), QStringLiteral("hosted"));
-            QVERIFY(rebound.value("applied").toBool()); QCOMPARE(rebound.value("via").toString(), QStringLiteral("native"));
-            QVERIFY(imported.value("imported").toBool()); QVERIFY(!imported.value("restartRequired").toBool());
-            QCOMPARE(outputs.size(), 1); QVERIFY(QFileInfo::exists(outputs.first().toObject().value("path").toString()));
+            QVERIFY(rebound.value("applied").toBool());
+            QCOMPARE(rebound.value("via").toString(), QStringLiteral("native"));
+            QVERIFY(imported.value("imported").toBool());
+            QVERIFY(!imported.value("restartRequired").toBool());
+            QCOMPARE(outputs.size(), 1);
+            QVERIFY(QFileInfo::exists(outputs.first().toObject().value("path").toString()));
             QVERIFY(!QDir(dir.path()).entryList({"config.json.backup-*.json"}, QDir::Files).isEmpty());
             QTRY_VERIFY([&] {
                 QFile file(link.locations().manifestPath(Ids::Wheel));
@@ -141,7 +158,8 @@ private slots:
                 auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
                 if (client) client->shortcutsSet("trigger", "Ctrl+DefinitelyNotAKey", &error);
             });
-            QCOMPARE(error.code, QStringLiteral("denied")); QCOMPARE(controller.config(), saved);
+            QCOMPARE(error.code, QStringLiteral("denied"));
+            QCOMPARE(controller.config(), saved);
             onWorker([&] {
                 auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
                 if (client) client->menuInvoke("missing", &error);
@@ -152,18 +170,23 @@ private slots:
                 if (client) client->menuInvoke("show-wheel", &error);
             });
             QVERIFY2(!error.isError(), qPrintable(error.message));
-            QVERIFY(controller.overlayVisible()); controller.cancelTrigger();
+            QVERIFY(controller.overlayVisible());
+            controller.cancelTrigger();
             onWorker([&] {
                 auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
                 if (client) client->settingsImport({QJsonObject{{"type", "file/any"}, {"path", "relative.json"}}}, &error);
             });
             QCOMPARE(error.code, QStringLiteral("unsupported_input"));
-            QFile bad(dir.filePath("bad.json")); QVERIFY(bad.open(QIODevice::WriteOnly)); bad.write("{}"); bad.close();
+            QFile bad(dir.filePath("bad.json"));
+            QVERIFY(bad.open(QIODevice::WriteOnly));
+            bad.write("{}");
+            bad.close();
             onWorker([&] {
                 auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
                 if (client) client->settingsImport({QJsonObject{{"type", "file/any"}, {"path", bad.fileName()}}}, &error);
             });
-            QCOMPARE(error.code, QStringLiteral("denied")); QCOMPARE(controller.config(), saved);
+            QCOMPARE(error.code, QStringLiteral("denied"));
+            QCOMPARE(controller.config(), saved);
             QString draftError;
             QVERIFY(controller.beginLinkAction(WheelLink::draftFor(textContent("text/url", "https://example.com"), &draftError), "Test"));
             onWorker([&] {
@@ -175,10 +198,12 @@ private slots:
                 auto client = Client::connect(link.locations(), Ids::Wheel, Ids::Tools, "1", 1000, &error);
                 if (client) client->restart("force", &error);
             });
-            QVERIFY2(!error.isError(), qPrintable(error.message)); QTRY_COMPARE(restarted.count(), 2);
+            QVERIFY2(!error.isError(), qPrintable(error.message));
+            QTRY_COMPARE(restarted.count(), 2);
             controller.finishLinkAction(false);
         }
-        if (previous.isNull()) qunsetenv("ARCADE_HOME"); else qputenv("ARCADE_HOME", previous);
+        if (previous.isNull()) qunsetenv("ARCADE_HOME");
+        else qputenv("ARCADE_HOME", previous);
     }
 
     void drafts()
@@ -200,18 +225,18 @@ private slots:
     void structuredActionPreservesOptions()
     {
         QString error;
-        const QJsonObject data{{"app", Ids::Box}, {"action", "box.pipeline.run"}, {"version", 1},
-            {"title", "Send optimized screenshot"}, {"input", "clipboard"},
-            {"preset", "share"}, {"options", QJsonObject{{"pipeline", "p-optimized-screenshot"}}}};
+        const QJsonObject data{{"app", Ids::Box}, {"action", "box.pipeline.run"}, {"version", 1}, {"title", "Send optimized screenshot"}, {"input", "clipboard"}, {"preset", "share"}, {"options", QJsonObject{{"pipeline", "p-optimized-screenshot"}}}};
         auto draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error);
         QCOMPARE(draft.value("type").toString(), QStringLiteral("arcade"));
         const auto payload = QJsonObject::fromVariantMap(draft.value("payload").toMap());
         QCOMPARE(payload.value("options"), data.value("options"));
         QCOMPARE(payload.value("input").toString(), QStringLiteral("clipboard"));
         QCOMPARE(payload.value("preset").toString(), QStringLiteral("share"));
-        auto invalid = data; invalid.insert("input", "shell");
+        auto invalid = data;
+        invalid.insert("input", "shell");
         QVERIFY(WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", invalid}}, &error).isEmpty());
-        invalid = data; invalid.insert("options", "shell command");
+        invalid = data;
+        invalid.insert("options", "shell command");
         QVERIFY(WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", invalid}}, &error).isEmpty());
         bool offered = false;
         for (const auto &value : WheelLink::actions())
@@ -223,14 +248,14 @@ private slots:
     void shelfActionPreservesNamedCollectionAndInputMode()
     {
         QString error;
-        QJsonObject data{{"app", "arcade.shelf"}, {"action", "shelf.show"}, {"version", 1},
-            {"title", "Open Research Shelf"}, {"input", "none"}, {"options", QJsonObject{{"shelf", "research"}}}};
+        QJsonObject data{{"app", "arcade.shelf"}, {"action", "shelf.show"}, {"version", 1}, {"title", "Open Research Shelf"}, {"input", "none"}, {"options", QJsonObject{{"shelf", "research"}}}};
         auto draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error);
         QVERIFY2(!draft.isEmpty(), qPrintable(error));
         auto payload = QJsonObject::fromVariantMap(draft.value("payload").toMap());
         QCOMPARE(payload.value("app").toString(), QStringLiteral("arcade.shelf"));
         QCOMPARE(payload.value("options").toObject().value("shelf").toString(), QStringLiteral("research"));
-        data.insert("action", "shelf.add"); data.insert("input", "file-selection");
+        data.insert("action", "shelf.add");
+        data.insert("input", "file-selection");
         draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error);
         QVERIFY(!draft.isEmpty());
         payload = QJsonObject::fromVariantMap(draft.value("payload").toMap());
@@ -242,8 +267,7 @@ private slots:
     void findShowAcceptsClipboardAndFileSelection()
     {
         QString error;
-        QJsonObject data{{"app", "arcade.find"}, {"action", "find.show"}, {"version", 1},
-            {"title", "Search in Find"}, {"input", "clipboard"}};
+        QJsonObject data{{"app", "arcade.find"}, {"action", "find.show"}, {"version", 1}, {"title", "Search in Find"}, {"input", "clipboard"}};
         auto draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error);
         QVERIFY2(!draft.isEmpty(), qPrintable(error));
         auto payload = QJsonObject::fromVariantMap(draft.value("payload").toMap());
@@ -263,7 +287,8 @@ private slots:
             LinkBackend backend;
             WheelController controller(&backend, nullptr, dir.filePath("config.json"));
             controller.initialize();
-            WheelLink link("9.9"); link.setController(&controller);
+            WheelLink link("9.9");
+            link.setController(&controller);
             connect(&controller, &WheelController::configChanged, &link, [&] { link.apply(QJsonObject::fromVariantMap(controller.config())); });
             link.apply(QJsonObject::fromVariantMap(controller.config()));
             QTRY_VERIFY(link.listening());
@@ -308,8 +333,7 @@ private slots:
         bool ok = false;
         QThread *t = QThread::create([&] {
             auto c = Client::connect(loc, Ids::Wheel, "arcade.lens", "1", 1000, &error);
-            if (c) ok = c->invoke({{"action", "wheel.add_action"}, {"inputs", QJsonArray{textContent("text/url", "https://example.com")}},
-                                   {"context", QJsonObject{{"source", "arcade.lens"}}}}, &result, &error);
+            if (c) ok = c->invoke({{"action", "wheel.add_action"}, {"inputs", QJsonArray{textContent("text/url", "https://example.com")}}, {"context", QJsonObject{{"source", "arcade.lens"}}}}, &result, &error);
         });
         t->start();
         QTRY_VERIFY(controller.linkPending());

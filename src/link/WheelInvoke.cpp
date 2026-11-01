@@ -70,8 +70,7 @@ Error WheelInvoke::validate(const QJsonObject &manifest, const QJsonObject &requ
                 size += info.size();
             }
         } else {
-            size += content.value("size").toInteger(content.value("text").toString().toUtf8().size()
-                        + content.value("html").toString().toUtf8().size());
+            size += content.value("size").toInteger(content.value("text").toString().toUtf8().size() + content.value("html").toString().toUtf8().size());
         }
     }
     const auto limit = action.value("maxBytes").toInteger(-1);
@@ -121,8 +120,7 @@ bool connectPeer(QLocalSocket &socket, const Locations &locations, const QString
     if (!Endpoint::read(locations, app, &endpoint)) return false;
     socket.connectToServer(endpoint.address);
     if (!socket.waitForConnected(HelloTimeoutMs)) return false;
-    socket.write(requestLine(1, "hello", {{"token", endpoint.token}, {"protocol", QJsonArray{1}},
-                                         {"client", QJsonObject{{"id", Ids::Wheel}, {"version", "1"}}}}));
+    socket.write(requestLine(1, "hello", {{"token", endpoint.token}, {"protocol", QJsonArray{1}}, {"client", QJsonObject{{"id", Ids::Wheel}, {"version", "1"}}}}));
     socket.waitForBytesWritten(HelloTimeoutMs);
     QByteArray buffer;
     QJsonObject response;
@@ -168,7 +166,10 @@ bool resident(QLocalSocket &socket, const QJsonObject &request, QJsonObject *res
             }
             const auto value = message.value("result").toObject();
             job = value.value("job").toString();
-            if (job.isEmpty()) { *result = value; return true; }
+            if (job.isEmpty()) {
+                *result = value;
+                return true;
+            }
         } else {
             const auto params = message.value("params").toObject();
             if (job.isEmpty() || params.value("job").toString() != job) continue;
@@ -176,9 +177,12 @@ bool resident(QLocalSocket &socket, const QJsonObject &request, QJsonObject *res
             if (method == "job.progress" && progress)
                 progress(params.value("fraction").toDouble(-1), params.value("message").toString());
             if (method == "job.done") {
-                if (params.value("status").toString() == "success") { *result = params; return true; }
+                if (params.value("status").toString() == "success") {
+                    *result = params;
+                    return true;
+                }
                 *error = params.contains("error") ? Error::fromJson(params.value("error").toObject())
-                    : Error::make(params.value("status").toString() == "cancelled" ? "cancelled" : "internal", {});
+                                                  : Error::make(params.value("status").toString() == "cancelled" ? "cancelled" : "internal", {});
                 return false;
             }
         }
@@ -193,7 +197,10 @@ bool oneShot(const QJsonObject &manifest, const QJsonObject &request, QJsonObjec
     QProcess process;
     process.setStandardErrorFile(QProcess::nullDevice());
     process.start(manifest.value("executable").toString(), args);
-    if (!process.waitForStarted(LaunchTimeoutMs)) { *error = Error::make("launch_failed", {}); return false; }
+    if (!process.waitForStarted(LaunchTimeoutMs)) {
+        *error = Error::make("launch_failed", {});
+        return false;
+    }
     process.write(requestLine(1, "invoke", request));
     process.closeWriteChannel();
     QElapsedTimer clock;
@@ -202,7 +209,8 @@ bool oneShot(const QJsonObject &manifest, const QJsonObject &request, QJsonObjec
     for (;;) {
         if ((cancel && cancel->load()) || clock.elapsed() >= timeoutMs) {
             *error = Error::make(cancel && cancel->load() ? "cancelled" : "timeout", {});
-            process.kill(); process.waitForFinished(1000);
+            process.kill();
+            process.waitForFinished(1000);
             return false;
         }
         process.waitForReadyRead(100);
@@ -213,9 +221,15 @@ bool oneShot(const QJsonObject &manifest, const QJsonObject &request, QJsonObjec
             buffer.remove(0, nl + 1);
             QJsonObject message;
             const auto kind = classify(line, &message);
-            if (kind == Kind::Invalid) { *error = Error::make("internal", {}, "invalid response"); return false; }
+            if (kind == Kind::Invalid) {
+                *error = Error::make("internal", {}, "invalid response");
+                return false;
+            }
             if (kind == Kind::Response && message.value("id").toInt() == 1) {
-                if (message.contains("error")) { *error = Error::fromJson(message.value("error").toObject()); return false; }
+                if (message.contains("error")) {
+                    *error = Error::fromJson(message.value("error").toObject());
+                    return false;
+                }
                 *result = message.value("result").toObject();
                 process.waitForFinished(1000);
                 return true;
@@ -225,11 +239,17 @@ bool oneShot(const QJsonObject &manifest, const QJsonObject &request, QJsonObjec
                 progress(params.value("fraction").toDouble(-1), params.value("message").toString());
             }
         }
-        if (buffer.size() > MaxLineBytes) { *error = Error::make("internal", {}, "response exceeds the protocol limit"); return false; }
-        if (process.state() == QProcess::NotRunning) { *error = Error::make("internal", {}, "one-shot process ended without a result"); return false; }
+        if (buffer.size() > MaxLineBytes) {
+            *error = Error::make("internal", {}, "response exceeds the protocol limit");
+            return false;
+        }
+        if (process.state() == QProcess::NotRunning) {
+            *error = Error::make("internal", {}, "one-shot process ended without a result");
+            return false;
+        }
     }
 }
-}
+} // namespace
 
 bool WheelInvoke::run(const Locations &locations, const QJsonObject &manifest, const QJsonObject &request,
                       QJsonObject *result, Error *error, const std::function<void(double, const QString &)> &progress,
@@ -237,9 +257,15 @@ bool WheelInvoke::run(const Locations &locations, const QJsonObject &manifest, c
 {
     *error = validate(manifest, request);
     if (error->isError()) return false;
-    if (cancel && cancel->load()) { *error = Error::make("cancelled", {}); return false; }
+    if (cancel && cancel->load()) {
+        *error = Error::make("cancelled", {});
+        return false;
+    }
     const auto line = requestLine(2, "invoke", request);
-    if (line.size() > MaxLineBytes) { *error = Error::make("too_large", {}, {}, MaxLineBytes); return false; }
+    if (line.size() > MaxLineBytes) {
+        *error = Error::make("too_large", {}, {}, MaxLineBytes);
+        return false;
+    }
     const auto app = manifest.value("id").toString();
     QLocalSocket socket;
     if (connectPeer(socket, locations, app, error))
@@ -253,12 +279,16 @@ bool WheelInvoke::run(const Locations &locations, const QJsonObject &manifest, c
     for (const auto &arg : launch.value("background").toArray()) args << arg.toString();
     if (progress) progress(-1, QStringLiteral("Starting %1…").arg(AppMetadata::appName(app)));
     if (!QProcess::startDetached(manifest.value("executable").toString(), args)) {
-        *error = Error::make("launch_failed", {}); return false;
+        *error = Error::make("launch_failed", {});
+        return false;
     }
     QElapsedTimer clock;
     clock.start();
     while (clock.elapsed() < LaunchTimeoutMs) {
-        if (cancel && cancel->load()) { *error = Error::make("cancelled", {}); return false; }
+        if (cancel && cancel->load()) {
+            *error = Error::make("cancelled", {});
+            return false;
+        }
         QLocalSocket next;
         *error = {};
         if (connectPeer(next, locations, app, error))

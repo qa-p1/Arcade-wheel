@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Build and run Wheel from source with its own profile in build/dev-profile,
+# so it never touches your installed Wheel's settings, login entry, command
+# socket or Link registry (a build tree never offers to install). Arguments go
+# to Wheel, e.g. `scripts/dev --settings`. Point CMAKE_PREFIX_PATH at Qt 6.8
+# (and LayerShellQt on Linux) first.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+[ -f build/CMakeCache.txt ] || cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake --build build --target arcade-wheel --parallel
+profile="${WHEEL_DEV_PROFILE:-$PWD/build/dev-profile}"
+mkdir -p "$profile"
+export XDG_CONFIG_HOME="$profile/config" XDG_CACHE_HOME="$profile/cache" XDG_DATA_HOME="$profile/data"
+export ARCADE_HOME="${ARCADE_HOME:-$profile/arcade}" ARCADE_WHEEL_INSTANCE="$profile"
+if [ -x build/arcade-wheel.app/Contents/MacOS/arcade-wheel ]; then
+  exec build/arcade-wheel.app/Contents/MacOS/arcade-wheel "$@"
+fi
+exec build/arcade-wheel "$@"

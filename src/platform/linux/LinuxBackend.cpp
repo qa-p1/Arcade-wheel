@@ -129,8 +129,7 @@ QString localizedValue(const QHash<QString, QString> &values, const QString &key
         key + QLatin1Char('[') + localeName + QLatin1Char(']'),
         country.isEmpty() ? QString() : key + QLatin1Char('[') + language + QLatin1Char('_') + country + QLatin1Char(']'),
         key + QLatin1Char('[') + language + QLatin1Char(']'),
-        key
-    };
+        key};
     for (const QString &candidate : candidates) {
         if (!candidate.isEmpty() && values.contains(candidate)) return values.value(candidate);
     }
@@ -209,8 +208,7 @@ QString preferredKeyName(const QString &rawKey, QString *error)
         {QStringLiteral("grave"), QStringLiteral("grave")},
         {QStringLiteral("equal"), QStringLiteral("equal")},
         {QStringLiteral("bracketleft"), QStringLiteral("bracketleft")},
-        {QStringLiteral("bracketright"), QStringLiteral("bracketright")}
-    };
+        {QStringLiteral("bracketright"), QStringLiteral("bracketright")}};
     if (aliases.contains(lower)) return aliases.value(lower);
 
     static const QRegularExpression functionKey(QStringLiteral("^F([1-9]|[12][0-9]|3[0-5])$"),
@@ -233,8 +231,7 @@ QString preferredKeyName(const QString &rawKey, QString *error)
             {QLatin1Char('.'), QStringLiteral("period")},
             {QLatin1Char('/'), QStringLiteral("slash")},
             {QLatin1Char('\\'), QStringLiteral("backslash")},
-            {QLatin1Char('`'), QStringLiteral("grave")}
-        };
+            {QLatin1Char('`'), QStringLiteral("grave")}};
         if (punctuation.contains(ch)) return punctuation.value(ch);
     }
 
@@ -260,16 +257,13 @@ LinuxPortalRequest::LinuxPortalRequest(const QDBusConnection &bus,
                                        const QString &predictedPath,
                                        QObject *parent,
                                        Completion completion)
-    : QObject(parent)
-    , m_bus(bus)
-    , m_portalService(portalService)
-    , m_completion(std::move(completion))
+    : QObject(parent), m_bus(bus), m_portalService(portalService), m_completion(std::move(completion))
 {
     setRequestPath(predictedPath);
     QTimer::singleShot(30000, this, [this] {
         if (m_finished) return;
         QDBusMessage close = QDBusMessage::createMethodCall(m_portalService, m_path,
-            QString::fromLatin1(kRequestInterface), QStringLiteral("Close"));
+                                                            QString::fromLatin1(kRequestInterface), QStringLiteral("Close"));
         m_bus.asyncCall(close, 1500);
         onResponse(2, {{QStringLiteral("arcade_timeout"), true}});
     });
@@ -288,7 +282,7 @@ bool LinuxPortalRequest::subscribe(const QString &path)
                          kRequestInterface,
                          "Response",
                          this,
-                         SLOT(onResponse(uint,QVariantMap)));
+                         SLOT(onResponse(uint, QVariantMap)));
 }
 
 void LinuxPortalRequest::unsubscribe()
@@ -299,7 +293,7 @@ void LinuxPortalRequest::unsubscribe()
                      kRequestInterface,
                      "Response",
                      this,
-                     SLOT(onResponse(uint,QVariantMap)));
+                     SLOT(onResponse(uint, QVariantMap)));
 }
 
 void LinuxPortalRequest::setRequestPath(const QString &path)
@@ -334,18 +328,19 @@ void LinuxPortalRequest::onResponse(uint response, const QVariantMap &results)
 
 LinuxBackend::LinuxBackend(QObject *parent)
     : PlatformBackend(parent)
-    // Registry.Register must be the first portal call on this connection.
-    // Qt's theme/file-dialog plugins may already have used sessionBus().
-    , m_bus(QDBusConnection::connectToBus(QDBusConnection::SessionBus,
-              QStringLiteral("arcade-wheel-shortcuts-%1").arg(QUuid::createUuid().toString(QUuid::Id128))))
-    , m_appId(QStringLiteral("com.arcadewheel.ArcadeWheel"))
+      // Registry.Register must be the first portal call on this connection.
+      // Qt's theme/file-dialog plugins may already have used sessionBus().
+      ,
+      m_bus(QDBusConnection::connectToBus(QDBusConnection::SessionBus,
+                                          QStringLiteral("arcade-wheel-shortcuts-%1").arg(QUuid::createUuid().toString(QUuid::Id128)))),
+      m_appId(QStringLiteral("dev.arcade.Wheel"))
 {
     qDBusRegisterMetaType<PortalShortcut>();
     qDBusRegisterMetaType<QList<PortalShortcut>>();
     m_portalWatcher = new QDBusServiceWatcher(QString::fromLatin1(kPortalService),
-                                                m_bus,
-                                                QDBusServiceWatcher::WatchForOwnerChange,
-                                                this);
+                                              m_bus,
+                                              QDBusServiceWatcher::WatchForOwnerChange,
+                                              this);
     connect(m_portalWatcher,
             &QDBusServiceWatcher::serviceOwnerChanged,
             this,
@@ -356,13 +351,13 @@ LinuxBackend::LinuxBackend(QObject *parent)
                   QString::fromLatin1(kGlobalShortcutsInterface),
                   "Activated",
                   this,
-                  SLOT(onShortcutActivated(QDBusObjectPath,QString,qulonglong,QVariantMap)));
+                  SLOT(onShortcutActivated(QDBusObjectPath, QString, qulonglong, QVariantMap)));
     m_bus.connect(QString::fromLatin1(kPortalService),
                   QString::fromLatin1(kPortalPath),
                   QString::fromLatin1(kGlobalShortcutsInterface),
                   "Deactivated",
                   this,
-                  SLOT(onShortcutDeactivated(QDBusObjectPath,QString,qulonglong,QVariantMap)));
+                  SLOT(onShortcutDeactivated(QDBusObjectPath, QString, qulonglong, QVariantMap)));
 
     if (m_bus.isConnected()) {
         const auto owner = m_bus.interface()->serviceOwner(QString::fromLatin1(kPortalService));
@@ -402,9 +397,12 @@ void LinuxBackend::configureTrigger(const QJsonObject &trigger)
     m_identityRetries = 0;
     m_triggerConfiguration = trigger;
     m_holdThresholdMs = std::clamp(trigger.value(QStringLiteral("holdThresholdMs")).toInt(), 0, 1000);
-    m_shortcutSetting = trigger.value(QStringLiteral("shortcut")).toString(
-        trigger.value(QStringLiteral("key")).toString(QStringLiteral("F8"))).trimmed();
-    if (m_triggerDown) { m_triggerDown = false; m_triggerClock.invalidate(); emit triggerCancelled(); }
+    m_shortcutSetting = trigger.value(QStringLiteral("shortcut")).toString(trigger.value(QStringLiteral("key")).toString(QStringLiteral("F8"))).trimmed();
+    if (m_triggerDown) {
+        m_triggerDown = false;
+        m_triggerClock.invalidate();
+        emit triggerCancelled();
+    }
     removeHyprlandBinding();
 
     QString problem;
@@ -441,7 +439,8 @@ QString LinuxBackend::triggerReadyStatus() const
 
     if (isHyprland() && m_bindingInstalled && m_luaBinding)
         return QStringLiteral("Ready · tap %1 for normal input; hold %2 ms to open")
-            .arg(m_shortcutSetting).arg(m_holdThresholdMs);
+            .arg(m_shortcutSetting)
+            .arg(m_holdThresholdMs);
 
     return QStringLiteral("Ready · hold %1 to open. This desktop cannot pass short taps to the active app.")
         .arg(m_shortcutSetting);
@@ -454,8 +453,7 @@ QString LinuxBackend::preferredTriggerFromShortcut(const QString &shortcut, QStr
         if (error) *error = QStringLiteral("The shortcut is empty.");
         return {};
     }
-    if (text.contains(QStringLiteral("mouse"), Qt::CaseInsensitive)
-        || text.contains(QStringLiteral("button"), Qt::CaseInsensitive)) {
+    if (text.contains(QStringLiteral("mouse"), Qt::CaseInsensitive) || text.contains(QStringLiteral("button"), Qt::CaseInsensitive)) {
         if (error) *error = QStringLiteral("The XDG GlobalShortcuts portal supports keyboard shortcuts; mouse-button triggers are not available on Linux Wayland.");
         return {};
     }
@@ -505,7 +503,8 @@ QString LinuxBackend::preferredTriggerFromShortcut(const QString &shortcut, QStr
     const QStringList order = {QStringLiteral("CTRL"), QStringLiteral("ALT"), QStringLiteral("SHIFT"),
                                QStringLiteral("NUM"), QStringLiteral("LOGO")};
     QStringList normalized;
-    for (const QString &modifier : order) if (modifiers.contains(modifier)) normalized.append(modifier);
+    for (const QString &modifier : order)
+        if (modifiers.contains(modifier)) normalized.append(modifier);
     normalized.append(keyName);
     return normalized.join(QLatin1Char('+'));
 }
@@ -519,8 +518,7 @@ bool LinuxBackend::ensureDesktopIdentity(QString *error)
     }
     AppInstaller::Engine::Environment environment;
     QJsonObject receipt;
-    if (AppInstaller::Engine::Environment::discover(&environment, error)
-        && environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt, error) && !receipt.isEmpty())
+    if (AppInstaller::Engine::Environment::discover(&environment, error) && environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt, error) && !receipt.isEmpty())
         return AppInstaller::repairDesktop(AppInstaller::Engine(environment), error);
     // Running a download once must not silently install a launcher. Keep
     // the historical durable desktop identity only for manual/dev builds.
@@ -533,7 +531,9 @@ bool LinuxBackend::ensureDesktopIdentity(QString *error)
     // AppImage's internal binary is mounted under /tmp and disappears on exit.
     const QString imagePath = qEnvironmentVariable("APPIMAGE");
     const QString executable = QFileInfo(imagePath.isEmpty()
-        ? QCoreApplication::applicationFilePath() : imagePath).canonicalFilePath();
+                                             ? QCoreApplication::applicationFilePath()
+                                             : imagePath)
+                                   .canonicalFilePath();
     const QString dataHome = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     for (const QString &root : {QStringLiteral("/tmp"), QStringLiteral("/var/tmp"), QStringLiteral("/run")}) {
         if (executable.startsWith(root + QLatin1Char('/'))) {
@@ -547,13 +547,13 @@ bool LinuxBackend::ensureDesktopIdentity(QString *error)
         return false;
     }
     const QByteArray contents = QStringLiteral(
-        "[Desktop Entry]\nType=Application\nName=Arcade Wheel\n"
-        "Comment=Radial command launcher\nExec=%1 --settings\n"
-        "Icon=applications-system\nTerminal=false\nCategories=Utility;\n")
-        .arg(escapeDesktopExecPath(executable)).toUtf8();
+                                    "[Desktop Entry]\nType=Application\nName=Arcade Wheel\n"
+                                    "Comment=Radial command launcher\nExec=%1 --settings\n"
+                                    "Icon=applications-system\nTerminal=false\nCategories=Utility;\n")
+                                    .arg(escapeDesktopExecPath(executable))
+                                    .toUtf8();
     QSaveFile file(path);
-    if (!QDir().mkpath(QFileInfo(path).absolutePath()) || !file.open(QIODevice::WriteOnly)
-        || file.write(contents) != contents.size() || !file.commit()) {
+    if (!QDir().mkpath(QFileInfo(path).absolutePath()) || !file.open(QIODevice::WriteOnly) || file.write(contents) != contents.size() || !file.commit()) {
         *error = QStringLiteral("Could not create Arcade Wheel's desktop entry: %1").arg(file.errorString());
         return false;
     }
@@ -601,9 +601,9 @@ void LinuxBackend::ensurePortalRegistered()
     m_registryRequestPending = true;
     const QString owner = m_portalOwner;
     QDBusMessage message = QDBusMessage::createMethodCall(QString::fromLatin1(kPortalService),
-                                                           QString::fromLatin1(kPortalPath),
-                                                           QString::fromLatin1(kRegistryInterface),
-                                                           QStringLiteral("Register"));
+                                                          QString::fromLatin1(kPortalPath),
+                                                          QString::fromLatin1(kRegistryInterface),
+                                                          QStringLiteral("Register"));
     message << m_appId << QVariantMap{};
     auto *watcher = new QDBusPendingCallWatcher(m_bus.asyncCall(message, 2500), this);
     connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, watcher, owner] {
@@ -614,8 +614,7 @@ void LinuxBackend::ensurePortalRegistered()
         if (reply.type() == QDBusMessage::ErrorMessage) {
             // Only genuinely old portals may skip this handshake. An identity
             // failure must never be followed by an anonymous CreateSession.
-            if (reply.errorName() != QStringLiteral("org.freedesktop.DBus.Error.UnknownMethod")
-                && reply.errorName() != QStringLiteral("org.freedesktop.DBus.Error.UnknownInterface")) {
+            if (reply.errorName() != QStringLiteral("org.freedesktop.DBus.Error.UnknownMethod") && reply.errorName() != QStringLiteral("org.freedesktop.DBus.Error.UnknownInterface")) {
                 // GIO's desktop-file monitor can lag behind a newly created
                 // local-build entry. Failed Register calls do not claim the ID.
                 if (reply.errorMessage().contains(QStringLiteral("App info not found")) && m_identityRetries++ < 3) {
@@ -634,8 +633,7 @@ void LinuxBackend::ensurePortalRegistered()
 
 void LinuxBackend::startPortalSession()
 {
-    if (!m_triggerSupported || !m_portalRegistered || m_portalOwner.isEmpty()
-        || !m_sessionHandle.isEmpty() || m_sessionRequestPending) return;
+    if (!m_triggerSupported || !m_portalRegistered || m_portalOwner.isEmpty() || !m_sessionHandle.isEmpty() || m_sessionRequestPending) return;
     m_sessionRequestPending = true;
     const quint64 generation = m_triggerGeneration;
     const QString token = QStringLiteral("arcade_wheel_create_%1").arg(++m_requestCounter);
@@ -643,7 +641,7 @@ void LinuxBackend::startPortalSession()
     if (sender.startsWith(QLatin1Char(':'))) sender.remove(0, 1);
     sender.replace(QLatin1Char('.'), QLatin1Char('_'));
     const QString predictedPath = QStringLiteral("%1/request/%2/%3")
-                                     .arg(QString::fromLatin1(kPortalPath), sender, token);
+                                      .arg(QString::fromLatin1(kPortalPath), sender, token);
 
     auto *request = new LinuxPortalRequest(
         m_bus,
@@ -663,9 +661,9 @@ void LinuxBackend::startPortalSession()
     options.insert(QStringLiteral("handle_token"), token);
     options.insert(QStringLiteral("session_handle_token"), QStringLiteral("arcade_wheel_session_%1").arg(m_requestCounter));
     QDBusMessage message = QDBusMessage::createMethodCall(QString::fromLatin1(kPortalService),
-                                                           QString::fromLatin1(kPortalPath),
-                                                           QString::fromLatin1(kGlobalShortcutsInterface),
-                                                           QStringLiteral("CreateSession"));
+                                                          QString::fromLatin1(kPortalPath),
+                                                          QString::fromLatin1(kGlobalShortcutsInterface),
+                                                          QStringLiteral("CreateSession"));
     message << options;
     auto *watcher = new QDBusPendingCallWatcher(m_bus.asyncCall(message, 5000), this);
     QPointer<LinuxPortalRequest> requestGuard(request);
@@ -703,7 +701,7 @@ void LinuxBackend::bindPortalShortcut(const QString &sessionHandle, quint64 gene
     if (sender.startsWith(QLatin1Char(':'))) sender.remove(0, 1);
     sender.replace(QLatin1Char('.'), QLatin1Char('_'));
     const QString predictedPath = QStringLiteral("%1/request/%2/%3")
-                                     .arg(QString::fromLatin1(kPortalPath), sender, token);
+                                      .arg(QString::fromLatin1(kPortalPath), sender, token);
 
     auto *request = new LinuxPortalRequest(
         m_bus,
@@ -728,9 +726,9 @@ void LinuxBackend::bindPortalShortcut(const QString &sessionHandle, quint64 gene
     options.insert(QStringLiteral("handle_token"), token);
 
     QDBusMessage message = QDBusMessage::createMethodCall(QString::fromLatin1(kPortalService),
-                                                           QString::fromLatin1(kPortalPath),
-                                                           QString::fromLatin1(kGlobalShortcutsInterface),
-                                                           QStringLiteral("BindShortcuts"));
+                                                          QString::fromLatin1(kPortalPath),
+                                                          QString::fromLatin1(kGlobalShortcutsInterface),
+                                                          QStringLiteral("BindShortcuts"));
     message << QDBusObjectPath(sessionHandle)
             << QVariant::fromValue(shortcuts)
             << QString()
@@ -802,7 +800,7 @@ void LinuxBackend::portalRequestFinished(PortalRequestKind kind,
         m_sessionHandle = session;
         m_bus.connect(QString::fromLatin1(kPortalService), session,
                       QString::fromLatin1(kSessionInterface), "Closed", this,
-                      SLOT(onPortalSessionClosed(QVariantMap,QDBusMessage)));
+                      SLOT(onPortalSessionClosed(QVariantMap, QDBusMessage)));
         bindPortalShortcut(session, generation);
         return;
     }
@@ -821,11 +819,11 @@ void LinuxBackend::closePortalSession(const QString &sessionHandle)
     if (sessionHandle.isEmpty() || !sessionHandle.startsWith(QLatin1Char('/'))) return;
     m_bus.disconnect(QString::fromLatin1(kPortalService), sessionHandle,
                      QString::fromLatin1(kSessionInterface), "Closed", this,
-                     SLOT(onPortalSessionClosed(QVariantMap,QDBusMessage)));
+                     SLOT(onPortalSessionClosed(QVariantMap, QDBusMessage)));
     QDBusMessage close = QDBusMessage::createMethodCall(QString::fromLatin1(kPortalService),
-                                                         sessionHandle,
-                                                         QString::fromLatin1(kSessionInterface),
-                                                         QStringLiteral("Close"));
+                                                        sessionHandle,
+                                                        QString::fromLatin1(kSessionInterface),
+                                                        QStringLiteral("Close"));
     m_bus.asyncCall(close, 1500);
 }
 
@@ -833,7 +831,11 @@ void LinuxBackend::onPortalSessionClosed(const QVariantMap &details, const QDBus
 {
     Q_UNUSED(details)
     if (m_sessionHandle.isEmpty() || message.path() != m_sessionHandle) return;
-    if (m_triggerDown) { m_triggerDown = false; m_triggerClock.invalidate(); emit triggerCancelled(); }
+    if (m_triggerDown) {
+        m_triggerDown = false;
+        m_triggerClock.invalidate();
+        emit triggerCancelled();
+    }
     removeHyprlandBinding();
     closePortalSession(std::exchange(m_sessionHandle, QString()));
     ++m_triggerGeneration;
@@ -849,7 +851,10 @@ void LinuxBackend::onPortalOwnerChanged(const QString &service,
     Q_UNUSED(oldOwner)
     if (service != QString::fromLatin1(kPortalService)) return;
     ++m_triggerGeneration; // Invalidate any response tied to the previous portal owner.
-    if (m_triggerDown) { m_triggerDown = false; emit triggerCancelled(); }
+    if (m_triggerDown) {
+        m_triggerDown = false;
+        emit triggerCancelled();
+    }
     removeHyprlandBinding();
     closePortalSession(std::exchange(m_sessionHandle, QString()));
     m_portalOwner = newOwner;
@@ -872,8 +877,7 @@ void LinuxBackend::onShortcutActivated(const QDBusObjectPath &session,
 {
     Q_UNUSED(timestamp)
     Q_UNUSED(options)
-    if (m_recordingShortcut || !m_triggerSupported || shortcutId != QString::fromLatin1(kShortcutId)
-        || session.path() != m_sessionHandle) {
+    if (m_recordingShortcut || !m_triggerSupported || shortcutId != QString::fromLatin1(kShortcutId) || session.path() != m_sessionHandle) {
         return;
     }
     if (m_triggerDown) {
@@ -904,8 +908,7 @@ void LinuxBackend::onShortcutDeactivated(const QDBusObjectPath &session,
 void LinuxBackend::clearActiveTrigger()
 {
     if (!m_triggerDown) return;
-    const bool isTap = m_holdThresholdMs > 0 && m_triggerClock.isValid()
-        && m_triggerClock.elapsed() < m_holdThresholdMs;
+    const bool isTap = m_holdThresholdMs > 0 && m_triggerClock.isValid() && m_triggerClock.elapsed() < m_holdThresholdMs;
     m_triggerDown = false;
     m_triggerClock.invalidate();
     emit triggerReleased();
@@ -1073,8 +1076,7 @@ LinuxBackend::DesktopEntry LinuxBackend::readDesktopEntry(const QString &path, c
     DesktopEntry entry;
     const QHash<QString, QString> values = parseDesktopFile(path);
     if (values.isEmpty() || values.value(QStringLiteral("Type")) != QStringLiteral("Application")) return entry;
-    if (parseDesktopBoolean(values, QStringLiteral("Hidden"))
-        || parseDesktopBoolean(values, QStringLiteral("NoDisplay"))) return entry;
+    if (parseDesktopBoolean(values, QStringLiteral("Hidden")) || parseDesktopBoolean(values, QStringLiteral("NoDisplay"))) return entry;
 
     entry.desktopFile = path;
     entry.exec = values.value(QStringLiteral("Exec"));
@@ -1131,8 +1133,7 @@ bool LinuxBackend::launchDesktopEntry(const DesktopEntry &entry, bool focusExist
     GError *launchError = nullptr;
     const bool launched = g_app_info_launch(G_APP_INFO(info), nullptr, nullptr, &launchError);
     if (!launched && error)
-        *error = QStringLiteral("Could not launch %1: %2").arg(entry.application.name,
-            launchError ? QString::fromUtf8(launchError->message) : QStringLiteral("unknown desktop error"));
+        *error = QStringLiteral("Could not launch %1: %2").arg(entry.application.name, launchError ? QString::fromUtf8(launchError->message) : QStringLiteral("unknown desktop error"));
     if (launchError) g_error_free(launchError);
     g_object_unref(info);
     return launched;
@@ -1159,8 +1160,7 @@ bool LinuxBackend::focusHyprlandWindow(const DesktopEntry &entry) const
         const auto address = client.value(QStringLiteral("address")).toString();
         static const QRegularExpression validAddress(QStringLiteral("^0x[0-9a-fA-F]+$"));
         if (!validAddress.match(address).hasMatch()) continue;
-        return sendHyprlandCommand(QStringLiteral("dispatch focuswindow address:%1").arg(address), &response)
-            && response.trimmed() == QStringLiteral("ok");
+        return sendHyprlandCommand(QStringLiteral("dispatch focuswindow address:%1").arg(address), &response) && response.trimmed() == QStringLiteral("ok");
     }
     // A generic focuswindow 'ok' does NOT mean a matching window exists.
     return false;
@@ -1193,14 +1193,36 @@ bool LinuxBackend::movePointer(const QPointF &position)
     const QString lua = QStringLiteral("eval hl.dispatch(hl.dsp.cursor.move({x = %1, y = %2}))").arg(x).arg(y);
     if (sendHyprlandCommand(lua, &response) && response.trimmed() == QStringLiteral("ok"))
         return true;
-    return sendHyprlandCommand(QStringLiteral("dispatch movecursor %1 %2").arg(x).arg(y), &response)
-        && response.trimmed() == QStringLiteral("ok");
+    return sendHyprlandCommand(QStringLiteral("dispatch movecursor %1 %2").arg(x).arg(y), &response) && response.trimmed() == QStringLiteral("ok");
 }
 
 bool LinuxBackend::performSystemAction(const QString &id, QString *error)
 {
-    if (id == QStringLiteral("media:play-pause") || id == QStringLiteral("media:next")
-        || id == QStringLiteral("media:previous")) {
+    // Output volume: PipeWire's wpctl, else PulseAudio's pactl (also served
+    // by pipewire-pulse).
+    if (id == QStringLiteral("media:volume-up") || id == QStringLiteral("media:volume-down") || id == QStringLiteral("media:mute")) {
+        const QString action = id.mid(QStringLiteral("media:").size());
+        const QString wpctl = QStandardPaths::findExecutable(QStringLiteral("wpctl"));
+        if (!wpctl.isEmpty()) {
+            const QString sink = QStringLiteral("@DEFAULT_AUDIO_SINK@");
+            if (action == QStringLiteral("mute"))
+                return launchDetached(wpctl, {QStringLiteral("set-mute"), sink, QStringLiteral("toggle")}, {}, error);
+            return launchDetached(wpctl, {QStringLiteral("set-volume"), QStringLiteral("-l"), QStringLiteral("1.0"), sink, action == QStringLiteral("volume-up") ? QStringLiteral("5%+") : QStringLiteral("5%-")},
+                                  {}, error);
+        }
+        const QString pactl = QStandardPaths::findExecutable(QStringLiteral("pactl"));
+        if (!pactl.isEmpty()) {
+            const QString sink = QStringLiteral("@DEFAULT_SINK@");
+            if (action == QStringLiteral("mute"))
+                return launchDetached(pactl, {QStringLiteral("set-sink-mute"), sink, QStringLiteral("toggle")}, {}, error);
+            return launchDetached(pactl, {QStringLiteral("set-sink-volume"), sink, action == QStringLiteral("volume-up") ? QStringLiteral("+5%") : QStringLiteral("-5%")},
+                                  {}, error);
+        }
+        if (error) *error = QStringLiteral("No volume control is available. Install wpctl (PipeWire) or pactl (PulseAudio).");
+        return false;
+    }
+
+    if (id == QStringLiteral("media:play-pause") || id == QStringLiteral("media:next") || id == QStringLiteral("media:previous") || id == QStringLiteral("media:stop")) {
         const QString action = id.mid(QStringLiteral("media:").size());
         const QString playerctl = QStandardPaths::findExecutable(QStringLiteral("playerctl"));
         if (!playerctl.isEmpty()) return launchDetached(playerctl, {action}, {}, error);
@@ -1208,6 +1230,7 @@ bool LinuxBackend::performSystemAction(const QString &id, QString *error)
         QString method;
         if (action == QStringLiteral("play-pause")) method = QStringLiteral("PlayPause");
         else if (action == QStringLiteral("next")) method = QStringLiteral("Next");
+        else if (action == QStringLiteral("stop")) method = QStringLiteral("Stop");
         else method = QStringLiteral("Previous");
         const QDBusReply<QStringList> names = m_bus.interface()->registeredServiceNames();
         if (names.isValid()) {
@@ -1267,18 +1290,21 @@ bool LinuxBackend::performSystemAction(const QString &id, QString *error)
             {QStringLiteral("movefocus-up"), QStringLiteral("dispatch movefocus u")},
             {QStringLiteral("movefocus-down"), QStringLiteral("dispatch movefocus d")},
             {QStringLiteral("workspace-next"), QStringLiteral("dispatch workspace e+1")},
-            {QStringLiteral("workspace-previous"), QStringLiteral("dispatch workspace e-1")}
-        };
+            {QStringLiteral("workspace-previous"), QStringLiteral("dispatch workspace e-1")},
+            {QStringLiteral("workspace-last"), QStringLiteral("dispatch workspace previous")},
+            {QStringLiteral("movetoworkspace-next"), QStringLiteral("dispatch movetoworkspace e+1")},
+            {QStringLiteral("movetoworkspace-previous"), QStringLiteral("dispatch movetoworkspace e-1")},
+            {QStringLiteral("centerwindow"), QStringLiteral("dispatch centerwindow")},
+            {QStringLiteral("killactive"), QStringLiteral("dispatch killactive")}};
         if (!allowed.contains(action)) {
-            if (error) *error = QStringLiteral("Unsupported Hyprland action. Allowed actions: togglefloating, fullscreen, pin, movefocus-left/right/up/down, workspace-next, workspace-previous.");
+            if (error) *error = QStringLiteral("Unsupported Hyprland action. Allowed actions: togglefloating, fullscreen, pin, movefocus-left/right/up/down, workspace-next, workspace-previous, workspace-last, movetoworkspace-next, movetoworkspace-previous, centerwindow, killactive.");
             return false;
         }
         QString response;
-        if (!sendHyprlandCommand(allowed.value(action), &response)
-            || !response.trimmed().startsWith(QStringLiteral("ok"), Qt::CaseInsensitive)) {
+        if (!sendHyprlandCommand(allowed.value(action), &response) || !response.trimmed().startsWith(QStringLiteral("ok"), Qt::CaseInsensitive)) {
             if (error) *error = response.trimmed().isEmpty()
-                ? QStringLiteral("Hyprland did not accept the desktop action.")
-                : response.trimmed();
+                                    ? QStringLiteral("Hyprland did not accept the desktop action.")
+                                    : response.trimmed();
             return false;
         }
         return true;
@@ -1304,6 +1330,15 @@ bool LinuxBackend::performSystemAction(const QString &id, QString *error)
         return launchDetached(systemctl, {QStringLiteral("suspend")}, {}, error);
     }
 
+    if (id == QStringLiteral("hibernate") || id == QStringLiteral("reboot")) {
+        const QString systemctl = QStandardPaths::findExecutable(QStringLiteral("systemctl"));
+        if (systemctl.isEmpty()) {
+            if (error) *error = QStringLiteral("systemctl is unavailable; this desktop does not expose a supported %1 command.").arg(id);
+            return false;
+        }
+        return launchDetached(systemctl, {id}, {}, error);
+    }
+
     if (id == QStringLiteral("poweroff")) {
         const QString systemctl = QStandardPaths::findExecutable(QStringLiteral("systemctl"));
         if (systemctl.isEmpty()) {
@@ -1316,8 +1351,7 @@ bool LinuxBackend::performSystemAction(const QString &id, QString *error)
     if (id == QStringLiteral("logout")) {
         if (isHyprland()) {
             QString response;
-            if (sendHyprlandCommand(QStringLiteral("dispatch exit"), &response)
-                && response.trimmed().startsWith(QStringLiteral("ok"), Qt::CaseInsensitive)) return true;
+            if (sendHyprlandCommand(QStringLiteral("dispatch exit"), &response) && response.trimmed().startsWith(QStringLiteral("ok"), Qt::CaseInsensitive)) return true;
             if (error) *error = response.trimmed().isEmpty() ? QStringLiteral("Hyprland did not accept the logout request.") : response.trimmed();
             return false;
         }
@@ -1340,8 +1374,7 @@ bool LinuxBackend::setStartOnLogin(bool enabled, QString *error)
 {
     AppInstaller::Engine::Environment environment;
     QJsonObject receipt;
-    if (!AppInstaller::Engine::Environment::discover(&environment, error)
-        || !environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt, error)) return false;
+    if (!AppInstaller::Engine::Environment::discover(&environment, error) || !environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt, error)) return false;
     if (!receipt.isEmpty()) return AppInstaller::setStartOnLogin(AppInstaller::Engine(environment), enabled, error);
     if (AppInstaller::Engine::Runtime::discover().isAppImage()) {
         if (error) *error = QStringLiteral("Install Arcade Wheel before enabling start at login.");
@@ -1382,7 +1415,9 @@ bool LinuxBackend::setStartOnLogin(bool enabled, QString *error)
 
     const QString imagePath = qEnvironmentVariable("APPIMAGE");
     const QString executable = QFileInfo(imagePath.isEmpty()
-        ? QCoreApplication::applicationFilePath() : imagePath).canonicalFilePath();
+                                             ? QCoreApplication::applicationFilePath()
+                                             : imagePath)
+                                   .canonicalFilePath();
     if (executable.isEmpty() || !QFileInfo(executable).isExecutable()) {
         if (error) *error = QStringLiteral("The running Arcade Wheel executable could not be located.");
         return false;
@@ -1442,21 +1477,20 @@ QJsonObject LinuxBackend::shortcutRegistration() const
 {
     if (m_bindingInstalled) return {{"applied", true}, {"via", "hyprland-runtime"}};
     if (m_triggerSupported) return {{"applied", true}, {"via", "portal"}};
-    return {{"applied", false}, {"via", "manual"},
-            {"hint", "Bind arcade-wheel --show in Settings → Keyboard. Wheel saved the requested trigger; portal approval may still be pending."}};
+    return {{"applied", false}, {"via", "manual"}, {"hint", "Bind arcade-wheel --show in Settings → Keyboard. Wheel saved the requested trigger; portal approval may still be pending."}};
 }
 
 QString LinuxBackend::autostartDesktopFile() const
 {
     const QString config = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
     if (config.isEmpty()) return {};
-    return QDir(config).filePath(QStringLiteral("autostart/arcade-wheel.desktop"));
+    return QDir(config).filePath(QStringLiteral("autostart/dev.arcade.Wheel.desktop"));
 }
 
 bool LinuxBackend::launchDetached(const QString &program,
-                                 const QStringList &arguments,
-                                 const QString &workingDirectory,
-                                 QString *error) const
+                                  const QStringList &arguments,
+                                  const QString &workingDirectory,
+                                  QString *error) const
 {
     QString executable = program;
     if (executable.contains(QLatin1Char('/'))) {
@@ -1485,8 +1519,7 @@ bool LinuxBackend::launchDetached(const QString &program,
 
 bool LinuxBackend::isHyprland() const
 {
-    return !qEnvironmentVariable("HYPRLAND_INSTANCE_SIGNATURE").isEmpty()
-        && !hyprlandSocketPath().isEmpty();
+    return !qEnvironmentVariable("HYPRLAND_INSTANCE_SIGNATURE").isEmpty() && !hyprlandSocketPath().isEmpty();
 }
 
 QString LinuxBackend::hyprlandSocketPath() const
@@ -1552,8 +1585,7 @@ QString modifierText(int mask)
 }
 bool matchesChord(const QJsonObject &bind, const QString &key, int mask)
 {
-    return bind.value(QStringLiteral("key")).toString().compare(key, Qt::CaseInsensitive) == 0
-        && bind.value(QStringLiteral("modmask")).toInt() == mask;
+    return bind.value(QStringLiteral("key")).toString().compare(key, Qt::CaseInsensitive) == 0 && bind.value(QStringLiteral("modmask")).toInt() == mask;
 }
 
 QString luaStringLiteral(QString value)
@@ -1598,13 +1630,7 @@ QString luaRestoreBindCommand(const QJsonObject &bind)
 
     QStringList options;
     const std::pair<const char *, const char *> boolOptions[] = {
-        {"locked", "locked"}, {"release", "release"}, {"repeat", "repeating"},
-        {"non_consuming", "non_consuming"}, {"auto_consuming", "auto_consuming"},
-        {"transparent", "transparent"}, {"ignore_mods", "ignore_mods"},
-        {"longPress", "long_press"}, {"dont_inhibit", "dont_inhibit"},
-        {"submap_universal", "submap_universal"}, {"click", "click"},
-        {"drag", "drag"}, {"allow_input_capture", "allow_input_capture"}
-    };
+        {"locked", "locked"}, {"release", "release"}, {"repeat", "repeating"}, {"non_consuming", "non_consuming"}, {"auto_consuming", "auto_consuming"}, {"transparent", "transparent"}, {"ignore_mods", "ignore_mods"}, {"longPress", "long_press"}, {"dont_inhibit", "dont_inhibit"}, {"submap_universal", "submap_universal"}, {"click", "click"}, {"drag", "drag"}, {"allow_input_capture", "allow_input_capture"}};
     for (const auto &[jsonField, luaField] : boolOptions) {
         if (bind.value(QLatin1String(jsonField)).toBool())
             options << QString::fromLatin1(luaField) + QStringLiteral(" = true");
@@ -1621,7 +1647,7 @@ QString luaRestoreBindCommand(const QJsonObject &bind)
     return QStringLiteral("eval local callback = debug.getregistry()[%1]; if type(callback) ~= 'function' then error('original shortcut callback is unavailable') end; %2")
         .arg(callbackId, bindExpression);
 }
-}
+} // namespace
 
 QString LinuxBackend::shortcutValidationError(const QString &shortcut) const
 {
@@ -1638,8 +1664,8 @@ bool LinuxBackend::replayTriggerTap(QString *error) const
     }
 
     const QString command = QStringLiteral(
-        "eval hl.dispatch(hl.dsp.send_shortcut({mods = %1, key = %2, window = \"activewindow\"}))")
-        .arg(luaStringLiteral(modifierText(m_boundModifiers)), luaStringLiteral(m_boundKey));
+                                "eval hl.dispatch(hl.dsp.send_shortcut({mods = %1, key = %2, window = \"activewindow\"}))")
+                                .arg(luaStringLiteral(modifierText(m_boundModifiers)), luaStringLiteral(m_boundKey));
     QString response;
     if (!sendHyprlandCommand(command, &response) || response.trimmed() != QStringLiteral("ok")) {
         if (error) *error = response.isEmpty() ? QStringLiteral("Hyprland did not accept the key replay.") : response;
@@ -1665,7 +1691,7 @@ QString LinuxBackend::shortcutConflict(const QString &shortcut) const
     for (const auto &displaced : m_displacedBindings) bindings.append(displaced);
     for (const auto &value : bindings) {
         const auto bind = value.toObject();
-        if (!matchesChord(bind,key,mask) || bind.value(QStringLiteral("description")).toString() == QStringLiteral("Arcade Wheel trigger")) continue;
+        if (!matchesChord(bind, key, mask) || bind.value(QStringLiteral("description")).toString() == QStringLiteral("Arcade Wheel trigger")) continue;
         QString name = bind.value(QStringLiteral("description")).toString();
         if (name.isEmpty()) name = bind.value(QStringLiteral("dispatcher")).toString() + QStringLiteral(" ") + bind.value(QStringLiteral("arg")).toString();
         conflicts << name.trimmed();
@@ -1724,7 +1750,11 @@ void LinuxBackend::watchHyprlandReloads()
             m_boundKey.clear();
             m_bindingInstalled = m_luaBinding = m_displacedWithLua = false;
             m_overlayRuleInstalled = false;
-            if (m_triggerDown) { m_triggerDown = false; m_triggerClock.invalidate(); emit triggerCancelled(); }
+            if (m_triggerDown) {
+                m_triggerDown = false;
+                m_triggerClock.invalidate();
+                emit triggerCancelled();
+            }
             if (!m_sessionHandle.isEmpty() && m_triggerSupported) {
                 QString error;
                 if (installHyprlandBinding(&error))
@@ -1772,7 +1802,7 @@ bool LinuxBackend::installHyprlandBinding(QString *error)
     QJsonArray displaced;
     for (const auto &value : QJsonDocument::fromJson(response.toUtf8()).array()) {
         const auto bind = value.toObject();
-        if (!matchesChord(bind,key,mask)) continue;
+        if (!matchesChord(bind, key, mask)) continue;
         if (bind.value(QStringLiteral("description")).toString() != QStringLiteral("Arcade Wheel trigger")) displaced.append(bind);
     }
     if (!displaced.isEmpty() && !m_triggerConfiguration.value(QStringLiteral("overrideConflict")).toBool()) {
@@ -1784,8 +1814,7 @@ bool LinuxBackend::installHyprlandBinding(QString *error)
     if (!displaced.isEmpty()) {
         const bool luaBindings = std::all_of(displaced.cbegin(), displaced.cend(), [](const QJsonValue &value) {
             const auto bind = value.toObject();
-            return bind.value(QStringLiteral("dispatcher")).toString() == QStringLiteral("__lua")
-                && !luaRestoreBindCommand(bind).isEmpty();
+            return bind.value(QStringLiteral("dispatcher")).toString() == QStringLiteral("__lua") && !luaRestoreBindCommand(bind).isEmpty();
         });
         QSet<QString> removed;
         for (const auto &value : displaced) {
@@ -1795,8 +1824,8 @@ bool LinuxBackend::installHyprlandBinding(QString *error)
             if (displayKey.isEmpty() || removed.contains(normalizedKey)) continue;
 
             const QString command = luaBindings
-                ? QStringLiteral("eval hl.unbind(%1)").arg(luaStringLiteral(displayKey))
-                : QStringLiteral("keyword unbind %1, %2").arg(modifierText(mask),bind.value(QStringLiteral("key")).toString());
+                                        ? QStringLiteral("eval hl.unbind(%1)").arg(luaStringLiteral(displayKey))
+                                        : QStringLiteral("keyword unbind %1, %2").arg(modifierText(mask), bind.value(QStringLiteral("key")).toString());
             if (!sendHyprlandCommand(command, &response) || response.trimmed() != QStringLiteral("ok")) {
                 removeHyprlandBinding();
                 if (error) *error = QStringLiteral("Could not override the desktop shortcut: %1").arg(response);
@@ -1819,9 +1848,9 @@ bool LinuxBackend::installHyprlandBinding(QString *error)
     parts.replaceInStrings(QStringLiteral("NUM"), QStringLiteral("MOD2"));
     const QString chord = parts.isEmpty() ? key : parts.join(QStringLiteral(" + ")) + QStringLiteral(" + ") + key;
     const QString luaBinding = QStringLiteral(
-        "eval if _G.arcadeWheelTrigger then _G.arcadeWheelTrigger:remove() end; "
-        "_G.arcadeWheelTrigger = hl.bind(\"%1\", hl.dsp.global(\"%2\"), {description=\"Arcade Wheel trigger\", transparent=true})")
-                                    .arg(chord, target);
+                                   "eval if _G.arcadeWheelTrigger then _G.arcadeWheelTrigger:remove() end; "
+                                   "_G.arcadeWheelTrigger = hl.bind(\"%1\", hl.dsp.global(\"%2\"), {description=\"Arcade Wheel trigger\", transparent=true})")
+                                   .arg(chord, target);
     m_boundKey = key;
     m_boundModifiers = mask;
     if (sendHyprlandCommand(luaBinding, &response) && response.trimmed() == QStringLiteral("ok")) {
@@ -1856,7 +1885,7 @@ void LinuxBackend::removeHyprlandBinding()
         current = QJsonDocument::fromJson(response.toUtf8()).array();
         for (const auto &value : current) {
             const auto bind = value.toObject();
-            if (!matchesChord(bind,m_boundKey,m_boundModifiers)) continue;
+            if (!matchesChord(bind, m_boundKey, m_boundModifiers)) continue;
             if (bind.value(QStringLiteral("description")).toString() == QStringLiteral("Arcade Wheel trigger")) owned = true;
             else foreign = true;
         }
@@ -1864,7 +1893,7 @@ void LinuxBackend::removeHyprlandBinding()
     if (m_luaBinding) {
         sendHyprlandCommand(QStringLiteral("eval if _G.arcadeWheelTrigger then _G.arcadeWheelTrigger:remove(); _G.arcadeWheelTrigger = nil end"));
     } else if (owned && !foreign) {
-        sendHyprlandCommand(QStringLiteral("keyword unbind %1, %2").arg(modifierText(m_boundModifiers),m_boundKey));
+        sendHyprlandCommand(QStringLiteral("keyword unbind %1, %2").arg(modifierText(m_boundModifiers), m_boundKey));
     }
     // A compositor reload already restores configured bindings. Do not replay
     // stale Lua callback IDs over those restored bindings.
@@ -1878,23 +1907,20 @@ void LinuxBackend::removeHyprlandBinding()
             }
             QString flags;
             const std::pair<const char *, char> fields[] = {
-                {"locked",'l'}, {"release",'r'}, {"repeat",'e'}, {"mouse",'m'},
-                {"non_consuming",'n'}, {"transparent",'t'}, {"ignore_mods",'i'},
-                {"longPress",'o'}, {"dont_inhibit",'p'}, {"submap_universal",'u'},
-                {"auto_consuming",'a'}, {"allow_input_capture",'x'}, {"click",'c'}, {"drag",'g'}
-            };
-            for (const auto &[field,flag] : fields) if (bind.value(QLatin1String(field)).toBool()) flags += QLatin1Char(flag);
+                {"locked", 'l'}, {"release", 'r'}, {"repeat", 'e'}, {"mouse", 'm'}, {"non_consuming", 'n'}, {"transparent", 't'}, {"ignore_mods", 'i'}, {"longPress", 'o'}, {"dont_inhibit", 'p'}, {"submap_universal", 'u'}, {"auto_consuming", 'a'}, {"allow_input_capture", 'x'}, {"click", 'c'}, {"drag", 'g'}};
+            for (const auto &[field, flag] : fields)
+                if (bind.value(QLatin1String(field)).toBool()) flags += QLatin1Char(flag);
             const QString submap = bind.value(QStringLiteral("submap")).toString();
             sendHyprlandCommand(QStringLiteral("keyword submap %1").arg(submap.isEmpty() ? QStringLiteral("reset") : submap));
             QString args = modifierText(bind.value(QStringLiteral("modmask")).toInt()) + QStringLiteral(", ") + bind.value(QStringLiteral("key")).toString() + QStringLiteral(", ");
             if (bind.value(QStringLiteral("has_description")).toBool()) {
                 flags += QLatin1Char('d');
                 QString description = bind.value(QStringLiteral("description")).toString();
-                description.replace(QLatin1Char(','),QLatin1Char(' '));
+                description.replace(QLatin1Char(','), QLatin1Char(' '));
                 args += description + QStringLiteral(", ");
             }
             args += bind.value(QStringLiteral("dispatcher")).toString() + QStringLiteral(", ") + bind.value(QStringLiteral("arg")).toString();
-            sendHyprlandCommand(QStringLiteral("keyword bind%1 %2").arg(flags,args));
+            sendHyprlandCommand(QStringLiteral("keyword bind%1 %2").arg(flags, args));
         }
         if (!m_displacedWithLua && !m_displacedBindings.isEmpty())
             sendHyprlandCommand(QStringLiteral("keyword submap reset"));

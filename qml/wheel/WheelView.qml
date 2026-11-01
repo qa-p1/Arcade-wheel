@@ -1,5 +1,10 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Shapes
+import Arcade
+
+// The ring (Template B, canvas variant). Geometry and motion follow the
+// user's appearance settings; colours and type come from the kit theme.
 
 Item {
     id: root
@@ -56,9 +61,13 @@ Item {
         const step = Math.PI*2 / Math.max(1,slotCount)
         return Math.floor(((Math.atan2(dy,dx)+Math.PI/2+step/2+Math.PI*2) % (Math.PI*2))/step)
     }
+    // Each slot runs its own entrance, exit or settle on these.
+    signal slotsEnter()
+    signal slotsLeave()
+    signal slotsSettle()
     function replayEntrance() {
         closeTimer.stop()
-        for (let i=0; i<slots.count; ++i) slots.itemAt(i).enter()
+        slotsEnter()
     }
     readonly property var actions: deck && deck.actions ? deck.actions : []
     readonly property int slotCount: Math.min(8, actions.length)
@@ -75,8 +84,12 @@ Item {
     readonly property real animationSpeed: Math.max(0.5,Math.min(2,setting("animationSpeed",1)))
     readonly property real selectedScale: Math.max(1,Math.min(1.12,setting("selectedScale",1.06)))
     readonly property bool labelsEnabled: appearance && appearance.labels === true
-    readonly property color accentColor: appearance && appearance.accentColor ? appearance.accentColor : "#b7b7f7"
+    // The kit accent (Wheel's amber) unless "Use a custom colour" is on.
+    readonly property color accentColor: appearance && appearance.customAccent && appearance.accentColor ? appearance.accentColor : Theme.accent
     readonly property real surfaceOpacity: Math.max(0.45,Math.min(1,setting("opacity",0.94)))
+    readonly property color panelColor: Theme.panel
+    readonly property color sunkenColor: Theme.sunken
+    readonly property color lineColor: Theme.lineStrong
     width: (outerRadius+24)*2
     height: width
     implicitWidth: width
@@ -93,13 +106,13 @@ Item {
     onOpenedChanged: {
         if (opened) replayEntrance()
         else {
-            for (let i=0;i<slots.count;++i) slots.itemAt(i).leave()
+            slotsLeave()
             closeTimer.restart()
         }
     }
     onReduceMotionChanged: {
         deckAnimation.stop(); deckPhase=1
-        for (let i=0;i<slots.count;++i) slots.itemAt(i).settle()
+        slotsSettle()
     }
     Component.onCompleted: if (opened) Qt.callLater(replayEntrance)
     Timer { id: closeTimer; interval: root.duration(95); onTriggered: if (!root.opened) root.closeFinished() }
@@ -139,6 +152,12 @@ Item {
                     else exitAnimation.restart()
                 }
                 function settle() { entrance.stop(); exitAnimation.stop(); progress=root.opened ? 1 : 0 }
+                Connections {
+                    target: root
+                    function onSlotsEnter() { slot.enter() }
+                    function onSlotsLeave() { slot.leave() }
+                    function onSlotsSettle() { slot.settle() }
+                }
                 Behavior on highlight { NumberAnimation { duration: root.duration(105); easing.type: Easing.OutCubic } }
                 SequentialAnimation {
                     id: entrance
@@ -148,15 +167,21 @@ Item {
                 NumberAnimation { id: exitAnimation; target: slot; property: "progress"; to: 0; duration: root.duration(85); easing.type: Easing.InCubic }
                 Shape {
                     y: 5; anchors.fill: parent
-                    ShapePath { strokeColor: "transparent"; fillColor: "#30000000"; PathSvg { path: slot.path } }
+                    ShapePath { strokeColor: "transparent"; fillColor: Qt.rgba(0, 0, 0, Theme.dark ? 0.19 : 0.1); PathSvg { path: slot.path } }
                 }
                 Shape {
                     anchors.fill: parent
                     preferredRendererType: Shape.CurveRenderer
                     ShapePath {
-                        strokeWidth: 1
-                        strokeColor: Qt.rgba(root.accentColor.r,root.accentColor.g,root.accentColor.b,0.11+0.52*slot.highlight)
-                        fillColor: Qt.rgba(0.085+0.05*slot.highlight,0.087+0.052*slot.highlight,0.115+0.085*slot.highlight,root.surfaceOpacity)
+                        // panel at the surface opacity, the accent at 16 % when selected;
+                        // a 1 px line, 2 px accent on the selected slot.
+                        strokeWidth: 1+slot.highlight
+                        strokeColor: Qt.rgba(root.lineColor.r+(root.accentColor.r-root.lineColor.r)*slot.highlight,
+                                             root.lineColor.g+(root.accentColor.g-root.lineColor.g)*slot.highlight,
+                                             root.lineColor.b+(root.accentColor.b-root.lineColor.b)*slot.highlight,1)
+                        fillColor: Qt.rgba(root.panelColor.r+(root.accentColor.r-root.panelColor.r)*0.16*slot.highlight,
+                                           root.panelColor.g+(root.accentColor.g-root.panelColor.g)*0.16*slot.highlight,
+                                           root.panelColor.b+(root.accentColor.b-root.panelColor.b)*0.16*slot.highlight,root.surfaceOpacity)
                         PathSvg { path: slot.path }
                     }
                 }
@@ -170,8 +195,9 @@ Item {
                         anchors.centerIn: parent
                         visible: appIcon.status !== Image.Ready
                         text: slot.action && slot.action.type !== "none" ? (slot.action.name || "A").substring(0,1).toUpperCase() : "+"
+                        font.family: Theme.fontSans
                         font.pixelSize: root.iconSize*0.65; font.weight: Font.Medium
-                        color: "#c9c9db"
+                        color: slot.highlight > 0.5 ? root.accentColor : Theme.muted
                     }
                     Image {
                         id: appIcon
@@ -182,26 +208,35 @@ Item {
                         fillMode: Image.PreserveAspectFit
                     }
                 }
-                Text {
-                    visible: root.labelsEnabled
+                Rectangle {
+                    visible: root.labelsEnabled && label.text.length > 0
                     x: slot.iconPoint.x-width/2; y: slot.iconPoint.y+root.iconSize/2-3
-                    width: 106; horizontalAlignment: Text.AlignHCenter
-                    text: slot.action ? slot.action.name || "" : ""
-                    elide: Text.ElideRight; color: "#c9c8d4"; font.pixelSize: 11
+                    width: Math.min(106, label.implicitWidth+Theme.space12); height: label.implicitHeight+Theme.space2*2
+                    radius: height/2
+                    color: Theme.panel
+                    Text {
+                        id: label
+                        anchors.centerIn: parent
+                        width: Math.min(implicitWidth, 106-Theme.space12)
+                        text: slot.action ? slot.action.name || "" : ""
+                        elide: Text.ElideRight
+                        color: Theme.text
+                        font.family: Theme.fontSans; font.pixelSize: Theme.smallSize; font.weight: Font.Medium
+                    }
                 }
             }
         }
         Rectangle {
             anchors.centerIn: parent
             width: root.centerRadius*2+10; height: width; radius: width/2
-            color: "#23000000"; opacity: hub.opacity
+            color: Qt.rgba(0, 0, 0, Theme.dark ? 0.14 : 0.06); opacity: hub.opacity
         }
         Rectangle {
             id: hub
             anchors.centerIn: parent
             width: root.centerRadius*2; height: width; radius: width/2; z: 5
-            color: Qt.rgba(0.065,0.068,0.09,root.surfaceOpacity)
-            border.color: root.hubPressed ? root.accentColor : "#20d0d0f0"; border.width: 1
+            color: Qt.rgba(root.sunkenColor.r,root.sunkenColor.g,root.sunkenColor.b,root.surfaceOpacity)
+            border.color: root.hubPressed ? root.accentColor : root.lineColor; border.width: 1
             opacity: root.opened ? 1 : 0
             scale: root.opened ? (root.hubPressed ? 0.95 : 1) : 0.85
             Behavior on opacity { NumberAnimation { duration: root.duration(90) } }
@@ -209,7 +244,8 @@ Item {
             Text {
                 anchors.fill: parent; anchors.margins: 9
                 text: root.selectedName()
-                color: "#edecf4"; font.pixelSize: text.length>16 ? 12 : 14; font.weight: Font.Medium
+                color: Theme.text
+                font.family: Theme.fontSans; font.pixelSize: text.length>16 ? Theme.smallSize : Theme.bodySize; font.weight: Font.Medium
                 horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                 wrapMode: Text.WordWrap; maximumLineCount: 3; elide: Text.ElideRight
                 opacity: root.effectiveSelection >= 0 ? 1 : 0
@@ -218,20 +254,34 @@ Item {
             Text {
                 anchors.top: parent.bottom; anchors.topMargin: 10
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: 300; color: "#e3aab5"; font.pixelSize: 11
+                width: 300; color: Theme.dangerInk
+                font.family: Theme.fontSans; font.pixelSize: Theme.captionSize
                 horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
                 text: root.effectiveSelection >= 0 && root.actions[root.effectiveSelection] ? root.actions[root.effectiveSelection].unavailableReason || "" : ""
             }
-            Row {
-                anchors.centerIn: parent; spacing: 6
+            Column {
+                anchors.centerIn: parent; spacing: Theme.space6
                 opacity: root.effectiveSelection < 0 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: root.duration(65) } }
-                Repeater {
-                    model: root.deckCount
-                    Rectangle {
-                        required property int index
-                        width: 5; height: 5; radius: 2.5
-                        color: index===root.deckIndex ? root.accentColor : "#4d4e63"
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(implicitWidth, hub.width-Theme.space16)
+                    visible: text.length > 0
+                    text: root.deck && root.deck.name ? root.deck.name : ""
+                    elide: Text.ElideRight
+                    color: Theme.muted
+                    font.family: Theme.fontSans; font.pixelSize: Theme.captionSize; font.weight: Font.Medium
+                }
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 6
+                    Repeater {
+                        model: root.deckCount
+                        Rectangle {
+                            required property int index
+                            width: 5; height: 5; radius: 2.5
+                            color: index===root.deckIndex ? root.accentColor : Theme.faint
+                        }
                     }
                 }
             }

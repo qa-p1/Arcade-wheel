@@ -9,4 +9,4 @@ inline QStringList apps() { return ArcadeLink::Ids::apps(); }
 inline QString appName(const QString &id) { return ArcadeLink::appName(id); }
 inline QString appPitch(const QString &id) { return ArcadeLink::appPitch(id); }
 inline QString releasesUrl(const QString &id) { return ArcadeLink::releasesUrl(id); }
-}
+} // namespace AppMetadata

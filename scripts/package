@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Builds this platform's packages from build/ into dist/: the Linux AppImage,
+# the Windows installer and portable ZIP, or the macOS disk image for this
+# Mac's processor. See docs/dev/packaging.md for what each needs.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+case "$(uname -s)" in
+  Linux) exec bash packaging/linux/package.sh build dist ;;
+  Darwin) exec bash packaging/macos/package.sh build dist "$(uname -m)" ;;
+  MINGW*|MSYS*|CYGWIN*)
+    exec powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File packaging/windows/package.ps1 \
+      -BuildDir build -Configuration Release -OutputDir dist ;;
+  *) echo "Unsupported platform: $(uname -s)" >&2; exit 2 ;;
+esac

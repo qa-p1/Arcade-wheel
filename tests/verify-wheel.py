@@ -125,7 +125,8 @@ def main():
 
             def ready():
                 status = run(WHEEL, "--status", check=False)
-                return json.loads(status) if status.startswith("{") else None
+                parsed = json.loads(status) if status.startswith("{") else {}
+                return parsed if parsed.get("running") else None
 
             wait(ready, "normal background Wheel did not start")
             wait(lambda: config.exists(), "Wheel did not load a config")

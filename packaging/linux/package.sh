@@ -82,12 +82,15 @@ fi
 mkdir -p "$appdir/usr/lib"
 cp -L "$opengl" "$appdir/usr/lib/libOpenGL.so.0"
 export QML_SOURCES_PATHS="$repo/qml"
+# linuxdeploy wants the icon named as the desktop entry's Icon= key.
+icon="$appdir/../dev.arcade.Wheel.svg"
+cp "$repo/assets/arcade-wheel.svg" "$icon"
 export APPIMAGE_EXTRACT_AND_RUN=1
 export OUTPUT="$output/ArcadeWheel-$version-Linux-x86_64.AppImage"
 # Libraries/plugins copied above are scanned before the Qt and AppImage plugins.
 "$tools_dir/linuxdeploy-x86_64.AppImage" --appdir "$appdir" \
-    --desktop-file "$repo/packaging/linux/com.arcadewheel.ArcadeWheel.desktop" \
-    --icon-file "$repo/assets/arcade-wheel.svg" --plugin qt --output appimage
+    --desktop-file "$repo/packaging/linux/dev.arcade.Wheel.desktop" \
+    --icon-file "$icon" --plugin qt --output appimage
 test -s "$OUTPUT"
 test -s "$appdir/usr/plugins/iconengines/libqsvgicon.so"
 python3 "$repo/packaging/linux/check-bundle.py" "$OUTPUT"

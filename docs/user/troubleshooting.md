@@ -12,7 +12,7 @@ Make sure the downloaded file is executable. If your system does not have FUSE a
 
 ## The trigger does not open the wheel
 
-Open **Settings → Trigger** and check the status below the shortcut field. Approve the desktop's shortcut request if prompted. If F8 is reserved by the keyboard or desktop, record another shortcut; some Mac keyboards need **Fn+F8** to send F8. Check that no other Arcade app or desktop binding owns the same shortcut.
+Open **Settings → Shortcuts** and check the status below the shortcut field. Approve the desktop's shortcut request if prompted. If F8 is reserved by the keyboard or desktop, record another shortcut; some Mac keyboards need **Fn+F8** to send F8. Check that no other Arcade app or desktop binding owns the same shortcut.
 
 On Linux Wayland, the desktop needs an XDG GlobalShortcuts portal and the package needs its LayerShellQt overlay support. If the portal is unavailable, install or enable the desktop portal backend and try again. On Hyprland, older portal versions may ask you to bind Wheel's global shortcut target in compositor settings.
 

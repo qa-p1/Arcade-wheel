@@ -107,7 +107,8 @@ private:
         bool dbusActivatable = false;
     };
 
-    enum class PortalRequestKind { CreateSession, BindShortcuts };
+    enum class PortalRequestKind { CreateSession,
+                                   BindShortcuts };
 
     void portalRequestFinished(PortalRequestKind kind,
                                quint64 generation,

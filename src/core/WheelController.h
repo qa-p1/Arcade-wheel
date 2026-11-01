@@ -36,6 +36,8 @@ class WheelController final : public QObject {
     Q_PROPERTY(QString triggerStatus READ triggerStatus NOTIFY triggerStatusChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
     Q_PROPERTY(QString configPath READ configPath CONSTANT)
+    Q_PROPERTY(QString logsPath READ logsPath CONSTANT)
+    Q_PROPERTY(QString channel READ channel CONSTANT)
     // Arcade Link: an action another app asked to add, waiting for the user
     // to choose a slot and save it.
     Q_PROPERTY(QVariantMap linkDraft READ linkDraft NOTIFY linkDraftChanged)
@@ -70,6 +72,15 @@ public:
     QString triggerStatus() const { return m_triggerStatus; }
     QString lastError() const { return m_lastError; }
     QString configPath() const { return m_store.path(); }
+    QString logsPath() const;
+    // The installed channel from the receipt; empty when not installed.
+    QString channel() const;
+    Q_INVOKABLE void openLogsFolder();
+    Q_INVOKABLE void openUserGuide();
+    Q_INVOKABLE void openLicences();
+    // App, version, desktop and Link details for a bug report; no action contents.
+    Q_INVOKABLE QString diagnostics() const;
+    Q_INVOKABLE void copyDiagnostics();
     QVariantMap linkDraft() const { return m_linkDraft; }
     QString linkSource() const { return m_linkSource; }
     QObject *arcadeWorker() const { return m_dispatcher.arcade().ioWorker(); }
@@ -90,6 +101,10 @@ public:
     Q_INVOKABLE void clearError();
     Q_INVOKABLE QString shortcutFromKey(int key, int modifiers) const;
     Q_INVOKABLE bool applyShortcut(const QString &shortcut, bool overrideConflict = false);
+    // The kit's shortcut recorder names keys the Arcade way ("Ctrl", "Super",
+    // physical keys on macOS); the trigger is stored as Qt portable text.
+    Q_INVOKABLE QString shortcutFromKit(const QString &sequence) const;
+    Q_INVOKABLE QString shortcutForKit(const QString &shortcut) const;
     Q_INVOKABLE void setShortcutRecording(bool recording);
     Q_INVOKABLE void cancelTrigger();
     Q_INVOKABLE void pointerMoved(qreal localX, qreal localY);
@@ -153,7 +168,9 @@ private:
     QJsonArray decks() const;
     QJsonObject deckAt(int index) const;
     int deckIndexById(const QString &id) const;
-    enum class Persist { Now, Coalesced, Prepared };
+    enum class Persist { Now,
+                         Coalesced,
+                         Prepared };
     bool commit(QJsonObject updated, bool triggerChanged = false, Persist persist = Persist::Now);
     void applyStartOnLogin();
     void openOverlay();
@@ -194,7 +211,9 @@ private:
     int m_iconGeneration = 0;
     int m_selectedIndex = -1;
     bool m_pressed = false;
-    enum class Mode { Hold, Click, Preview };
+    enum class Mode { Hold,
+                      Click,
+                      Preview };
     Mode m_mode = Mode::Hold;
     bool m_waitingForCenter = false;
     bool m_visible = false;

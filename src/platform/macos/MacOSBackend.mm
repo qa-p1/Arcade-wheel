@@ -24,22 +24,7 @@ void assignError(QString *error, const QString &message)
 int nativeKey(Qt::Key key)
 {
     static const QHash<int, int> keys = {
-        {Qt::Key_F1, kVK_F1}, {Qt::Key_F2, kVK_F2}, {Qt::Key_F3, kVK_F3},
-        {Qt::Key_F4, kVK_F4}, {Qt::Key_F5, kVK_F5}, {Qt::Key_F6, kVK_F6},
-        {Qt::Key_F7, kVK_F7}, {Qt::Key_F8, kVK_F8}, {Qt::Key_F9, kVK_F9},
-        {Qt::Key_F10, kVK_F10}, {Qt::Key_F11, kVK_F11}, {Qt::Key_F12, kVK_F12},
-        {Qt::Key_F13, kVK_F13}, {Qt::Key_F14, kVK_F14}, {Qt::Key_F15, kVK_F15},
-        {Qt::Key_F16, kVK_F16}, {Qt::Key_F17, kVK_F17}, {Qt::Key_F18, kVK_F18},
-        {Qt::Key_F19, kVK_F19}, {Qt::Key_F20, kVK_F20},
-        {Qt::Key_Space, kVK_Space}, {Qt::Key_Tab, kVK_Tab},
-        {Qt::Key_Return, kVK_Return}, {Qt::Key_Enter, kVK_ANSI_KeypadEnter},
-        {Qt::Key_Escape, kVK_Escape}, {Qt::Key_Backspace, kVK_Delete},
-        {Qt::Key_Delete, kVK_ForwardDelete}, {Qt::Key_Home, kVK_Home},
-        {Qt::Key_End, kVK_End}, {Qt::Key_PageUp, kVK_PageUp},
-        {Qt::Key_PageDown, kVK_PageDown}, {Qt::Key_Left, kVK_LeftArrow},
-        {Qt::Key_Right, kVK_RightArrow}, {Qt::Key_Up, kVK_UpArrow},
-        {Qt::Key_Down, kVK_DownArrow}
-    };
+        {Qt::Key_F1, kVK_F1}, {Qt::Key_F2, kVK_F2}, {Qt::Key_F3, kVK_F3}, {Qt::Key_F4, kVK_F4}, {Qt::Key_F5, kVK_F5}, {Qt::Key_F6, kVK_F6}, {Qt::Key_F7, kVK_F7}, {Qt::Key_F8, kVK_F8}, {Qt::Key_F9, kVK_F9}, {Qt::Key_F10, kVK_F10}, {Qt::Key_F11, kVK_F11}, {Qt::Key_F12, kVK_F12}, {Qt::Key_F13, kVK_F13}, {Qt::Key_F14, kVK_F14}, {Qt::Key_F15, kVK_F15}, {Qt::Key_F16, kVK_F16}, {Qt::Key_F17, kVK_F17}, {Qt::Key_F18, kVK_F18}, {Qt::Key_F19, kVK_F19}, {Qt::Key_F20, kVK_F20}, {Qt::Key_Space, kVK_Space}, {Qt::Key_Tab, kVK_Tab}, {Qt::Key_Return, kVK_Return}, {Qt::Key_Enter, kVK_ANSI_KeypadEnter}, {Qt::Key_Escape, kVK_Escape}, {Qt::Key_Backspace, kVK_Delete}, {Qt::Key_Delete, kVK_ForwardDelete}, {Qt::Key_Home, kVK_Home}, {Qt::Key_End, kVK_End}, {Qt::Key_PageUp, kVK_PageUp}, {Qt::Key_PageDown, kVK_PageDown}, {Qt::Key_Left, kVK_LeftArrow}, {Qt::Key_Right, kVK_RightArrow}, {Qt::Key_Up, kVK_UpArrow}, {Qt::Key_Down, kVK_DownArrow}};
     if (keys.contains(key)) return keys.value(key);
     // Translate printable keys using the active keyboard layout.
     if (key < Qt::Key_Space || key > Qt::Key_ydiaeresis) return -1;
@@ -54,8 +39,8 @@ int nativeKey(Qt::Key key)
             UniChar chars[4];
             UniCharCount count = 0;
             if (UCKeyTranslate(layout, code, kUCKeyActionDown, 0, LMGetKbdType(),
-                    kUCKeyTranslateNoDeadKeysBit, &deadKey, 4, &count, chars) == noErr
-                && count == 1 && QChar(chars[0]).toUpper().unicode() == key) {
+                               kUCKeyTranslateNoDeadKeysBit, &deadKey, 4, &count, chars) == noErr &&
+                count == 1 && QChar(chars[0]).toUpper().unicode() == key) {
                 result = code;
                 break;
             }
@@ -64,7 +49,7 @@ int nativeKey(Qt::Key key)
     CFRelease(source);
     return result;
 }
-}
+} // namespace
 
 struct MacOSBackend::Native {
     EventHotKeyRef hotKey = nullptr;
@@ -79,7 +64,8 @@ struct MacOSBackend::Native {
         auto &state = *backend->m_native;
         EventHotKeyID id{};
         if (GetEventParameter(event, kEventParamDirectObject, typeEventHotKeyID,
-                nullptr, sizeof(id), nullptr, &id) != noErr || id.signature != 0x4157434c || id.id != 1)
+                              nullptr, sizeof(id), nullptr, &id) != noErr ||
+            id.signature != 0x4157434c || id.id != 1)
             return eventNotHandledErr;
         const bool pressed = GetEventKind(event) == kEventHotKeyPressed;
         if (pressed != state.down) {
@@ -112,8 +98,7 @@ QString MacOSBackend::shortcutValidationError(const QString &shortcut) const
 
 QJsonObject MacOSBackend::shortcutRegistration() const
 {
-    return {{"applied", m_native->hotKey != nullptr}, {"via", "native"},
-            {"hint", "Could not register the shortcut. Choose one not used by another app or macOS."}};
+    return {{"applied", m_native->hotKey != nullptr}, {"via", "native"}, {"hint", "Could not register the shortcut. Choose one not used by another app or macOS."}};
 }
 
 void MacOSBackend::configureTrigger(const QJsonObject &trigger)
@@ -153,10 +138,10 @@ void MacOSBackend::configureTrigger(const QJsonObject &trigger)
     }
     if (status == noErr)
         status = RegisterEventHotKey(nativeKey(sequence[0].key()), nativeModifiers,
-            EventHotKeyID{0x4157434c, 1}, GetApplicationEventTarget(), 0, &m_native->hotKey);
+                                     EventHotKeyID{0x4157434c, 1}, GetApplicationEventTarget(), 0, &m_native->hotKey);
     emit triggerStatusChanged(status == noErr
-        ? QStringLiteral("Ready — hold %1").arg(sequence.toString(QKeySequence::NativeText))
-        : QStringLiteral("Could not register shortcut (macOS error %1). Choose a shortcut not used by another app or macOS.").arg(status));
+                                  ? QStringLiteral("Ready — hold %1").arg(sequence.toString(QKeySequence::NativeText))
+                                  : QStringLiteral("Could not register shortcut (macOS error %1). Choose a shortcut not used by another app or macOS.").arg(status));
 }
 
 void MacOSBackend::setShortcutRecording(bool recording)
@@ -167,7 +152,10 @@ void MacOSBackend::setShortcutRecording(bool recording)
 
 bool MacOSBackend::prepareOverlay(QQuickWindow *window, QString *error)
 {
-    if (!window) { assignError(error, QStringLiteral("Overlay window is missing")); return false; }
+    if (!window) {
+        assignError(error, QStringLiteral("Overlay window is missing"));
+        return false;
+    }
     if (QGuiApplication::platformName() != QStringLiteral("cocoa")) return true;
     NSView *view = reinterpret_cast<NSView *>(window->winId());
     NSWindow *nativeWindow = [view window];
@@ -190,17 +178,17 @@ QVector<DiscoveredApplication> MacOSBackend::applications() const
     QSet<QString> seen;
     @autoreleasepool {
         for (const QString &root : {QStringLiteral("/Applications"), QStringLiteral("/System/Applications"),
-                                   QDir::homePath() + QStringLiteral("/Applications")}) {
+                                    QDir::homePath() + QStringLiteral("/Applications")}) {
             NSDirectoryEnumerator *items = [[NSFileManager defaultManager]
-                enumeratorAtURL:[NSURL fileURLWithPath:root.toNSString()]
+                           enumeratorAtURL:[NSURL fileURLWithPath:root.toNSString()]
                 includingPropertiesForKeys:nil
-                options:NSDirectoryEnumerationSkipsHiddenFiles | NSDirectoryEnumerationSkipsPackageDescendants
-                errorHandler:nil];
+                                   options:NSDirectoryEnumerationSkipsHiddenFiles | NSDirectoryEnumerationSkipsPackageDescendants
+                              errorHandler:nil];
             for (NSURL *url in items) {
                 if (![[url pathExtension] isEqualToString:@"app"]) continue;
                 NSBundle *bundle = [NSBundle bundleWithURL:url];
                 NSString *identifier = [bundle bundleIdentifier];
-                if (!identifier || [identifier isEqualToString:@"com.arcadewheel.ArcadeWheel"]) continue;
+                if (!identifier || ([identifier isEqualToString:@"dev.arcade.Wheel"] || [identifier isEqualToString:@"com.arcadewheel.ArcadeWheel"])) continue;
                 const QString id = QString::fromNSString(identifier);
                 if (seen.contains(id)) continue;
                 seen.insert(id);
@@ -210,8 +198,7 @@ QVector<DiscoveredApplication> MacOSBackend::applications() const
                 NSString *icon = [bundle objectForInfoDictionaryKey:@"CFBundleIconFile"];
                 if (icon && [[icon pathExtension] length] == 0) icon = [icon stringByAppendingPathExtension:@"icns"];
                 NSString *iconPath = icon ? [[bundle resourcePath] stringByAppendingPathComponent:icon] : nil;
-                result.append({id, QString::fromNSString(title), QString::fromNSString(iconPath),
-                               {}, QString::fromNSString([url path])});
+                result.append({id, QString::fromNSString(title), QString::fromNSString(iconPath), {}, QString::fromNSString([url path])});
             }
         }
     }
@@ -232,6 +219,23 @@ bool MacOSBackend::launchApplication(const QString &id, bool focusExisting, QStr
     return false;
 }
 
+namespace {
+// AppleScript for the actions macOS exposes to scripts; empty when it has none.
+QString macScript(const QString &id)
+{
+    if (id == QStringLiteral("logout")) return QStringLiteral("tell application \"System Events\" to log out");
+    if (id == QStringLiteral("reboot")) return QStringLiteral("tell application \"System Events\" to restart");
+    if (id == QStringLiteral("poweroff")) return QStringLiteral("tell application \"System Events\" to shut down");
+    if (id == QStringLiteral("media:volume-up"))
+        return QStringLiteral("set volume output volume ((output volume of (get volume settings)) + 6)");
+    if (id == QStringLiteral("media:volume-down"))
+        return QStringLiteral("set volume output volume ((output volume of (get volume settings)) - 6)");
+    if (id == QStringLiteral("media:mute"))
+        return QStringLiteral("set volume output muted (not (output muted of (get volume settings)))");
+    return {};
+}
+} // namespace
+
 bool MacOSBackend::performSystemAction(const QString &id, QString *error)
 {
     bool started = false;
@@ -239,6 +243,9 @@ bool MacOSBackend::performSystemAction(const QString &id, QString *error)
         started = QProcess::startDetached(QStringLiteral("/usr/sbin/screencapture"), {QStringLiteral("-i"), QStringLiteral("-c")});
     else if (id == QStringLiteral("suspend"))
         started = QProcess::startDetached(QStringLiteral("/usr/bin/pmset"), {QStringLiteral("sleepnow")});
+    else if (const QString script = macScript(id); !script.isEmpty())
+        // System Events asks once for permission to control it (Automation).
+        started = QProcess::startDetached(QStringLiteral("/usr/bin/osascript"), {QStringLiteral("-e"), script});
     else {
         assignError(error, QStringLiteral("This system or media action is not available on macOS: %1").arg(id));
         return false;
@@ -251,8 +258,7 @@ bool MacOSBackend::setStartOnLogin(bool enabled, QString *error)
 {
     @autoreleasepool {
         const QString bundle = QFileInfo(QString::fromNSString([[NSBundle mainBundle] bundlePath])).canonicalFilePath();
-        if (enabled && !bundle.startsWith(QStringLiteral("/Applications/"))
-            && !bundle.startsWith(QDir::homePath() + QStringLiteral("/Applications/"))) {
+        if (enabled && !bundle.startsWith(QStringLiteral("/Applications/")) && !bundle.startsWith(QDir::homePath() + QStringLiteral("/Applications/"))) {
             assignError(error, QStringLiteral("Move Arcade Wheel to Applications before enabling start on login."));
             return false;
         }

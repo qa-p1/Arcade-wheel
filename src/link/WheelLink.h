@@ -32,7 +32,7 @@ public:
     static QVariantMap draftFor(const QJsonObject &content, QString *error);
 
     // Writes the manifest and starts or stops listening to match `config`.
-    void apply(const QJsonObject &config);
+    void apply(const QJsonObject &next);
     void stop();
     void setTrayState(const QString &state);
     bool listening() const;

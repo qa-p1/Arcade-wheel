@@ -8,13 +8,19 @@ since: 0.3.0
 
 ## Arrange actions into decks
 
-A deck has up to eight radial slots. Create as many decks as you need, name them, duplicate them, move them earlier or later, and delete them. The first **Applications** deck is filled with up to six installed graphical apps; empty slots are ready to edit. Choose a slot in **Settings → Wheel** to add, replace or clear an action.
+A deck has up to eight radial slots. Create as many decks as you need, name them, duplicate them, move them earlier or later, and delete them. The first **Applications** deck is filled with up to six installed graphical apps; empty slots are ready to edit. Choose a slot in **Settings → Your wheel** to add, replace or clear an action.
 
 Scroll while holding the trigger to switch decks. Decks wrap around by default; **Settings → Behaviour** can turn wrapping off or reverse scroll direction. The wheel shows the current deck and its position in the deck list.
 
 ## Choose what a slot does
 
-The action picker can launch or focus an application, run a command with arguments, open a URL, file or folder, perform a supported system action, send a media key, run a compositor action, or invoke a compatible Arcade app action. Commands run as a program and argument list, not through a shell; use `sh -c` explicitly if a shell command is needed.
+The action picker can launch or focus an application, run a command with arguments, open a URL, file or folder, perform a system action, send a media key, run a desktop action, or invoke a compatible Arcade app action.
+
+- **System:** lock, suspend, hibernate, log out, restart, power off and screenshot.
+- **Media:** play or pause, next, previous, stop, volume up, volume down and mute.
+- **Desktop** (Hyprland): fullscreen, float, pin, center or close the active window, move focus left, right, up or down, go to the next, previous or last workspace, and move the window to the next or previous workspace.
+
+What a system can run varies: macOS runs suspend (sleep), log out, restart, power off, screenshot and the three volume actions, and asks once for permission to control System Events; Windows has no desktop actions. Commands run as a program and argument list, not through a shell; use `sh -c` explicitly if a shell command is needed.
 
 A slot whose application, provider or action is missing stays visible in Settings with its unavailable reason. Repair the slot or reconnect the provider to use it again.
 
@@ -22,7 +28,7 @@ A slot whose application, provider or action is missing stays visible in Setting
 
 Hold the configured global trigger. The overlay opens on the screen containing the pointer and, on Hyprland, moves the pointer to the wheel center. Move toward a slice to select its action; the selected name appears in the hub. Release the trigger to run it. Releasing in the center cancels. Right-click or **Escape** cancels the overlay. Scroll to change decks while holding.
 
-**Settings → Trigger** records a different trigger, checks for shortcut collisions and shows whether the platform registered it. You can set a hold threshold so Wheel waits before opening. The default threshold is zero, so the wheel opens as soon as the trigger is pressed.
+**Settings → Shortcuts** records a different trigger, checks for shortcut collisions and shows whether the platform registered it. You can set a hold threshold so Wheel waits before opening. The default threshold is zero, so the wheel opens as soon as the trigger is pressed.
 
 ## Assign center gestures
 

@@ -1,6 +1,7 @@
 #include "core/IconImageProvider.h"
 
 #include <QFileInfo>
+#include <QHash>
 #include <QIcon>
 #include <QPainter>
 #include <QUrl>
@@ -15,6 +16,22 @@ QImage IconImageProvider::requestImage(const QString &id, QSize *size, const QSi
     QString name = QUrl::fromPercentEncoding(id.section(u'?', 0, 0).toUtf8());
     if (name.startsWith(QStringLiteral("qrc:/"))) name = name.mid(3);
     QIcon icon = QFileInfo::exists(name) ? QIcon(name) : QIcon::fromTheme(name);
+    // Current Adwaita ships only symbolic action icons (media-playback-start-symbolic).
+    bool symbolic = false;
+    if (icon.isNull() && !QFileInfo::exists(name)) {
+        icon = QIcon::fromTheme(name + QStringLiteral("-symbolic"));
+        if (icon.isNull()) {
+            // Names Adwaita has under another standard name only.
+            static const QHash<QString, QString> aliases{
+                {QStringLiteral("internet-web-browser"), QStringLiteral("web-browser-symbolic")},
+                {QStringLiteral("system-suspend"), QStringLiteral("weather-clear-night-symbolic")},
+                {QStringLiteral("system-suspend-hibernate"), QStringLiteral("weather-clear-night-symbolic")},
+                {QStringLiteral("window-pin"), QStringLiteral("view-pin-symbolic")},
+                {QStringLiteral("applications-other"), QStringLiteral("view-app-grid-symbolic")}};
+            if (const auto alias = aliases.constFind(name); alias != aliases.cend()) icon = QIcon::fromTheme(*alias);
+        }
+        symbolic = !icon.isNull();
+    }
     if (icon.isNull()) icon = QIcon::fromTheme(QStringLiteral("application-x-executable"));
     QImage image(QSize(width, height), QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
@@ -36,6 +53,10 @@ QImage IconImageProvider::requestImage(const QString &id, QSize *size, const QSi
     if (name.startsWith(QStringLiteral(":/assets/arcade/"))) {
         painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
         painter.fillRect(image.rect(), QColor(QStringLiteral("#E7EAF0")));
+    } else if (symbolic) {
+        // A mid grey that reads on the light and the dark cards.
+        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        painter.fillRect(image.rect(), QColor(QStringLiteral("#7C8596")));
     }
     if (size) *size = image.size();
     return image;

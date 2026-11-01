@@ -1,6 +1,6 @@
-Arcade Link shared assets (unchanged since v0.3.0).
+Arcade Link shared assets (unchanged since v0.3.0; pinned to v0.4.15, the tag src/link comes from).
 Repository: https://github.com/qa-p1/Arcade-link
-Commit: 4c75f3a7c806ae78f96127c556708e65eaeeb476
+Commit: 56798545d263c104ded54877239750f9645c32a3
 License: MIT OR Apache-2.0 (upstream source; Windows includes are MIT).
 
 SHA-256:

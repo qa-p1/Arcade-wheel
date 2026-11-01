@@ -8,7 +8,7 @@ since: 0.3.0
 
 ## Why does F8 open a wheel only while I hold it?
 
-Wheel uses press and release as one gesture: press opens the overlay, pointer direction selects a slot, and release runs it. A release in the center cancels. You can assign a hold threshold or choose a different trigger in **Settings → Trigger**.
+Wheel uses press and release as one gesture: press opens the overlay, pointer direction selects a slot, and release runs it. A release in the center cancels. You can assign a hold threshold or choose a different trigger in **Settings → Shortcuts**.
 
 ## Can I tap the trigger to toggle the wheel?
 
@@ -29,6 +29,10 @@ Linux Wayland is used daily on Hyprland, and the project has Linux Xvfb checks. 
 ## Can I keep using Wheel without Tools?
 
 Yes. Tools hosts only the tray. Wheel's actions and settings stay in Wheel. If Tools quits or crashes, Wheel restores its own tray immediately; during a declared Tools restart it waits up to five seconds to avoid flashing icons. Turning off connections also restores Wheel's tray.
+
+## Where does Wheel keep its settings?
+
+In `~/.config/arcade/wheel/settings.json` on Linux, `%APPDATA%\Arcade\Wheel\settings.json` on Windows and `~/Library/Application Support/Arcade/Wheel/settings.json` on macOS. **Settings → General** shows the exact file. Logs are in `~/.cache/arcade/wheel/logs` (Windows `%LOCALAPPDATA%\Arcade\Wheel\logs`, macOS `~/Library/Caches/Arcade/Wheel/logs`). Wheel 0.5 moves the folders of earlier versions here on its first start and keeps anything it could not move.
 
 ## What goes into a settings backup?
 

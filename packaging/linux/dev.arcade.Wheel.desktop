@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Arcade Wheel
+Comment=A radial launcher for the desktop. Hold a key, flick toward an action, release.
+Exec=arcade-wheel --settings
+Icon=dev.arcade.Wheel
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=wheel;radial;launcher;shortcut;actions;decks;pie menu;
+StartupNotify=false
+StartupWMClass=dev.arcade.Wheel
+Actions=Settings;Quit;
+
+[Desktop Action Settings]
+Name=Settings
+Exec=arcade-wheel --settings
+
+[Desktop Action Quit]
+Name=Quit Arcade Wheel
+Exec=arcade-wheel --quit

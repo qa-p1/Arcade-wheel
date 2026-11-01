@@ -17,15 +17,6 @@ cp "$repo/LICENSE" "$repo/README.md" "$app/Contents/Resources/"
 mkdir -p "$app/Contents/Resources/docs"
 ditto "$repo/docs/user" "$app/Contents/Resources/docs/user"
 
-iconset="$stage/arcade-wheel.iconset"
-mkdir -p "$iconset"
-for size in 16 32 128 256 512; do
-    sips -z "$size" "$size" "$repo/assets/arcade-wheel.png" --out "$iconset/icon_${size}x${size}.png" >/dev/null
-    doubled=$((size * 2))
-    sips -z "$doubled" "$doubled" "$repo/assets/arcade-wheel.png" --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
-done
-iconutil -c icns "$iconset" -o "$app/Contents/Resources/arcade-wheel.icns"
-rm -r "$iconset"
 # macdeployqt normally deploys only Cocoa. Include the offscreen plugin and
 # relocate its framework references too, so the packaged UI can be tested.
 qt_plugins=$(qmake -query QT_INSTALL_PLUGINS)

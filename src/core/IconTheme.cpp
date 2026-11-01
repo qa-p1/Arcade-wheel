@@ -15,8 +15,7 @@ namespace {
 QString unquote(QString value)
 {
     value = value.trimmed();
-    if (value.size() >= 2 && (value.startsWith(u'"') || value.startsWith(u'\''))
-        && value.endsWith(value.front()))
+    if (value.size() >= 2 && (value.startsWith(u'"') || value.startsWith(u'\'')) && value.endsWith(value.front()))
         value = value.mid(1, value.size() - 2).trimmed();
     return value;
 }

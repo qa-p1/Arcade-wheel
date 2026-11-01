@@ -40,4 +40,4 @@ The default global trigger is **F8**. Your desktop may ask you to approve it. To
 
 ## Try this first
 
-Open **Settings → Wheel**, choose an empty slot and save an action. Then hold F8 and aim toward that slot. The center label shows the selected action before you release.
+Open **Settings → Your wheel**, choose an empty slot and save an action. Then hold F8 and aim toward that slot. The center label shows the selected action before you release.

@@ -1,5 +1,6 @@
 #include "link/AppMetadata.h"
 #include "link/WheelLink.h"
+#include "core/WheelPaths.h"
 
 #include "core/WheelController.h"
 
@@ -16,7 +17,10 @@
 
 using namespace ArcadeLink;
 
-struct WheelLink::PresenceState { std::unique_ptr<Server> server; QString tray = QStringLiteral("own"); };
+struct WheelLink::PresenceState {
+    std::unique_ptr<Server> server;
+    QString tray = QStringLiteral("own");
+};
 
 namespace {
 QString backendShortcut(QString accelerator)
@@ -32,10 +36,7 @@ QString backendShortcut(QString accelerator)
 #else
     accelerator.replace(QStringLiteral("Super+"), QStringLiteral("Meta+"));
 #endif
-    const QHash<QString, QString> names{{"Slash", "/"}, {"Backslash", "\\"},
-        {"BracketLeft", "["}, {"BracketRight", "]"}, {"Quote", "'"}, {"Backquote", "`"},
-        {"Minus", "-"}, {"Equal", "="}, {"Semicolon", ";"}, {"Comma", ","}, {"Period", "."},
-        {"PageUp", "PgUp"}, {"PageDown", "PgDown"}};
+    const QHash<QString, QString> names{{"Slash", "/"}, {"Backslash", "\\"}, {"BracketLeft", "["}, {"BracketRight", "]"}, {"Quote", "'"}, {"Backquote", "`"}, {"Minus", "-"}, {"Equal", "="}, {"Semicolon", ";"}, {"Comma", ","}, {"Period", "."}, {"PageUp", "PgUp"}, {"PageDown", "PgDown"}};
     const QString key = accelerator.section('+', -1);
     if (names.contains(key)) accelerator = accelerator.left(accelerator.size() - key.size()) + names.value(key);
     return accelerator;
@@ -53,7 +54,7 @@ QString canonicalTrigger(QString shortcut)
     return Accelerator::normalize(shortcut);
 }
 
-}
+} // namespace
 
 WheelLink::WheelLink(QString version, QObject *parent, bool background)
     : QObject(parent), m_version(std::move(version)), m_startMode(background ? "background" : "foreground"),
@@ -72,27 +73,15 @@ QJsonArray WheelLink::actions()
 {
     const QJsonArray all{QStringLiteral("linux"), QStringLiteral("windows"), QStringLiteral("macos")};
     return {
-        QJsonObject{{QStringLiteral("id"), QStringLiteral("wheel.add_action")}, {QStringLiteral("version"), 1},
-                    {QStringLiteral("title"), QStringLiteral("Add to Wheel")}, {QStringLiteral("verb"), QStringLiteral("add")},
-                    {QStringLiteral("accepts"), QJsonArray{QStringLiteral("text/url"), QStringLiteral("text/plain;hint=command"),
-                                                           QStringLiteral("file/*"), QStringLiteral("folder/reference"), QStringLiteral("structured/arcade-action")}},
-                    {QStringLiteral("produces"), QJsonArray{}},
-                    {QStringLiteral("effects"), QJsonArray{QStringLiteral("persists"), QStringLiteral("opens-ui")}},
-                    {QStringLiteral("interactive"), true}, {QStringLiteral("privacy"), QStringLiteral("local")},
-                    {QStringLiteral("platforms"), all}, {QStringLiteral("available"), true}},
-        QJsonObject{{QStringLiteral("id"), QStringLiteral("wheel.show")}, {QStringLiteral("version"), 1},
-                    {QStringLiteral("title"), QStringLiteral("Show the Wheel")}, {QStringLiteral("verb"), QStringLiteral("show")},
-                    {QStringLiteral("accepts"), QJsonArray{}}, {QStringLiteral("produces"), QJsonArray{}},
-                    {QStringLiteral("effects"), QJsonArray{QStringLiteral("opens-ui")}},
-                    {QStringLiteral("interactive"), true}, {QStringLiteral("privacy"), QStringLiteral("local")},
-                    {QStringLiteral("platforms"), all}, {QStringLiteral("available"), true}},
+        QJsonObject{{QStringLiteral("id"), QStringLiteral("wheel.add_action")}, {QStringLiteral("version"), 1}, {QStringLiteral("title"), QStringLiteral("Add to Wheel")}, {QStringLiteral("verb"), QStringLiteral("add")}, {QStringLiteral("accepts"), QJsonArray{QStringLiteral("text/url"), QStringLiteral("text/plain;hint=command"), QStringLiteral("file/*"), QStringLiteral("folder/reference"), QStringLiteral("structured/arcade-action")}}, {QStringLiteral("produces"), QJsonArray{}}, {QStringLiteral("effects"), QJsonArray{QStringLiteral("persists"), QStringLiteral("opens-ui")}}, {QStringLiteral("interactive"), true}, {QStringLiteral("privacy"), QStringLiteral("local")}, {QStringLiteral("platforms"), all}, {QStringLiteral("available"), true}},
+        QJsonObject{{QStringLiteral("id"), QStringLiteral("wheel.show")}, {QStringLiteral("version"), 1}, {QStringLiteral("title"), QStringLiteral("Show the Wheel")}, {QStringLiteral("verb"), QStringLiteral("show")}, {QStringLiteral("accepts"), QJsonArray{}}, {QStringLiteral("produces"), QJsonArray{}}, {QStringLiteral("effects"), QJsonArray{QStringLiteral("opens-ui")}}, {QStringLiteral("interactive"), true}, {QStringLiteral("privacy"), QStringLiteral("local")}, {QStringLiteral("platforms"), all}, {QStringLiteral("available"), true}},
     };
 }
 
 QJsonArray WheelLink::menuItems()
 {
     return {QJsonObject{{QStringLiteral("id"), QStringLiteral("show-wheel")},
-                        {QStringLiteral("title"), QStringLiteral("Show Wheel")},
+                        {QStringLiteral("title"), QStringLiteral("Open wheel")},
                         {QStringLiteral("kind"), QStringLiteral("action")},
                         {QStringLiteral("enabled"), true},
                         {QStringLiteral("effects"), QJsonArray{QStringLiteral("opens-ui")}}}};
@@ -109,19 +98,13 @@ QVariantMap WheelLink::draftFor(const QJsonObject &content, QString *error)
         const auto action = data.value(QStringLiteral("action")).toString();
         const auto input = data.value(QStringLiteral("input")).toString(QStringLiteral("none"));
         const QStringList inputs{QStringLiteral("none"), QStringLiteral("clipboard"), QStringLiteral("lens-selection"), QStringLiteral("file-selection")};
-        if (!AppMetadata::apps().contains(app) || action.isEmpty() || data.value(QStringLiteral("version")).toInt(0) < 1
-            || data.value(QStringLiteral("title")).toString().isEmpty() || !inputs.contains(input)
-            || (data.contains(QStringLiteral("options")) && !data.value(QStringLiteral("options")).isObject())) {
+        if (!AppMetadata::apps().contains(app) || action.isEmpty() || data.value(QStringLiteral("version")).toInt(0) < 1 || data.value(QStringLiteral("title")).toString().isEmpty() || !inputs.contains(input) || (data.contains(QStringLiteral("options")) && !data.value(QStringLiteral("options")).isObject())) {
             if (error) *error = QStringLiteral("The Arcade action reference is incomplete or invalid");
             return {};
         }
-        QJsonObject payload{{QStringLiteral("app"), app}, {QStringLiteral("action"), action},
-            {QStringLiteral("version"), data.value(QStringLiteral("version"))}, {QStringLiteral("input"), input},
-            {QStringLiteral("options"), data.value(QStringLiteral("options")).toObject()}};
+        QJsonObject payload{{QStringLiteral("app"), app}, {QStringLiteral("action"), action}, {QStringLiteral("version"), data.value(QStringLiteral("version"))}, {QStringLiteral("input"), input}, {QStringLiteral("options"), data.value(QStringLiteral("options")).toObject()}};
         if (data.contains(QStringLiteral("preset"))) payload.insert(QStringLiteral("preset"), data.value(QStringLiteral("preset")));
-        return {{QStringLiteral("type"), QStringLiteral("arcade")}, {QStringLiteral("name"), data.value(QStringLiteral("title")).toString()},
-                {QStringLiteral("icon"), QStringLiteral("qrc:/assets/arcade/%1.svg").arg(app)},
-                {QStringLiteral("payload"), payload.toVariantMap()}};
+        return {{QStringLiteral("type"), QStringLiteral("arcade")}, {QStringLiteral("name"), data.value(QStringLiteral("title")).toString()}, {QStringLiteral("icon"), QStringLiteral("qrc:/assets/arcade/%1.svg").arg(app)}, {QStringLiteral("payload"), payload.toVariantMap()}};
     }
     if (typeMatches(QStringLiteral("text/url"), type)) {
         const QUrl url = QUrl::fromUserInput(text);
@@ -166,9 +149,10 @@ void WheelLink::setController(WheelController *controller)
     m_ioWorker = controller->arcadeWorker();
     const auto updateBusy = [this] {
         bool busy = m_controller && m_controller->linkPending();
-        if (m_controller) for (const auto &value : m_controller->linkJobs()) {
-            busy |= value.toMap().value(QStringLiteral("running")).toBool();
-        }
+        if (m_controller)
+            for (const auto &value : m_controller->linkJobs()) {
+                busy |= value.toMap().value(QStringLiteral("running")).toBool();
+            }
         m_busy.store(busy);
     };
     connect(controller, &WheelController::linkJobsChanged, this, updateBusy);
@@ -183,9 +167,9 @@ void WheelLink::setController(WheelController *controller)
         m_pendingAdd.reset();
         m_addCancelTimer.stop();
         if (saved)
-            respond(r, [where](const Responder &r) { r.finish({{QStringLiteral("message"), where.isEmpty() ? QStringLiteral("Added to the Wheel") : QStringLiteral("Added to %1").arg(where)}}); });
+            respond(r, [where](const Responder &reply) { reply.finish({{QStringLiteral("message"), where.isEmpty() ? QStringLiteral("Added to the Wheel") : QStringLiteral("Added to %1").arg(where)}}); });
         else
-            respond(r, [](const Responder &r) { r.finishError(Error::make(QStringLiteral("denied"), QStringLiteral("cancelled in Arcade Wheel"), QStringLiteral("user_cancelled"))); });
+            respond(r, [](const Responder &reply) { reply.finishError(Error::make(QStringLiteral("denied"), QStringLiteral("cancelled in Arcade Wheel"), QStringLiteral("user_cancelled"))); });
     });
 }
 
@@ -255,7 +239,7 @@ QJsonObject WheelLink::manifest(const QJsonObject &config, const QString &versio
             {QStringLiteral("launch"), QJsonObject{{QStringLiteral("background"), QJsonArray{QStringLiteral("--background")}}}},
             {QStringLiteral("shortcuts"), shortcuts},
             {QStringLiteral("menu"), menuItems()},
-            {QStringLiteral("logs"), QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/logs")},
+            {QStringLiteral("logs"), WheelPaths::logsDir()},
             {QStringLiteral("install"), AppInstaller::installMethod()},
             {QStringLiteral("docs"), QJsonObject{{QStringLiteral("version"), version}}},
             {QStringLiteral("settings"), QJsonObject{{QStringLiteral("linkEnabled"), enabled}}},
@@ -267,42 +251,51 @@ void WheelLink::respond(const Responder &r, std::function<void(const Responder &
     if (m_ioWorker) QMetaObject::invokeMethod(m_ioWorker, [r, reply = std::move(reply)] { reply(r); });
 }
 
-void WheelLink::apply(const QJsonObject &config)
+void WheelLink::apply(const QJsonObject &next)
 {
     if (!m_ioWorker) return;
-    const auto configSnapshot = config;
+    const auto configSnapshot = next;
     const auto state = m_presence;
     const auto loc = m_locations;
     const auto version = m_version;
-    const auto mode = m_startMode;
-    QMetaObject::invokeMethod(m_ioWorker, [this, state, loc, version, configSnapshot, mode] {
+    const auto startMode = m_startMode;
+    QMetaObject::invokeMethod(m_ioWorker, [this, state, loc, version, configSnapshot, startMode] {
         const auto manifest = WheelLink::manifest(configSnapshot, version);
-        QString error;
-        const bool changed = writeManifest(loc, manifest, &error);
+        QString startError;
+        const bool changed = writeManifest(loc, manifest, &startError);
         const bool enabled = manifest.value("settings").toObject().value("linkEnabled").toBool();
         if (enabled && !state->server) {
             state->server = std::make_unique<Server>(Ids::Wheel, version, loc);
             state->server->describe = [] { return WheelLink::actions(); };
-            state->server->status = [mode] { return QJsonObject{{"mode", mode}}; };
+            state->server->status = [startMode] { return QJsonObject{{"mode", startMode}}; };
             state->server->trayState = [state] { return state->tray; };
             state->server->settings = [this](const QJsonObject &, const Responder &r) {
                 QMetaObject::invokeMethod(this, [this, r] {
-                    if (!m_controller) { respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); }); return; }
+                    if (!m_controller) {
+                        respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); });
+                        return;
+                    }
                     m_controller->requestSettings();
                     respond(r, [](const Responder &reply) { reply.done({{"opened", true}}); });
                 });
             };
-            state->server->restartReady = [this](const QString &mode) {
-                return m_busy.load() && mode != u"force" ? Error::make("busy", "Wheel has an active job or an action waiting to be saved.") : Error{};
+            state->server->restartReady = [this](const QString &requested) {
+                return m_busy.load() && requested != u"force" ? Error::make("busy", "Wheel has an active job or an action waiting to be saved.") : Error{};
             };
             state->server->restart = [this](const QString &) {
                 QMetaObject::invokeMethod(this, [this] { if (m_controller) m_controller->requestRestart(); });
             };
             state->server->menu = [](const QJsonObject &, const Responder &r) { r.done({{"items", menuItems()}}); };
             state->server->menuInvoke = [this](const QJsonObject &params, const Responder &r) {
-                if (params.value("id").toString() != u"show-wheel") { r.fail(Error::make("unavailable", "No such menu item.")); return; }
+                if (params.value("id").toString() != u"show-wheel") {
+                    r.fail(Error::make("unavailable", "No such menu item."));
+                    return;
+                }
                 QMetaObject::invokeMethod(this, [this, r] {
-                    if (!m_controller) { respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); }); return; }
+                    if (!m_controller) {
+                        respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); });
+                        return;
+                    }
                     m_controller->showWheel();
                     respond(r, [](const Responder &reply) { reply.done({{"done", true}}); });
                 });
@@ -310,10 +303,19 @@ void WheelLink::apply(const QJsonObject &config)
             state->server->shortcutsSet = [this](const QJsonObject &params, const Responder &r) {
                 QString error;
                 const QString accelerator = Accelerator::normalize(params.value("accelerator").toString(), &error);
-                if (params.value("id").toString() != u"trigger") { r.fail(Error::make("unavailable", "No such global shortcut.")); return; }
-                if (accelerator.isEmpty() || accelerator.contains(' ')) { r.fail(Error::make("denied", error.isEmpty() ? QStringLiteral("Use one keyboard chord for the hold trigger.") : error)); return; }
+                if (params.value("id").toString() != u"trigger") {
+                    r.fail(Error::make("unavailable", "No such global shortcut."));
+                    return;
+                }
+                if (accelerator.isEmpty() || accelerator.contains(' ')) {
+                    r.fail(Error::make("denied", error.isEmpty() ? QStringLiteral("Use one keyboard chord for the hold trigger.") : error));
+                    return;
+                }
                 QMetaObject::invokeMethod(this, [this, r, accelerator] {
-                    if (!m_controller) { respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); }); return; }
+                    if (!m_controller) {
+                        respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); });
+                        return;
+                    }
                     if (!m_controller->applyShortcut(backendShortcut(accelerator))) {
                         const auto message = m_controller->shortcutConflict().isEmpty() ? m_controller->lastError() : m_controller->shortcutConflict();
                         const auto code = m_controller->shortcutFailureCode();
@@ -326,26 +328,38 @@ void WheelLink::apply(const QJsonObject &config)
             };
             state->server->settingsExport = [this, loc](const QJsonObject &, const Responder &r) {
                 QMetaObject::invokeMethod(this, [this, loc, r] {
-                    if (!m_controller) { respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); }); return; }
+                    if (!m_controller) {
+                        respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); });
+                        return;
+                    }
                     const auto config = QJsonObject::fromVariantMap(m_controller->config());
                     respond(r, [config, loc](const Responder &reply) {
                         QString error;
                         const QString path = QDir(loc.handoff).filePath(QStringLiteral("wheel-settings-%1.json").arg(ConfigStore::freshId()));
-                        if (!ensurePrivateDir(loc.handoff) || !ConfigStore().exportTo(config, path, &error)) { reply.fail(Error::make("io", error)); return; }
+                        if (!ensurePrivateDir(loc.handoff) || !ConfigStore().exportTo(config, path, &error)) {
+                            reply.fail(Error::make("io", error));
+                            return;
+                        }
                         reply.done({{"outputs", QJsonArray{QJsonObject{{"type", "file/any"}, {"path", path}}}}});
                     });
                 });
             };
             state->server->settingsImport = [this](const QJsonObject &params, const Responder &r) {
                 const auto inputs = params.value("inputs").toArray();
-                if (inputs.size() != 1 || !inputs.first().toObject().value("type").toString().startsWith("file/")
-                    || !QDir::isAbsolutePath(inputs.first().toObject().value("path").toString())) {
-                    r.fail(Error::make("unsupported_input", "Supply one absolute settings file.")); return;
+                if (inputs.size() != 1 || !inputs.first().toObject().value("type").toString().startsWith("file/") || !QDir::isAbsolutePath(inputs.first().toObject().value("path").toString())) {
+                    r.fail(Error::make("unsupported_input", "Supply one absolute settings file."));
+                    return;
                 }
                 const QString path = inputs.first().toObject().value("path").toString();
-                if (QFileInfo(path).size() > MaxLineBytes) { r.fail(Error::make("too_large", "The settings file exceeds 1 MiB.", {}, MaxLineBytes)); return; }
+                if (QFileInfo(path).size() > MaxLineBytes) {
+                    r.fail(Error::make("too_large", "The settings file exceeds 1 MiB.", {}, MaxLineBytes));
+                    return;
+                }
                 QMetaObject::invokeMethod(this, [this, r, path] {
-                    if (!m_controller) { respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); }); return; }
+                    if (!m_controller) {
+                        respond(r, [](const Responder &reply) { reply.fail(Error::make("not_running", {})); });
+                        return;
+                    }
                     const bool ok = m_controller->importConfig(path);
                     const auto error = m_controller->lastError();
                     respond(r, [ok, error](const Responder &reply) {
@@ -371,13 +385,13 @@ void WheelLink::apply(const QJsonObject &config)
                 QMetaObject::invokeMethod(this, [this] { if (m_controller) m_controller->requestQuit(); });
                 return true;
             };
-            if (!state->server->start(&error)) state->server.reset();
+            if (!state->server->start(&startError)) state->server.reset();
         } else if (!enabled) state->server.reset();
         else if (changed) state->server->notifyChanged();
         const bool live = state->server && state->server->listening();
-        QMetaObject::invokeMethod(this, [this, live, error] { m_listening.store(live); m_lastError = error; emit diagnosticsChanged(live ? QStringLiteral("Listening") : QStringLiteral("Not listening"), error); });
+        QMetaObject::invokeMethod(this, [this, live, startError] { m_listening.store(live); m_lastError = startError; emit diagnosticsChanged(live ? QStringLiteral("Listening") : QStringLiteral("Not listening"), startError); });
     });
-    if (!config.value("link").toObject().value("enabled").toBool(true) && m_controller)
+    if (!next.value("link").toObject().value("enabled").toBool(true) && m_controller)
         m_controller->finishLinkAction(false);
 }
 

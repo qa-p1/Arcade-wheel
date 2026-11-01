@@ -31,7 +31,8 @@ private slots:
             const QString name = o.value(QStringLiteral("name")).toString();
             QVERIFY2((k != Kind::Invalid) == o.value(QStringLiteral("valid")).toBool(), qPrintable(name));
             if (k == Kind::Invalid) continue;
-            const QString kind = k == Kind::Request ? QStringLiteral("request") : k == Kind::Notification ? QStringLiteral("notification") : QStringLiteral("response");
+            const QString kind = k == Kind::Request ? QStringLiteral("request") : k == Kind::Notification ? QStringLiteral("notification")
+                                                                                                          : QStringLiteral("response");
             QCOMPARE(kind, o.value(QStringLiteral("kind")).toString());
         }
         for (const auto &c : v.value(QStringLiteral("negotiate")).toArray()) {

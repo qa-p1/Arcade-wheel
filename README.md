@@ -17,7 +17,12 @@ Arcade Wheel is a small background launcher that works like a game weapon wheel.
 
 It targets **Linux Wayland (especially Hyprland)** on x86_64, **Windows** (x64), and **macOS 13+** (Apple Silicon and Intel). It is written in C++20 with Qt 6 and Qt Quick.
 
-<p align="center"><img src="docs/user/images/settings.png" width="720" alt="Arcade Wheel Settings in an isolated X11 session"></p>
+<p align="center"><img src="docs/user/images/wheel.png" width="640" alt="The wheel open over the desktop, aiming at LibreOffice Writer"></p>
+
+<p align="center">
+  <img src="docs/user/images/settings.png" width="420" alt="Settings, Your wheel page, light theme">
+  <img src="docs/user/images/settings-dark.png" width="420" alt="Settings, Your wheel page, dark theme">
+</p>
 
 ## Download and install
 
@@ -37,14 +42,14 @@ Download the file for your system from [Releases](https://github.com/qa-p1/Arcad
 - Builds are unsigned: Windows installers have no publisher certificate and macOS bundles are ad-hoc signed, without notarization. On Windows, SmartScreen may warn: choose **More info → Run anyway**. On macOS, Control-click or right-click the app and choose **Open** the first time.
 - If FUSE is missing on Linux, run the AppImage with `--appimage-extract-and-run`. Keep the AppImage outside temporary folders before enabling start on login.
 
-See [Install and start Arcade Wheel](docs/user/getting-started.md) and [packaging and release details](docs/PACKAGING.md).
+See [Install and start Arcade Wheel](docs/user/getting-started.md) and [packaging and release details](docs/dev/packaging.md).
 
 ## Features
 
 - **Hold → move → release.** You don't have to aim at an icon; each action owns a whole slice of the circle.
 - **Decks.** Up to 8 actions per deck, any number of decks. Scroll while holding the trigger to switch.
 - **Center gestures.** Single-click, double-click, triple-click, and long press in the hub can each run a group of up to 16 apps or actions.
-- **Actions:** launch or focus applications, run commands, open URLs, files, or folders, system actions (lock, suspend, log out, power off, screenshot), media keys, compositor actions, and actions from other Arcade apps.
+- **Actions:** launch or focus applications, run commands, open URLs, files, or folders, system actions (lock, suspend, hibernate, log out, restart, power off, screenshot), media and volume keys, Hyprland window and workspace actions, and actions from other Arcade apps.
 - **Live settings.** Changes apply to the running wheel immediately, and the Wheel page has a live preview.
 - **Plain JSON config**, saved atomically, with versioned migrations and import/export.
 - **Quiet UI.** The wheel shows action icons, a center label, and deck dots. Nothing else.
@@ -67,13 +72,13 @@ Wheel works on its own. It connects to other installed Arcade apps automatically
 
 The action picker shows each action's effects, including ↗ for actions that send content out. **Activity** shows progress, results and errors, and can cancel a request. Other apps can offer an action through `wheel.add_action`, which opens a draft and requires a chosen slot and confirmation. `wheel.show` opens the wheel.
 
-When Arcade Tools is running, its tray icon hosts Wheel's menu, including **Show Wheel**. When Tools quits, Wheel's own icon returns immediately (after a five-second grace period if Tools announces a restart). Turning Link off also restores it.
+When Arcade Tools is running, its tray icon hosts Wheel's menu, including **Open wheel**. When Tools quits, Wheel's own icon returns immediately (after a five-second grace period if Tools announces a restart). Turning Link off also restores it.
 
-See [how the Arcade apps connect](docs/user/with-other-apps.md) and [Arcade Link actions and platform support](docs/ARCADE_LINK.md).
+See [how the Arcade apps connect](docs/user/with-other-apps.md) and [Arcade Link actions and platform support](docs/dev/link.md).
 
 ## Usage
 
-Closing Settings leaves the wheel running. When the desktop has a system tray, the tray icon opens Settings on click. Its menu offers **Show Wheel**, **Open Settings**, **Restart Arcade Wheel** and **Quit Arcade Wheel**. The default shortcut is **F8**, and the desktop may ask you to approve it the first time.
+Closing Settings leaves the wheel running. When the desktop has a system tray, the tray icon opens Settings on click. Its menu offers **Open wheel**, **Settings**, **Restart Arcade Wheel** and **Quit Arcade Wheel**. The default shortcut is **F8**, and the desktop may ask you to approve it the first time.
 
 - **Hold** the shortcut. The wheel opens in the middle of the screen the pointer is on, and the pointer jumps to its center.
 - **Move** toward an action. It highlights and its name appears in the center.
@@ -81,7 +86,7 @@ Closing Settings leaves the wheel running. When the desktop has a system tray, t
 - **Scroll** while holding to change decks.
 - **Right-click** or **Escape** to cancel.
 
-The first deck, **Applications**, starts with up to six of your installed graphical apps; any remaining slots are left empty for you to fill. **Settings → Trigger** records a different trigger and can set a hold threshold. See the [shortcut reference](docs/user/shortcuts.md).
+The first deck, **Applications**, starts with up to six of your installed graphical apps; any remaining slots are left empty for you to fill. **Settings → Shortcuts** records a different trigger and can set a hold threshold. See the [shortcut reference](docs/user/shortcuts.md).
 
 ### Center gestures
 
@@ -103,12 +108,14 @@ When Arcade Wheel is already running, each command is sent to the running instan
 | Command | Effect |
 | --- | --- |
 | `--settings` | Open Settings (default when no argument is given) |
+| `--help` | List the commands |
 | `--background` | Start without opening any window |
 | `--show` | Open the wheel in click mode; click an action, right-click to cancel |
 | `--preview` | Show the real overlay in a safe mode that never runs actions |
-| `--cancel` | Close the wheel |
+| `--hide` / `--cancel` | Close the wheel without running anything |
+| `--toggle` | Open the wheel in click mode, or close it when it is open |
 | `--press` / `--release` | Simulate the trigger (`--release` **does** run the selected action) |
-| `--status` | Print the running instance's status as JSON |
+| `--status` | Print one line of JSON: `running`, `version` and the Link state. Exits 1 when Wheel is not running |
 | `--restart` / `--quit` | Restart or quit the running instance |
 | `--menu` | Print app-specific tray items as JSON |
 | `--settings-export FILE` | Export portable settings without credentials or device identity |
@@ -122,7 +129,7 @@ When Arcade Wheel is already running, each command is sent to the running instan
 
 ## Settings and data
 
-The configuration is a versioned JSON file. Its path is shown on the **General** settings page (on Linux, `~/.config/Arcade Wheel/config.json`). It is written atomically. Deck and action IDs stay the same when you reorder them, and unknown action types are kept rather than dropped. If the file can't be parsed, it is backed up next to the original before defaults are loaded.
+The configuration is a versioned JSON file. Its path is shown on the **General** settings page: `~/.config/arcade/wheel/settings.json` on Linux, `%APPDATA%\Arcade\Wheel\settings.json` on Windows and `~/Library/Application Support/Arcade/Wheel/settings.json` on macOS. Logs go to `~/.cache/arcade/wheel/logs` (on Windows `%LOCALAPPDATA%\Arcade\Wheel\logs`, on macOS `~/Library/Caches/Arcade/Wheel/logs`). Wheel 0.5 moves the folders of earlier versions here on its first start and keeps anything it could not move. It is written atomically. Deck and action IDs stay the same when you reorder them, and unknown action types are kept rather than dropped. If the file can't be parsed, it is backed up next to the original before defaults are loaded.
 
 Commands run as a program plus arguments, not through a shell. Use `sh -c '…'` explicitly if you need shell syntax.
 
@@ -141,7 +148,7 @@ Settings stay unless you pass `--remove-data`.
 - **Wayland:** global press and release events come from the XDG GlobalShortcuts portal. LayerShellQt provides the overlay layer.
 - **Hyprland:** the pointer position is read over compositor IPC (generic Wayland clients can't query it), and the pointer is moved to the wheel center when it opens. Other Wayland desktops can only provide a best-effort position and may not move the pointer.
 - **Windows:** a narrowly scoped, passive keyboard hook watches only the configured trigger. It doesn't record keys or block normal input. Caps Lock tap passthrough and mouse-button triggers are not supported.
-- **macOS:** a registered global keyboard shortcut supplies press/release events; Settings can record a replacement when F8 is reserved by the OS (some keyboards require Fn+F8). Application discovery, launch/focus, the overlay, and optional login startup are implemented. Screenshot and sleep actions are supported; other system/media/compositor actions and mouse/modifier-only triggers are not available yet.
+- **macOS:** a registered global keyboard shortcut supplies press/release events; Settings can record a replacement when F8 is reserved by the OS (some keyboards require Fn+F8). Application discovery, launch/focus, the overlay, and optional login startup are implemented. Screenshot, sleep, log out, restart, power off and the volume actions are supported (System Events asks for permission once); lock, play/pause and track keys, desktop actions and mouse/modifier-only triggers are not available yet.
 - Fullscreen games or apps with exclusive input may block the overlay or the shortcut, depending on the compositor or OS.
 
 ## Build from source
@@ -175,6 +182,17 @@ On Windows, configure with an MSVC Qt 6 kit, build with CMake, then run `packagi
 
 From a source checkout, `./arcade-wheel` runs the binary in `build/`.
 
+### Development
+
+Point `CMAKE_PREFIX_PATH` at Qt 6.8 (and LayerShellQt on Linux), then:
+
+| Command | What it does |
+| --- | --- |
+| `scripts/dev [ARGS]` | Builds and runs Wheel with its own profile in `build/dev-profile`, so it never touches an installed Wheel |
+| `scripts/check` | Exactly what CI runs on this system: the build with warnings as errors, `clang-format`, `qmllint`, the vendor checks, the docs, shortcut and release tests, and CTest. Pass `--link-source ../Arcade-Link` to check the vendored files against a Link checkout |
+| `scripts/package` | Builds this system's packages into `dist/` |
+| `scripts/sync-design vX.Y.Z` | Refreshes the vendored Link module, design kit and app icons from an Arcade Link tag |
+
 ### Project layout
 
 ```
@@ -184,19 +202,21 @@ src/actions/     ActionDispatcher: built-in action routing
 src/providers/   ActionProvider interface and asynchronous Arcade Link discovery/jobs
 src/platform/    Linux, Windows, and macOS desktop integration backends
 src/install/     Qt first-run dialog and installation CLI
-src/link/qt/     Commit-pinned Arcade Link v0.3.0 modules
-qml/             Wheel overlay, settings UI, shared components
-tests/           Qt Test suites (run with ctest)
-docs/            Architecture, manual release checks, Arcade Link actions
+src/link/        Arcade Link v0.4.15: the Qt module and the Arcade design kit (vendored)
+qml/             Wheel overlay, Settings window and install prompt on the kit
+tests/           Qt Test suites (run with ctest) and the Link e2e checks
+scripts/         dev, check, package and sync-design
+docs/            User guide (user/), developer notes (dev/), STATUS
 ```
 
 ## Documentation
 
 - [User guide](docs/user/): [getting started](docs/user/getting-started.md), [features](docs/user/features.md), [shortcuts](docs/user/shortcuts.md), [FAQ](docs/user/faq.md), [troubleshooting](docs/user/troubleshooting.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Arcade Link actions and platform support](docs/ARCADE_LINK.md)
-- [Packaging and release details](docs/PACKAGING.md)
-- [Manual release checks](docs/MANUAL_TESTING.md)
+- [Architecture](docs/dev/architecture.md)
+- [Arcade Link actions and platform support](docs/dev/link.md)
+- [Packaging and release details](docs/dev/packaging.md)
+- [Testing and release checks](docs/dev/testing.md)
+- [Decisions](docs/dev/decisions.md)
 - [Status](docs/STATUS.md)
 - [Changelog](CHANGELOG.md)
 
@@ -206,12 +226,12 @@ Issues and pull requests are welcome. Please:
 
 1. Keep changes focused. Arcade Wheel is deliberately small.
 2. Put platform-specific code behind `PlatformBackend`, and keep `WheelController` and QML free of platform code.
-3. Add or update tests in `tests/` and make sure `ctest` passes. CI builds, tests, packages, and smoke-tests on Linux, Windows, and both macOS architectures.
-4. For interaction changes, go through the relevant steps in [manual release checks](docs/MANUAL_TESTING.md) on a real desktop.
+3. Add or update tests in `tests/` and make sure `scripts/check` passes. CI builds, tests, packages, and smoke-tests on Linux, Windows, and both macOS architectures.
+4. For interaction changes, go through the relevant steps in [manual release checks](docs/dev/testing.md) on a real desktop.
 
 ## License
 
-MIT. See [LICENSE](LICENSE) and the [vendored dependency inventory](docs/VENDORED.md).
+MIT. See [LICENSE](LICENSE) and the [vendored dependency inventory](docs/dev/vendored.md).
 
 ---
 

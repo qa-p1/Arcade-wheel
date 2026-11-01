@@ -1,3 +1,4 @@
+#include "core/IconImageProvider.h"
 #include "core/IconTheme.h"
 
 #include <QDir>
@@ -12,7 +13,8 @@ class IconThemeTest final : public QObject {
     const QString root = QStringLiteral(ARCADE_ICON_THEME_FIXTURES);
     QString config() const { return root + QStringLiteral("/config"); }
     QStringList icons() const { return {QStringLiteral(":/not-a-user-theme"), root + QStringLiteral("/icons")}; }
-    IconTheme::Sources sources(const QString &platform, const QString &gsettings = {}, int *calls = nullptr) const {
+    IconTheme::Sources sources(const QString &platform, const QString &gsettings = {}, int *calls = nullptr) const
+    {
         IconTheme::Sources s;
         s.platformTheme = platform;
         s.configHome = config();
@@ -21,7 +23,8 @@ class IconThemeTest final : public QObject {
         return s;
     }
 private slots:
-    void readsEachConfigFormat() {
+    void readsEachConfigFormat()
+    {
         QCOMPARE(IconTheme::readQtEngine(config() + "/qtengine/config.json"), QStringLiteral("Papirus-Dark"));
         QCOMPARE(IconTheme::readIniValue(config() + "/qt6ct/qt6ct.conf", "Appearance", "icon_theme"), QStringLiteral("breeze"));
         QCOMPARE(IconTheme::readIniValue(config() + "/kdeglobals", "Icons", "Theme"), QStringLiteral("Oxygen"));
@@ -30,13 +33,15 @@ private slots:
         QCOMPARE(IconTheme::parseGsettings("'Papirus-Dark'\n"), QStringLiteral("Papirus-Dark"));
         QCOMPARE(IconTheme::parseGsettings(""), QString());
     }
-    void acceptsOnlyInstalledThemes() {
+    void acceptsOnlyInstalledThemes()
+    {
         QVERIFY(IconTheme::isInstalled("Papirus-Dark", icons()));
         QVERIFY(!IconTheme::isInstalled("NoIndex", icons()));
         QVERIFY(!IconTheme::isInstalled("Missing", icons()));
         QVERIFY(!IconTheme::isInstalled("../icons/breeze", icons()));
     }
-    void platformThemeConfigWinsOverStaleFiles() {
+    void platformThemeConfigWinsOverStaleFiles()
+    {
         int calls = 0;
         // The owner's setup: qtengine is current, qt6ct and GTK are stale.
         QCOMPARE(IconTheme::detect(sources("qtengine", "'Adwaita'", &calls)), QStringLiteral("Papirus-Dark"));
@@ -44,10 +49,12 @@ private slots:
         QCOMPARE(IconTheme::detect(sources("kde", "'Adwaita'", &calls)), QStringLiteral("Oxygen"));
         QCOMPARE(calls, 0); // gsettings is not started when it is not needed
     }
-    void unsetPlatformThemeUsesQtEngineWhenPresent() {
+    void unsetPlatformThemeUsesQtEngineWhenPresent()
+    {
         QCOMPARE(IconTheme::detect(sources({}, "'Adwaita'")), QStringLiteral("Papirus-Dark"));
     }
-    void fallsBackThroughGsettingsKdeAndGtk() {
+    void fallsBackThroughGsettingsKdeAndGtk()
+    {
         QCOMPARE(IconTheme::detect(sources("gtk3", "'breeze'\n")), QStringLiteral("breeze"));
         // Not installed or hicolor: keep looking.
         QCOMPARE(IconTheme::detect(sources("gtk3", "'NoIndex'")), QStringLiteral("Oxygen"));
@@ -65,7 +72,8 @@ private slots:
         nothing.configHome = empty.path();
         QCOMPARE(IconTheme::detect(nothing), QString());
     }
-    void appliesOnlyOverHicolor() {
+    void appliesOnlyOverHicolor()
+    {
         qputenv("XDG_CONFIG_HOME", config().toUtf8());
         qputenv("QT_QPA_PLATFORMTHEME", "qtengine");
         QIcon::setThemeSearchPaths(icons());
@@ -77,7 +85,8 @@ private slots:
         QCOMPARE(QIcon::themeName(), QStringLiteral("Papirus-Dark"));
         QCOMPARE(QIcon::fallbackThemeName(), QStringLiteral("hicolor"));
     }
-    void newSearchPathsGoFirst() {
+    void newSearchPathsGoFirst()
+    {
         QTemporaryDir root;
         QDir(root.path()).mkpath("data/icons");
         const QString created = root.path() + "/data/icons";
@@ -86,7 +95,8 @@ private slots:
                  (QStringList{created, "/usr/share/icons", ":/icons"}));
         QCOMPARE(IconTheme::withNewSearchPaths(current, {}), current);
     }
-    void reloadFindsIconsInstalledLater() {
+    void reloadFindsIconsInstalledLater()
+    {
         QTemporaryDir data;
         qputenv("XDG_DATA_HOME", data.path().toUtf8());
         QIcon::setThemeSearchPaths({":/icons"});
@@ -105,6 +115,30 @@ private slots:
         QVERIFY(QIcon::fromTheme("arcade-later").isNull()); // Qt keeps the failed lookup
         IconTheme::reloadSearchPaths();
         QVERIFY(!QIcon::fromTheme("arcade-later").isNull());
+    }
+    void symbolicOnlyThemesStillDrawActionIcons()
+    {
+        // Current Adwaita has media-playback-start-symbolic and no full-colour icon.
+        QTemporaryDir data;
+        const QDir theme(data.path() + "/SymbolicOnly");
+        QVERIFY(theme.mkpath("16x16/actions"));
+        QFile index(theme.filePath("index.theme"));
+        QVERIFY(index.open(QIODevice::WriteOnly));
+        index.write("[Icon Theme]\nName=SymbolicOnly\nDirectories=16x16/actions\n\n[16x16/actions]\nSize=16\nType=Fixed\n");
+        index.close();
+        QImage glyph(16, 16, QImage::Format_ARGB32);
+        glyph.fill(Qt::black);
+        QVERIFY(glyph.save(theme.filePath("16x16/actions/arcade-play-symbolic.png")));
+        QIcon::setThemeSearchPaths({data.path()});
+        QIcon::setThemeName("SymbolicOnly");
+
+        IconImageProvider provider;
+        QSize size;
+        const QImage drawn = provider.requestImage("arcade-play?v=1", &size, QSize(32, 32));
+        QCOMPARE(size, QSize(32, 32));
+        const QColor centre = drawn.pixelColor(16, 16);
+        QCOMPARE(centre.alpha(), 255);
+        QCOMPARE(centre.name(), QStringLiteral("#7c8596")); // tinted, not black
     }
 };
 

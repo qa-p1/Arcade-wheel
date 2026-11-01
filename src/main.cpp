@@ -2,6 +2,7 @@
 #include "core/IconTheme.h"
 #include "core/CommandReply.h"
 #include "core/WheelController.h"
+#include "core/WheelPaths.h"
 #include "link/WheelLink.h"
 #include "link/qt/ArcadeLink.h"
 #include "link/qt/ArcadeTrayHost.h"
@@ -26,6 +27,9 @@
 #include <QLockFile>
 #include <QTextStream>
 #include <QIcon>
+#include <QPainter>
+#include <QPixmap>
+#include <QSvgRenderer>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMenu>
@@ -35,12 +39,16 @@
 #include <QQuickItem>
 #include <QQuickView>
 #include <QQuickStyle>
+#include <QtQml/qqmlextensionplugin.h>
 #include <QStandardPaths>
 #include <QSystemTrayIcon>
 #include <QThread>
 #include <QTimer>
 #include <QTemporaryDir>
 #include <memory>
+
+Q_IMPORT_QML_PLUGIN(ArcadePlugin)
+Q_IMPORT_QML_PLUGIN(ArcadeWheelPlugin)
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
@@ -51,10 +59,39 @@ static void releaseFreedHeap()
 #endif
 }
 
+// The tray icon: Wheel's glyph, monochrome (STANDARD §8). White on the usual
+// dark Linux and Windows panels; on macOS a black template image the menu bar
+// tints for its appearance.
+static QIcon trayIcon()
+{
+    QFile file(QStringLiteral(":/assets/arcade/arcade.wheel.svg"));
+    if (!file.open(QIODevice::ReadOnly)) return {};
+#ifdef Q_OS_MACOS
+    const QByteArray ink = "#000000";
+#else
+    const QByteArray ink = "#ffffff";
+#endif
+    QSvgRenderer renderer(file.readAll().replace("currentColor", ink));
+    QIcon icon;
+    for (const int size : {16, 22, 24, 32, 48, 64}) {
+        QPixmap pixmap(size, size);
+        pixmap.fill(Qt::transparent);
+        {
+            QPainter painter(&pixmap);
+            painter.setRenderHint(QPainter::Antialiasing);
+            renderer.render(&painter);
+        }
+        icon.addPixmap(pixmap);
+    }
+#ifdef Q_OS_MACOS
+    icon.setIsMask(true);
+#endif
+    return icon;
+}
+
 static bool readSettingsForExport(QJsonObject *config, QString *error)
 {
-    const ConfigStore store;
-    QFile file(store.path());
+    QFile file(WheelPaths::readableSettingsFile());
     if (!file.exists()) {
         *config = ConfigStore::defaults();
         return true;
@@ -76,15 +113,18 @@ static bool readSettingsForExport(QJsonObject *config, QString *error)
 int main(int argc, char **argv)
 {
     ArcadeLink::onStartup();
-    QQuickStyle::setStyle(QStringLiteral("Material"));
-    qputenv("QT_QUICK_CONTROLS_MATERIAL_THEME", "Dark");
+    // The kit draws every control itself on Qt Quick Templates; Basic is the
+    // lightest fallback for anything it does not cover.
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
     QApplication app(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("Arcade Wheel"));
     QCoreApplication::setOrganizationDomain(QStringLiteral("arcadewheel.org"));
     QCoreApplication::setApplicationName(QStringLiteral("Arcade Wheel"));
     QCoreApplication::setApplicationVersion(QStringLiteral(ARCADE_VERSION));
     app.setQuitOnLastWindowClosed(false);
-    app.setDesktopFileName(QStringLiteral("com.arcadewheel.ArcadeWheel"));
+    // The OS identifier (STANDARD §10): Wayland app_id, the desktop file and
+    // the portal's app id. Before 0.5 it was com.arcadewheel.ArcadeWheel.
+    app.setDesktopFileName(QStringLiteral("dev.arcade.Wheel"));
 
     const QStringList cliArguments = app.arguments().mid(1);
     const QString command = cliArguments.isEmpty() ? QStringLiteral("--settings") : cliArguments.first();
@@ -98,31 +138,32 @@ int main(int argc, char **argv)
     }
     if (command == QStringLiteral("--help") || command == QStringLiteral("-h")) {
         QTextStream(stdout) << "Arcade Wheel\n\n"
-            "  arcade-wheel               Open Settings; keep the launcher running\n"
-            "  arcade-wheel --settings    Same as above\n"
-            "  arcade-wheel --background  Start the resident launcher without a window\n"
-            "  arcade-wheel --show        Open the wheel; click an action or right-click to cancel\n"
-            "  arcade-wheel --preview     Show a safe visual preview\n"
-            "  arcade-wheel --cancel      Dismiss the wheel\n"
-            "  arcade-wheel --press       Simulate pressing the trigger\n"
-            "  arcade-wheel --release     Simulate releasing the trigger (runs the selection)\n"
-            "  arcade-wheel --status      Show resident status as JSON\n"
-            "  arcade-wheel --restart     Restart the resident launcher\n"
-            "  arcade-wheel --quit        Quit the resident launcher\n"
-            "  arcade-wheel --menu        Print app-specific tray items as JSON\n"
-            "  arcade-wheel --settings-export FILE\n"
-            "                             Export portable settings without credentials or device identity\n"
-            "  arcade-wheel --settings-import FILE\n"
-            "                             Import portable settings after saving a private backup\n"
-            "  arcade-wheel --install [--silent] [--no-launch] [--channel C]\n"
-            "  arcade-wheel --uninstall [--silent] [--remove-data]\n"
-            "  arcade-wheel --repair\n"
-            "  arcade-wheel --integration-status\n"
-            "                             Show receipt, integration entries and PATH status\n"
-            "  arcade-wheel --version     Print the version\n"
-            "  arcade-wheel --arcade-manifest\n"
-            "                             Print the Arcade Link manifest (no side effects)\n\n"
-            "Once running, hold the configured shortcut (F8 by default), move toward an action, then release.\n";
+                               "  arcade-wheel               Open Settings; keep the launcher running\n"
+                               "  arcade-wheel --settings    Same as above\n"
+                               "  arcade-wheel --background  Start the resident launcher without a window\n"
+                               "  arcade-wheel --show        Open the wheel; click an action or right-click to cancel\n"
+                               "  arcade-wheel --preview     Show a safe visual preview\n"
+                               "  arcade-wheel --hide        Dismiss the wheel (also --cancel)\n"
+                               "  arcade-wheel --toggle      Open the wheel, or dismiss it when open\n"
+                               "  arcade-wheel --press       Simulate pressing the trigger\n"
+                               "  arcade-wheel --release     Simulate releasing the trigger (runs the selection)\n"
+                               "  arcade-wheel --status      Show resident status as JSON\n"
+                               "  arcade-wheel --restart     Restart the resident launcher\n"
+                               "  arcade-wheel --quit        Quit the resident launcher\n"
+                               "  arcade-wheel --menu        Print app-specific tray items as JSON\n"
+                               "  arcade-wheel --settings-export FILE\n"
+                               "                             Export portable settings without credentials or device identity\n"
+                               "  arcade-wheel --settings-import FILE\n"
+                               "                             Import portable settings after saving a private backup\n"
+                               "  arcade-wheel --install [--silent] [--no-launch] [--channel C]\n"
+                               "  arcade-wheel --uninstall [--silent] [--remove-data]\n"
+                               "  arcade-wheel --repair\n"
+                               "  arcade-wheel --integration-status\n"
+                               "                             Show receipt, integration entries and PATH status\n"
+                               "  arcade-wheel --version     Print the version\n"
+                               "  arcade-wheel --arcade-manifest\n"
+                               "                             Print the Arcade Link manifest (no side effects)\n\n"
+                               "Once running, hold the configured shortcut (F8 by default), move toward an action, then release.\n";
         return 0;
     }
     if (command == QStringLiteral("--version") || command == QStringLiteral("-V")) {
@@ -132,7 +173,7 @@ int main(int argc, char **argv)
     if (command == QStringLiteral("--arcade-manifest")) {
         // Read the configuration without the store, which would write defaults.
         QJsonObject config;
-        QFile file(ConfigStore().path());
+        QFile file(WheelPaths::readableSettingsFile());
         if (file.open(QIODevice::ReadOnly)) config = ConfigStore::normalize(QJsonDocument::fromJson(file.readAll()).object());
         if (config.isEmpty()) config = ConfigStore::defaults();
         QTextStream(stdout) << QJsonDocument(WheelLink::manifest(config, QStringLiteral(ARCADE_VERSION))).toJson(QJsonDocument::Indented);
@@ -165,30 +206,66 @@ int main(int argc, char **argv)
         QTextStream(stdout) << "Exported portable settings to " << output << '\n';
         return 0;
     }
-    if (command == QStringLiteral("--settings-import")
-        && (cliArguments.size() != 2 || cliArguments.at(1).isEmpty())) {
+    if (command == QStringLiteral("--settings-import") && (cliArguments.size() != 2 || cliArguments.at(1).isEmpty())) {
         QTextStream(stderr) << "Usage: arcade-wheel --settings-import FILE\n";
         return 2;
     }
     const int installCommand = AppInstaller::command(cliArguments, QStringLiteral(ARCADE_VERSION));
     if (installCommand >= 0) return installCommand;
-    if (!AppInstaller::firstRun(cliArguments, QStringLiteral(ARCADE_VERSION), smokeTest
-        || QGuiApplication::platformName() == u"offscreen" || QGuiApplication::platformName() == u"minimal")) return 0;
-    QByteArray identity = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation).toUtf8()
-        + qgetenv("ARCADE_WHEEL_INSTANCE") + qgetenv("WAYLAND_DISPLAY");
-    // Test/offscreen instances must never intercept commands for the desktop.
-    if (QGuiApplication::platformName() == QStringLiteral("offscreen") ||
-        QGuiApplication::platformName() == QStringLiteral("minimal")) identity += "-headless";
-    const auto hash = QCryptographicHash::hash(identity, QCryptographicHash::Sha256).toHex().left(12);
-    const QString instanceKey = QStringLiteral("arcade-wheel-%1").arg(QString::fromLatin1(hash));
+    const bool headlessPlatform = QGuiApplication::platformName() == u"offscreen" || QGuiApplication::platformName() == u"minimal";
+    // One resident per user and display: the command socket's name comes
+    // from the settings folder, so isolated test profiles get their own.
     const QString runtime = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    const auto instanceKeyFor = [&](const QString &folder) {
+        QByteArray identity = folder.toUtf8() + qgetenv("ARCADE_WHEEL_INSTANCE") + qgetenv("WAYLAND_DISPLAY");
+        // Test/offscreen instances must never intercept commands for the desktop.
+        if (headlessPlatform) identity += "-headless";
+        const auto hash = QCryptographicHash::hash(identity, QCryptographicHash::Sha256).toHex().left(12);
+        return QStringLiteral("arcade-wheel-%1").arg(QString::fromLatin1(hash));
+    };
+    const auto serverNameFor = [&](const QString &key) {
 #ifdef Q_OS_WIN
-    const QString serverName = instanceKey;
+        return key;
 #else
-    // A bare name would live in the shared /tmp, where another local user
-    // could pre-create it. The runtime directory is private to this user.
-    const QString serverName = QDir(runtime).filePath(instanceKey + QStringLiteral(".sock"));
+        // A bare name would live in the shared /tmp, where another local user
+        // could pre-create it. The runtime directory is private to this user.
+        return QDir(runtime).filePath(key + QStringLiteral(".sock"));
 #endif
+    };
+    // A real start moves the folders from before 0.5 (STANDARD §10). An older
+    // Wheel still running from them is asked to quit first, so nothing writes
+    // there mid-copy. Commands that only ask or dismiss leave them alone.
+    QString migrationNote;
+    const bool query = QStringList{QStringLiteral("--status"), QStringLiteral("--quit"), QStringLiteral("--release"),
+                                   QStringLiteral("--cancel"), QStringLiteral("--hide")}
+                           .contains(command);
+    if (!smokeTest && !headlessPlatform && !query) {
+        const auto legacy = ArcadeLink::legacyDirs(ArcadeLink::Ids::Wheel);
+        if (std::any_of(legacy.begin(), legacy.end(), [](const auto &dir) { return QFileInfo::exists(dir.path); })) {
+            // Before 0.5 the key came from Qt's "Arcade Wheel/Arcade Wheel" config folder.
+            QLocalSocket older;
+            older.connectToServer(serverNameFor(instanceKeyFor(
+                QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))));
+            if (older.waitForConnected(150)) {
+                older.write("--quit\n");
+                older.waitForBytesWritten(300);
+                older.waitForDisconnected(5000);
+            }
+            migrationNote = WheelPaths::migrate();
+        }
+    }
+    if (!AppInstaller::firstRun(cliArguments, QStringLiteral(ARCADE_VERSION), smokeTest || headlessPlatform)) return 0;
+#ifdef Q_OS_LINUX
+    // An installed copy from before 0.5: its launcher and login entry move to dev.arcade.Wheel.
+    if (!smokeTest && !headlessPlatform && !query) {
+        AppInstaller::Engine::Environment environment;
+        QString error;
+        if (!AppInstaller::Engine::Environment::discover(&environment, &error) || !AppInstaller::migrateIntegration(environment, AppInstaller::Engine::Runtime::discover(), &error))
+            migrationNote += (migrationNote.isEmpty() ? QString() : QStringLiteral(" ")) + QStringLiteral("Couldn't move the launcher to its new name: ") + error;
+    }
+#endif
+    const QString instanceKey = instanceKeyFor(WheelPaths::dirs().config);
+    const QString serverName = serverNameFor(instanceKey);
     if (command == QStringLiteral("--restarting")) {
         QLocalSocket probe;
         probe.connectToServer(serverName);
@@ -204,7 +281,9 @@ int main(int argc, char **argv)
             QByteArray request;
             if (command == QStringLiteral("--settings-import")) {
                 request = QJsonDocument(QJsonObject{{QStringLiteral("command"), command},
-                    {QStringLiteral("path"), QFileInfo(cliArguments.at(1)).absoluteFilePath()}}).toJson(QJsonDocument::Compact) + '\n';
+                                                    {QStringLiteral("path"), QFileInfo(cliArguments.at(1)).absoluteFilePath()}})
+                              .toJson(QJsonDocument::Compact) +
+                          '\n';
                 if (request.size() > 16000) {
                     QTextStream(stderr) << "The settings path is too long.\n";
                     return 2;
@@ -236,10 +315,13 @@ int main(int argc, char **argv)
             }
             return 0;
         }
-        if (command == QStringLiteral("--release") || command == QStringLiteral("--cancel")
-            || command == QStringLiteral("--quit")) return 0;
+        if (command == QStringLiteral("--release") || command == QStringLiteral("--cancel") || command == QStringLiteral("--hide") || command == QStringLiteral("--quit")) return 0;
         if (command == QStringLiteral("--status")) {
-            QTextStream(stdout) << "Arcade Wheel is not running\n";
+            // One line of JSON either way (STANDARD §10); exit status 1 when not running.
+            QTextStream(stdout) << QJsonDocument(QJsonObject{{QStringLiteral("running"), false},
+                                                             {QStringLiteral("version"), QStringLiteral(ARCADE_VERSION)}})
+                                       .toJson(QJsonDocument::Compact)
+                                << '\n';
             return 1;
         }
     }
@@ -258,8 +340,8 @@ int main(int argc, char **argv)
     }
     // Started at login or by Tools, stderr often goes to /dev/null: keep
     // Qt's warnings in the log folder the manifest advertises instead.
-    ArcadeLink::captureStderr(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/logs"),
-                              QStringLiteral("arcade-wheel"));
+    ArcadeLink::captureStderr(WheelPaths::logsDir(), QStringLiteral("arcade-wheel"));
+    if (!migrationNote.isEmpty()) qWarning("%s", qPrintable(migrationNote));
 
 #ifdef Q_OS_WIN
     WindowsBackend backend;
@@ -269,7 +351,7 @@ int main(int argc, char **argv)
     LinuxBackend backend;
 #endif
     WheelController controller(&backend, nullptr,
-        smokeTest ? smokeDirectory->filePath(QStringLiteral("config.json")) : QString());
+                               smokeTest ? smokeDirectory->filePath(QStringLiteral("config.json")) : QString());
     controller.initialize();
     // Apps installed or removed while Wheel runs: rescan their launchers once
     // a burst of changes settles, instead of waiting for Settings → Refresh.
@@ -285,8 +367,10 @@ int main(int argc, char **argv)
             if (QFileInfo(dir).isDir() && !wanted.contains(dir)) wanted.append(dir);
         }
         const QStringList watched = applicationFolders.directories();
-        for (const QString &dir : watched) if (!wanted.contains(dir)) applicationFolders.removePath(dir);
-        for (const QString &dir : wanted) if (!watched.contains(dir)) applicationFolders.addPath(dir);
+        for (const QString &dir : watched)
+            if (!wanted.contains(dir)) applicationFolders.removePath(dir);
+        for (const QString &dir : wanted)
+            if (!watched.contains(dir)) applicationFolders.addPath(dir);
     };
     if (!smokeTest) {
         QObject::connect(&applicationFolders, &QFileSystemWatcher::directoryChanged, &applicationRescan,
@@ -300,8 +384,7 @@ int main(int argc, char **argv)
     // Arcade Link, set up once the event loop runs. Test instances (the smoke
     // test, offscreen platforms) stay out of the real registry unless they
     // were given their own ARCADE_HOME.
-    const bool headless = QGuiApplication::platformName() == QStringLiteral("offscreen")
-        || QGuiApplication::platformName() == QStringLiteral("minimal");
+    const bool headless = QGuiApplication::platformName() == QStringLiteral("offscreen") || QGuiApplication::platformName() == QStringLiteral("minimal");
     std::unique_ptr<WheelLink> link;
     if (!smokeTest && (!headless || !qEnvironmentVariableIsEmpty("ARCADE_HOME"))) {
         link = std::make_unique<WheelLink>(QStringLiteral(ARCADE_VERSION), nullptr, command == QStringLiteral("--background"));
@@ -336,12 +419,18 @@ int main(int argc, char **argv)
                      Qt::WindowDoesNotAcceptFocus);
     overlay.setResizeMode(QQuickView::SizeRootObjectToView);
     overlay.engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);
-    overlay.rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
-    overlay.setSource(QUrl(QStringLiteral("qrc:/qml/wheel/Overlay.qml")));
+    overlay.setInitialProperties({{QStringLiteral("controller"), QVariant::fromValue(&controller)}});
+    overlay.loadFromModule("ArcadeWheel", "Overlay");
     if (overlay.status() == QQuickView::Error) return 1;
-    if (overlay.rootObject())
-        overlay.rootObject()->setProperty("controller", QVariant::fromValue(static_cast<QObject *>(&controller)));
     controller.setOverlayView(&overlay);
+    // Inter at 13 px (the kit's body size) for every window, Qt Widgets menus
+    // and dialogs included. The kit's Fonts singleton has already loaded it
+    // from the resources.
+    if (auto *fonts = overlay.engine()->singletonInstance<QObject *>("Arcade", "Fonts")) {
+        QFont font(fonts->property("sans").toString());
+        font.setPixelSize(13);
+        QApplication::setFont(font);
+    }
 
     // Settings holds its own QML engine, about 80 MiB. Keep it for a quick
     // reopen, then let it go.
@@ -360,14 +449,15 @@ int main(int argc, char **argv)
         releaseSettings.stop();
         if (!settings) {
             settings = std::make_unique<QQuickView>();
-            settings->setTitle(QStringLiteral("Arcade Wheel · Settings"));
-            settings->setColor(QColor(QStringLiteral("#0d1118")));
-            settings->setMinimumSize(QSize(800, 560));
-            settings->resize(1240, 820);
+            settings->setTitle(QStringLiteral("Settings — Arcade Wheel"));
+            // The editor needs room for the deck list, preview and slots;
+            // the kit's own minimum is 720 x 520.
+            settings->setMinimumSize(QSize(720, 520));
+            settings->resize(1080, 720);
             settings->setResizeMode(QQuickView::SizeRootObjectToView);
             settings->engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);
-            settings->rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
-            settings->setSource(QUrl(QStringLiteral("qrc:/qml/settings/Settings.qml")));
+            settings->setInitialProperties({{QStringLiteral("controller"), QVariant::fromValue(&controller)}});
+            settings->loadFromModule("ArcadeWheel", "SettingsWindow");
             if (settings->status() == QQuickView::Error) {
                 app.exit(1);
                 return;
@@ -399,12 +489,12 @@ int main(int argc, char **argv)
         releaseActivity.stop();
         if (!activity) {
             activity = std::make_unique<QQuickView>();
-            activity->setTitle(QStringLiteral("Arcade Wheel · Activity"));
+            activity->setTitle(QStringLiteral("Activity — Arcade Wheel"));
             activity->setResizeMode(QQuickView::SizeRootObjectToView);
             activity->resize(540, 320);
             activity->engine()->addImageProvider(QStringLiteral("icons"), new IconImageProvider);
-            activity->rootContext()->setContextProperty(QStringLiteral("controller"), &controller);
-            activity->setSource(QUrl(QStringLiteral("qrc:/qml/settings/LinkActivity.qml")));
+            activity->setInitialProperties({{QStringLiteral("controller"), QVariant::fromValue(&controller)}});
+            activity->loadFromModule("ArcadeWheel", "LinkActivity");
             QObject::connect(activity.get(), &QWindow::visibleChanged, &releaseActivity, [&](bool visible) {
                 if (!visible) releaseActivity.start();
             });
@@ -414,13 +504,14 @@ int main(int argc, char **argv)
 
     QSystemTrayIcon tray;
     tray.setToolTip(QStringLiteral("Arcade Wheel"));
-    tray.setIcon(appIcon);
+    const QIcon glyph = trayIcon();
+    tray.setIcon(glyph.isNull() ? appIcon : glyph);
     QMenu menu;
-    auto *wheelAction = menu.addAction(QStringLiteral("Show Wheel"));
+    auto *wheelAction = menu.addAction(QStringLiteral("Open wheel"));
     QObject::connect(wheelAction, &QAction::triggered, &controller, &WheelController::showWheel);
-    auto *openAction = menu.addAction(QStringLiteral("Open Settings"));
-    auto *restartAction = menu.addAction(QStringLiteral("Restart Arcade Wheel"));
+    auto *openAction = menu.addAction(QStringLiteral("Settings"));
     menu.addSeparator();
+    auto *restartAction = menu.addAction(QStringLiteral("Restart Arcade Wheel"));
     auto *quitAction = menu.addAction(QStringLiteral("Quit Arcade Wheel"));
     QObject::connect(openAction, &QAction::triggered, &app, showSettings);
     QObject::connect(quitAction, &QAction::triggered, &app, &QCoreApplication::quit);
@@ -449,8 +540,7 @@ int main(int argc, char **argv)
     QObject::connect(restartAction, &QAction::triggered, &app, restart);
     QObject::connect(&controller, &WheelController::restartRequested, &app, restart);
     QObject::connect(&controller, &WheelController::actionFailed, &tray, [&](const QString &message) {
-        if (tray.isVisible() && controller.config().value(QStringLiteral("general")).toMap()
-                                   .value(QStringLiteral("showNotifications"), true).toBool())
+        if (tray.isVisible() && controller.config().value(QStringLiteral("general")).toMap().value(QStringLiteral("showNotifications"), true).toBool())
             tray.showMessage(QStringLiteral("Arcade Wheel"), message, QSystemTrayIcon::Warning, 3000);
     });
     tray.setContextMenu(&menu);
@@ -458,8 +548,7 @@ int main(int argc, char **argv)
         if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick) showSettings();
     });
     const auto updateTray = [&] {
-        tray.setVisible(hasTray && arcadeTrayHost.ready() && arcadeTrayHost.state() == u"own"
-                        && QSystemTrayIcon::isSystemTrayAvailable());
+        tray.setVisible(hasTray && arcadeTrayHost.ready() && arcadeTrayHost.state() == u"own" && QSystemTrayIcon::isSystemTrayAvailable());
     };
     QObject::connect(&arcadeTrayHost, &ArcadeLink::ArcadeTrayHost::stateChanged, &tray, updateTray);
     QObject::connect(&arcadeTrayHost, &ArcadeLink::ArcadeTrayHost::startupReady, &tray, updateTray);
@@ -485,8 +574,12 @@ int main(int argc, char **argv)
         else if (cmd == QStringLiteral("--press")) controller.pressTrigger();
         else if (cmd == QStringLiteral("--release")) controller.releaseTrigger();
         else if (cmd == QStringLiteral("--preview")) controller.previewOverlay();
-        else if (cmd == QStringLiteral("--cancel")) controller.cancelTrigger();
-        else if (cmd == QStringLiteral("--quit")) app.quit();
+        // --hide is the standard name for --cancel (STANDARD §10).
+        else if (cmd == QStringLiteral("--cancel") || cmd == QStringLiteral("--hide")) controller.cancelTrigger();
+        else if (cmd == QStringLiteral("--toggle")) {
+            if (controller.overlayVisible()) controller.cancelTrigger();
+            else controller.showWheel();
+        } else if (cmd == QStringLiteral("--quit")) app.quit();
         else if (cmd == QStringLiteral("--restart")) restart();
         else if (cmd == QStringLiteral("--settings") || cmd.isEmpty()) showSettings();
         else if (cmd == QStringLiteral("--settings-import")) {
@@ -510,17 +603,21 @@ int main(int argc, char **argv)
                     value = envelope.object().value(QStringLiteral("path")).toString();
                 }
                 if (cmd == QStringLiteral("--status")) {
+                    const bool linkEnabled = controller.config().value(QStringLiteral("link")).toMap().value(QStringLiteral("enabled"), true).toBool();
                     const QJsonObject status{{QStringLiteral("running"), true},
-                        {QStringLiteral("pid"), QCoreApplication::applicationPid()},
-                        {QStringLiteral("tray"), arcadeTrayHost.state()},
-                        {QStringLiteral("platform"), QGuiApplication::platformName()},
-                        {QStringLiteral("trigger"), controller.triggerStatus()},
-                        {QStringLiteral("overlayVisible"), controller.overlayVisible()},
-                        {QStringLiteral("overlayRevealed"), controller.overlayRevealed()},
-                        {QStringLiteral("surfaceVisible"), overlay.isVisible()},
-                        {QStringLiteral("selectedIndex"), controller.selectedIndex()},
-                        {QStringLiteral("deckIndex"), controller.currentDeckIndex()},
-                        {QStringLiteral("error"), controller.lastError()}};
+                                             {QStringLiteral("version"), QStringLiteral(ARCADE_VERSION)},
+                                             {QStringLiteral("link"), QJsonObject{{QStringLiteral("enabled"), linkEnabled},
+                                                                                  {QStringLiteral("listening"), link && link->listening()}}},
+                                             {QStringLiteral("pid"), QCoreApplication::applicationPid()},
+                                             {QStringLiteral("tray"), arcadeTrayHost.state()},
+                                             {QStringLiteral("platform"), QGuiApplication::platformName()},
+                                             {QStringLiteral("trigger"), controller.triggerStatus()},
+                                             {QStringLiteral("overlayVisible"), controller.overlayVisible()},
+                                             {QStringLiteral("overlayRevealed"), controller.overlayRevealed()},
+                                             {QStringLiteral("surfaceVisible"), overlay.isVisible()},
+                                             {QStringLiteral("selectedIndex"), controller.selectedIndex()},
+                                             {QStringLiteral("deckIndex"), controller.currentDeckIndex()},
+                                             {QStringLiteral("error"), controller.lastError()}};
                     socket->write(QJsonDocument(status).toJson(QJsonDocument::Compact) + '\n');
                 } else {
                     const bool ok = handleCommand(cmd, value);
@@ -544,13 +641,11 @@ int main(int argc, char **argv)
     if (smokeTest) {
         QTimer::singleShot(0, &app, showSettings);
         QTimer::singleShot(1500, &app, [&] {
-            app.exit(settings && settings->status() == QQuickView::Ready
-                     && overlay.status() == QQuickView::Ready ? 0 : 1);
+            app.exit(settings && settings->status() == QQuickView::Ready && overlay.status() == QQuickView::Ready ? 0 : 1);
         });
     } else if (command != QStringLiteral("--background"))
         QTimer::singleShot(0, &app, [&] {
-            if (!handleCommand(command, command == QStringLiteral("--settings-import") ? cliArguments.value(1) : QString())
-                && command == QStringLiteral("--settings-import")) app.exit(1);
+            if (!handleCommand(command, command == QStringLiteral("--settings-import") ? cliArguments.value(1) : QString()) && command == QStringLiteral("--settings-import")) app.exit(1);
         });
     return app.exec();
 }

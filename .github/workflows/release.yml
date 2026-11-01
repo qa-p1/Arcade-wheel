@@ -1,0 +1,64 @@
+# Builds, tests and publishes a release through ci.yml. Beta is a private
+# draft prerelease on main (the rehearsal); stable must run on its v<version>
+# tag, created by tag.yml, and becomes the latest release. Tools installs
+# stable releases through arcade-release.json and SHA256SUMS.txt.
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        type: choice
+        options: [beta, stable]
+        default: beta
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Validate the channel and version before building
+        env:
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          version=$(sed -nE 's/^project\(ArcadeWheel VERSION ([^ ]+).*/\1/p' CMakeLists.txt)
+          if [ "$CHANNEL" = stable ]; then
+            [ "$GITHUB_REF" = "refs/tags/v$version" ] || { echo "Stable releases must run on v$version"; exit 1; }
+          else
+            [ "$GITHUB_REF" = refs/heads/main ] || { echo "Beta releases run on main"; exit 1; }
+          fi
+  ci:
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+  publish:
+    name: Publish
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: ArcadeWheel-*
+          path: artifacts
+          merge-multiple: false
+      - name: Publish packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          python3 packaging/publish-release.py --bundles artifacts --artifacts dist \
+            --channel "$CHANNEL" --commit "$GITHUB_SHA" --ref "$GITHUB_REF" \
+            --run-number "$GITHUB_RUN_NUMBER" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

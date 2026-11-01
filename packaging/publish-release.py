@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Publish the complete, verified package set from a successful CI run."""
+"""Publish the complete, verified package set from a successful release run.
+
+release.yml runs this after ci.yml: stable on the v<version> tag (made by
+tag.yml) as the latest release, or beta on main as a private draft
+prerelease, the rehearsal. The CI run number goes into the release notes."""
 import argparse
 import importlib.util
 import json
@@ -26,18 +30,25 @@ def project_version(path):
     return match.group(1)
 
 
-def release_tag(version, ref, run_number):
+def release_tag(version, ref, run_number, channel="stable"):
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ValueError("Expected a major.minor.patch application version")
-    if ref == "refs/heads/main":
-        if run_number < 1:
-            raise ValueError("The CI run number must be positive")
-        # SemVer build metadata distinguishes builds without changing the app's
-        # base version or creating a prerelease version.
-        return f"v{version}+build.{run_number}"
-    if ref == f"refs/tags/v{version}":
+    if run_number < 1:
+        raise ValueError("The CI run number must be positive")
+    if channel == "stable":
+        if ref != f"refs/tags/v{version}":
+            raise ValueError(f"A stable release must run on the tag v{version}")
         return f"v{version}"
-    raise ValueError("Only main and a version tag matching CMakeLists.txt may publish")
+    if channel == "beta":
+        if ref != "refs/heads/main":
+            raise ValueError("A beta release must run on main")
+        return f"v{version}-beta.{run_number}"
+    raise ValueError("The channel must be stable or beta")
+
+
+def manifest_channel(channel):
+    # Tools knows stable and nightly; a beta draft is checked as nightly.
+    return "stable" if channel == "stable" else "nightly"
 
 
 def package_names(version):
@@ -47,7 +58,7 @@ def package_names(version):
         "macOS-arm64.dmg", "macOS-x86_64.dmg")]
 
 
-def verified_bundle(directory, version, release_version=None, complete=False):
+def verified_bundle(directory, version, release_version=None, complete=False, channel="stable"):
     required = set(package_names(version))
     actual = {path.name for path in directory.iterdir()}
     filenames = sorted(required if complete else actual & required)
@@ -62,7 +73,7 @@ def verified_bundle(directory, version, release_version=None, complete=False):
         if not package.is_file() or package.stat().st_size == 0:
             raise ValueError(f"Empty or invalid package: {name}")
     manifest = json.loads((directory / "arcade-release.json").read_text(encoding="utf-8-sig"))
-    wanted, sums = generator.build("arcade.wheel", release_version or version, "stable",
+    wanted, sums = generator.build("arcade.wheel", release_version or version, manifest_channel(channel),
                                    manifest.get("notes", ""), directory, "inno")
     if (directory / "SHA256SUMS.txt").read_text(encoding="utf-8-sig") != sums:
         raise ValueError("Checksum mismatch in SHA256SUMS.txt")
@@ -71,8 +82,8 @@ def verified_bundle(directory, version, release_version=None, complete=False):
     return [directory / name for name in sorted(expected)]
 
 
-def verified_assets(directory, version, release_version=None):
-    return verified_bundle(directory, version, release_version, complete=True)
+def verified_assets(directory, version, release_version=None, channel="stable"):
+    return verified_bundle(directory, version, release_version, complete=True, channel=channel)
 
 
 def collect_assets(bundles, directory, version):
@@ -96,9 +107,9 @@ def collect_assets(bundles, directory, version):
         shutil.copyfile(path, directory / name)
 
 
-def write_metadata(directory, version, notes):
+def write_metadata(directory, version, notes, channel="stable"):
     subprocess.run([sys.executable, str(GENERATOR), "--id", "arcade.wheel", "--version", version,
-                    "--channel", "stable", "--notes", notes, "--windows-installer", "inno",
+                    "--channel", manifest_channel(channel), "--notes", notes, "--windows-installer", "inno",
                     str(directory)], check=True)
 
 
@@ -132,7 +143,7 @@ def release_by_tag(repository, tag):
         page += 1
 
 
-def publish(repository, version, tag, commit, assets, run_url, run_number):
+def publish(repository, version, tag, commit, assets, run_url, run_number, channel="stable"):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Release target must be the full tested commit SHA")
     existing = release_by_tag(repository, tag)
@@ -149,11 +160,9 @@ def publish(repository, version, tag, commit, assets, run_url, run_number):
         print(f"Already published; preserving its assets: {existing['html_url']}")
         return existing["html_url"]
 
-    title = f"Arcade Wheel {version}"
-    if "+build." in tag:
-        title += f" (build {run_number})"
+    title = f"Arcade Wheel {version}" if channel == "stable" else f"Arcade Wheel {tag}"
     notes = (
-        f"Built and tested from commit `{commit}`. [Successful CI run]({run_url}).\n\n"
+        f"Build {run_number}, built and tested from commit `{commit}`. [Successful run]({run_url}).\n\n"
         "Download the package for your system below:\n\n"
         "- **Windows x64:** run `Windows-x64-Setup.exe`, or extract the entire portable ZIP.\n"
         "- **Linux x86_64:** make the AppImage executable and launch it.\n"
@@ -177,6 +186,11 @@ def publish(repository, version, tag, commit, assets, run_url, run_number):
     sizes = {asset.name: asset.stat().st_size for asset in assets}
     if {asset["name"]: asset["size"] for asset in uploaded["assets"]} != sizes:
         raise ValueError("Uploaded assets are incomplete; keeping the release as a draft")
+    if channel != "stable":
+        # The rehearsal stays a private draft prerelease.
+        gh("release", "edit", tag, "--repo", repository, "--prerelease")
+        print(uploaded["html_url"])
+        return uploaded["html_url"]
 
     # A slower, older CI run must not replace a newer release as Latest.
     latest = api(f"repos/{repository}/releases/latest", allow_missing=True)
@@ -201,16 +215,18 @@ def main():
     parser.add_argument("--ref", required=True)
     parser.add_argument("--run-number", type=int, required=True)
     parser.add_argument("--run-url", required=True)
+    parser.add_argument("--channel", choices=["stable", "beta"], default="stable")
     args = parser.parse_args()
     version = project_version(Path(__file__).resolve().parents[1] / "CMakeLists.txt")
-    tag = release_tag(version, args.ref, args.run_number)
+    tag = release_tag(version, args.ref, args.run_number, args.channel)
     repository = os.environ["GH_REPO"]
+    notes = f"https://github.com/{repository}/blob/{tag}/CHANGELOG.md"
     if args.bundles:
         collect_assets(args.bundles, args.artifacts, version)
-        write_metadata(args.artifacts, tag[1:], f"https://github.com/{repository}/releases/tag/{tag}")
-    assets = verified_assets(args.artifacts, version, tag[1:])
+        write_metadata(args.artifacts, version, notes, args.channel)
+    assets = verified_assets(args.artifacts, version, version, args.channel)
     url = publish(repository, version, tag, args.commit,
-                  assets, args.run_url, args.run_number)
+                  assets, args.run_url, args.run_number, args.channel)
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary, "a") as stream:
             stream.write(f"Published [{tag}]({url}) with all five packages and checksums.\n")

@@ -26,7 +26,7 @@ class ReleaseTests(unittest.TestCase):
             (self.directory / name).write_bytes(data)
         release.write_metadata(self.directory, "0.2.0", "https://example.com/release")
         self.commit = "a" * 40
-        self.tag = "v0.2.0+build.15"
+        self.tag = "v0.2.0"
 
     def publish(self):
         assets = release.verified_assets(self.directory, "0.2.0")
@@ -37,13 +37,40 @@ class ReleaseTests(unittest.TestCase):
         return {"draft": True, "prerelease": False, "assets": [
             {"name": path.name, "size": path.stat().st_size} for path in self.directory.iterdir()]}
 
-    def test_tags_are_unique_and_reruns_are_stable(self):
-        self.assertEqual(release.release_tag("0.2.0", "refs/heads/main", 15), self.tag)
-        self.assertNotEqual(release.release_tag("0.2.0", "refs/heads/main", 16), self.tag)
+    def test_stable_needs_its_tag_and_beta_runs_on_main(self):
         self.assertEqual(release.release_tag("0.2.0", "refs/tags/v0.2.0", 15), "v0.2.0")
-        for ref in ("refs/pull/3/merge", "refs/heads/feature", "refs/tags/v9.9.9"):
+        self.assertEqual(release.release_tag("0.2.0", "refs/tags/v0.2.0", 16), "v0.2.0")
+        self.assertEqual(release.release_tag("0.2.0", "refs/heads/main", 15, "beta"), "v0.2.0-beta.15")
+        self.assertNotEqual(release.release_tag("0.2.0", "refs/heads/main", 16, "beta"), "v0.2.0-beta.15")
+        for ref in ("refs/heads/main", "refs/pull/3/merge", "refs/heads/feature", "refs/tags/v9.9.9"):
             with self.assertRaises(ValueError):
                 release.release_tag("0.2.0", ref, 15)
+        for ref in ("refs/tags/v0.2.0", "refs/heads/feature"):
+            with self.assertRaises(ValueError):
+                release.release_tag("0.2.0", ref, 15, "beta")
+        with self.assertRaises(ValueError):
+            release.release_tag("0.2.0", "refs/tags/v0.2.0", 15, "nightly")
+
+    def test_beta_stays_a_draft_prerelease(self):
+        uploaded = self.uploaded() | {"html_url": "https://example.com/draft"}
+        with patch.object(release, "api", side_effect=[None, [], None, uploaded]), \
+                patch.object(release, "gh") as gh:
+            assets = release.verified_assets(self.directory, "0.2.0")
+            release.publish("owner/repo", "0.2.0", "v0.2.0-beta.15", self.commit,
+                            assets, "https://example.com/ci/15", 15, "beta")
+        commands = [call.args for call in gh.call_args_list]
+        self.assertEqual([args[1] for args in commands], ["create", "upload", "edit"])
+        self.assertIn("--draft", commands[0])
+        self.assertIn("--prerelease", commands[2])
+        self.assertNotIn("--draft=false", commands[2])
+        self.assertNotIn("--latest", commands[2])
+
+    def test_beta_manifest_uses_the_nightly_channel(self):
+        release.write_metadata(self.directory, "0.2.0", "https://example.com/release", "beta")
+        manifest = json.loads((self.directory / "arcade-release.json").read_text())
+        self.assertEqual(manifest["channel"], "nightly")
+        self.assertEqual(manifest["version"], "0.2.0")
+        self.assertEqual(len(release.verified_assets(self.directory, "0.2.0", channel="beta")), 7)
 
     def test_all_five_packages_and_checksums_are_required(self):
         self.assertEqual(len(release.verified_assets(self.directory, "0.2.0")), 7)
@@ -72,7 +99,7 @@ class ReleaseTests(unittest.TestCase):
         release.write_metadata(self.directory, self.tag[1:], "https://example.com/release")
         release.verified_assets(self.directory, "0.2.0", self.tag[1:])
         manifest = json.loads((self.directory / "arcade-release.json").read_text())
-        self.assertEqual(manifest["version"], "0.2.0+build.15")
+        self.assertEqual(manifest["version"], "0.2.0")
         self.assertEqual(manifest["id"], "arcade.wheel")
         self.assertEqual(manifest["linkProtocol"], [1])
         self.assertEqual(len(manifest["assets"]), 5)

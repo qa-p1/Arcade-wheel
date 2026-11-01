@@ -38,7 +38,8 @@ QString ActionDispatcher::unavailableReason(const QJsonObject &action) const
     if (type == QStringLiteral("none")) return QStringLiteral("Choose an action");
     if (type == QStringLiteral("application")) {
         const auto id = payload.value(QStringLiteral("desktopId")).toString();
-        for (const auto &app : m_applications) if (app.id == id) return {};
+        for (const auto &app : m_applications)
+            if (app.id == id) return {};
         return QStringLiteral("Application is not installed");
     }
     if (type == QStringLiteral("command")) {

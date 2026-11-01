@@ -168,7 +168,9 @@ private:
     QJsonArray decks() const;
     QJsonObject deckAt(int index) const;
     int deckIndexById(const QString &id) const;
-    enum class Persist { Now, Coalesced, Prepared };
+    enum class Persist { Now,
+                         Coalesced,
+                         Prepared };
     bool commit(QJsonObject updated, bool triggerChanged = false, Persist persist = Persist::Now);
     void applyStartOnLogin();
     void openOverlay();
@@ -209,7 +211,9 @@ private:
     int m_iconGeneration = 0;
     int m_selectedIndex = -1;
     bool m_pressed = false;
-    enum class Mode { Hold, Click, Preview };
+    enum class Mode { Hold,
+                      Click,
+                      Preview };
     Mode m_mode = Mode::Hold;
     bool m_waitingForCenter = false;
     bool m_visible = false;

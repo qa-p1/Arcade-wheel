@@ -47,7 +47,8 @@ constexpr wchar_t kStartMenuIdPrefix[] = L"win-startmenu:";
 constexpr wchar_t kRunKey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 constexpr wchar_t kRunValue[] = L"ArcadeWheel";
 
-template <typename F> auto loginWorker(F work)
+template <typename F>
+auto loginWorker(F work)
 {
     decltype(work()) result{};
     QEventLoop loop;
@@ -174,7 +175,7 @@ bool createLoginShortcut(const QString &path, const QString &executable, QString
     IShellLinkW *link = nullptr;
     IPersistFile *file = nullptr;
     HRESULT result = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
-                                     IID_IShellLinkW, reinterpret_cast<void **>(&link));
+                                      IID_IShellLinkW, reinterpret_cast<void **>(&link));
     const QString target = nativePath(executable);
     const QString directory = nativePath(QFileInfo(executable).absolutePath());
     const QString pending = path + QStringLiteral(".pending-%1.lnk").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
@@ -219,8 +220,7 @@ bool installedLogin(AppInstaller::Engine::Environment environment, QJsonObject r
     QString backup;
     if (existed) {
         ShortcutInfo shortcut;
-        if (!readShortcut(path, &shortcut) || !samePath(shortcut.target, executable)
-            || shortcut.arguments != QStringLiteral("--background")) {
+        if (!readShortcut(path, &shortcut) || !samePath(shortcut.target, executable) || shortcut.arguments != QStringLiteral("--background")) {
             assignError(error, QStringLiteral("The login shortcut was changed outside Wheel; it was kept."));
             return false;
         }
@@ -271,30 +271,52 @@ UINT keyVirtualKey(const QString &name)
     const QString key = name.trimmed();
     const QString lower = key.toLower();
     static const QHash<QString, UINT> namedKeys = {
-        {QStringLiteral("space"), VK_SPACE}, {QStringLiteral("tab"), VK_TAB},
-        {QStringLiteral("escape"), VK_ESCAPE}, {QStringLiteral("esc"), VK_ESCAPE},
-        {QStringLiteral("enter"), VK_RETURN}, {QStringLiteral("return"), VK_RETURN},
-        {QStringLiteral("backspace"), VK_BACK}, {QStringLiteral("delete"), VK_DELETE},
-        {QStringLiteral("del"), VK_DELETE}, {QStringLiteral("insert"), VK_INSERT},
-        {QStringLiteral("home"), VK_HOME}, {QStringLiteral("end"), VK_END},
-        {QStringLiteral("pageup"), VK_PRIOR}, {QStringLiteral("pgup"), VK_PRIOR},
-        {QStringLiteral("pagedown"), VK_NEXT}, {QStringLiteral("pgdn"), VK_NEXT},
-        {QStringLiteral("up"), VK_UP}, {QStringLiteral("down"), VK_DOWN},
-        {QStringLiteral("left"), VK_LEFT}, {QStringLiteral("right"), VK_RIGHT},
-        {QStringLiteral("capslock"), VK_CAPITAL}, {QStringLiteral("caps lock"), VK_CAPITAL},
-        {QStringLiteral("printscreen"), VK_SNAPSHOT}, {QStringLiteral("prtsc"), VK_SNAPSHOT},
-        {QStringLiteral("pause"), VK_PAUSE}, {QStringLiteral("plus"), VK_OEM_PLUS},
-        {QStringLiteral("minus"), VK_OEM_MINUS}, {QStringLiteral("comma"), VK_OEM_COMMA},
-        {QStringLiteral("period"), VK_OEM_PERIOD}, {QStringLiteral("slash"), VK_OEM_2},
-        {QStringLiteral("backslash"), VK_OEM_5}, {QStringLiteral("semicolon"), VK_OEM_1},
-        {QStringLiteral("quote"), VK_OEM_7}, {QStringLiteral("leftbracket"), VK_OEM_4},
-        {QStringLiteral("rightbracket"), VK_OEM_6}, {QStringLiteral("backtick"), VK_OEM_3},
+        {QStringLiteral("space"), VK_SPACE},
+        {QStringLiteral("tab"), VK_TAB},
+        {QStringLiteral("escape"), VK_ESCAPE},
+        {QStringLiteral("esc"), VK_ESCAPE},
+        {QStringLiteral("enter"), VK_RETURN},
+        {QStringLiteral("return"), VK_RETURN},
+        {QStringLiteral("backspace"), VK_BACK},
+        {QStringLiteral("delete"), VK_DELETE},
+        {QStringLiteral("del"), VK_DELETE},
+        {QStringLiteral("insert"), VK_INSERT},
+        {QStringLiteral("home"), VK_HOME},
+        {QStringLiteral("end"), VK_END},
+        {QStringLiteral("pageup"), VK_PRIOR},
+        {QStringLiteral("pgup"), VK_PRIOR},
+        {QStringLiteral("pagedown"), VK_NEXT},
+        {QStringLiteral("pgdn"), VK_NEXT},
+        {QStringLiteral("up"), VK_UP},
+        {QStringLiteral("down"), VK_DOWN},
+        {QStringLiteral("left"), VK_LEFT},
+        {QStringLiteral("right"), VK_RIGHT},
+        {QStringLiteral("capslock"), VK_CAPITAL},
+        {QStringLiteral("caps lock"), VK_CAPITAL},
+        {QStringLiteral("printscreen"), VK_SNAPSHOT},
+        {QStringLiteral("prtsc"), VK_SNAPSHOT},
+        {QStringLiteral("pause"), VK_PAUSE},
+        {QStringLiteral("plus"), VK_OEM_PLUS},
+        {QStringLiteral("minus"), VK_OEM_MINUS},
+        {QStringLiteral("comma"), VK_OEM_COMMA},
+        {QStringLiteral("period"), VK_OEM_PERIOD},
+        {QStringLiteral("slash"), VK_OEM_2},
+        {QStringLiteral("backslash"), VK_OEM_5},
+        {QStringLiteral("semicolon"), VK_OEM_1},
+        {QStringLiteral("quote"), VK_OEM_7},
+        {QStringLiteral("leftbracket"), VK_OEM_4},
+        {QStringLiteral("rightbracket"), VK_OEM_6},
+        {QStringLiteral("backtick"), VK_OEM_3},
         {QStringLiteral("numpadenter"), VK_RETURN},
         // Qt's portable key names, as produced by the Settings shortcut recorder.
-        {QStringLiteral("ins"), VK_INSERT}, {QStringLiteral("pgdown"), VK_NEXT},
-        {QStringLiteral("print"), VK_SNAPSHOT}, {QStringLiteral("numlock"), VK_NUMLOCK},
-        {QStringLiteral("scrolllock"), VK_SCROLL}, {QStringLiteral("menu"), VK_APPS},
-        {QStringLiteral("volume mute"), VK_VOLUME_MUTE}, {QStringLiteral("volume up"), VK_VOLUME_UP},
+        {QStringLiteral("ins"), VK_INSERT},
+        {QStringLiteral("pgdown"), VK_NEXT},
+        {QStringLiteral("print"), VK_SNAPSHOT},
+        {QStringLiteral("numlock"), VK_NUMLOCK},
+        {QStringLiteral("scrolllock"), VK_SCROLL},
+        {QStringLiteral("menu"), VK_APPS},
+        {QStringLiteral("volume mute"), VK_VOLUME_MUTE},
+        {QStringLiteral("volume up"), VK_VOLUME_UP},
         {QStringLiteral("volume down"), VK_VOLUME_DOWN},
         {QStringLiteral("media play"), VK_MEDIA_PLAY_PAUSE},
         {QStringLiteral("media pause"), VK_MEDIA_PLAY_PAUSE},
@@ -512,7 +534,8 @@ public:
         enabled.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
         DWORD previousSize = sizeof(m_previous);
         if (!AdjustTokenPrivileges(m_token, FALSE, &enabled, sizeof(m_previous), &m_previous,
-                                   &previousSize) || GetLastError() == ERROR_NOT_ALL_ASSIGNED)
+                                   &previousSize) ||
+            GetLastError() == ERROR_NOT_ALL_ASSIGNED)
             return;
         m_enabled = true;
     }
@@ -569,7 +592,7 @@ QString shellIconCachePath(const QString &path)
     if (!directory.mkpath(directoryPath))
         return {};
     const QString filename = QString::fromLatin1(
-        QCryptographicHash::hash(fingerprint, QCryptographicHash::Sha256).toHex()) +
+                                 QCryptographicHash::hash(fingerprint, QCryptographicHash::Sha256).toHex()) +
                              QStringLiteral(".png");
     return QDir(directoryPath).filePath(filename);
 }
@@ -584,7 +607,8 @@ QString shellIconCacheFile(const QString &path)
 
     SHFILEINFOW fileInfo{};
     if (!SHGetFileInfoW(reinterpret_cast<LPCWSTR>(path.utf16()), 0, &fileInfo,
-                        sizeof(fileInfo), SHGFI_ICON | SHGFI_LARGEICON) || !fileInfo.hIcon)
+                        sizeof(fileInfo), SHGFI_ICON | SHGFI_LARGEICON) ||
+        !fileInfo.hIcon)
         return {};
 
     constexpr int iconSize = 64;
@@ -599,7 +623,8 @@ QString shellIconCacheFile(const QString &path)
     bitmapInfo.bmiHeader.biCompression = BI_RGB;
     void *pixels = nullptr;
     HBITMAP bitmap = memoryDc ? CreateDIBSection(screenDc, &bitmapInfo, DIB_RGB_COLORS,
-                                                &pixels, nullptr, 0) : nullptr;
+                                                 &pixels, nullptr, 0)
+                              : nullptr;
     HGDIOBJ oldBitmap = bitmap ? SelectObject(memoryDc, bitmap) : nullptr;
     if (bitmap && pixels) {
         std::memset(pixels, 0, iconSize * iconSize * 4);
@@ -641,7 +666,8 @@ WindowsBackend::WindowsBackend(QObject *parent)
     using SetDpiContext = BOOL(WINAPI *)(HANDLE);
     const HMODULE user32 = GetModuleHandleW(L"user32.dll");
     const auto setDpiContext = user32 ? reinterpret_cast<SetDpiContext>(
-        GetProcAddress(user32, "SetProcessDpiAwarenessContext")) : nullptr;
+                                            GetProcAddress(user32, "SetProcessDpiAwarenessContext"))
+                                      : nullptr;
     if (setDpiContext)
         setDpiContext(reinterpret_cast<HANDLE>(static_cast<INT_PTR>(-4)));
 }
@@ -658,8 +684,7 @@ QString WindowsBackend::name() const
 
 QJsonObject WindowsBackend::shortcutRegistration() const
 {
-    return {{"applied", m_hookThreadId != 0}, {"via", "native"},
-            {"hint", "Could not register the global keyboard trigger. Choose another shortcut."}};
+    return {{"applied", m_hookThreadId != 0}, {"via", "native"}, {"hint", "Could not register the global keyboard trigger. Choose another shortcut."}};
 }
 
 QString WindowsBackend::shortcutValidationError(const QString &shortcut) const
@@ -773,8 +798,7 @@ QPointF WindowsBackend::cursorPosition() const
     if (monitor && GetMonitorInfoW(monitor, reinterpret_cast<MONITORINFO *>(&monitorInfo))) {
         const QString deviceName = QString::fromWCharArray(monitorInfo.szDevice);
         for (QScreen *screen : QGuiApplication::screens()) {
-            if (normalizedDisplayName(screen->name()).compare(normalizedDisplayName(deviceName),
-                                                               Qt::CaseInsensitive) != 0)
+            if (normalizedDisplayName(screen->name()).compare(normalizedDisplayName(deviceName), Qt::CaseInsensitive) != 0)
                 continue;
             const qreal ratio = screen->devicePixelRatio();
             const QRect geometry = screen->geometry();
@@ -835,8 +859,7 @@ QVector<DiscoveredApplication> WindowsBackend::applications() const
         }
     }
 
-    std::sort(result.begin(), result.end(), [](const DiscoveredApplication &left,
-                                               const DiscoveredApplication &right) {
+    std::sort(result.begin(), result.end(), [](const DiscoveredApplication &left, const DiscoveredApplication &right) {
         return left.name.compare(right.name, Qt::CaseInsensitive) < 0;
     });
     return result;
@@ -893,7 +916,7 @@ bool WindowsBackend::performSystemAction(const QString &id, QString *error)
         succeeded = SetSuspendState(TRUE, FALSE, FALSE);
     } else if (id == QLatin1String("logout")) {
         succeeded = ExitWindowsEx(EWX_LOGOFF, SHTDN_REASON_MAJOR_APPLICATION |
-                                               SHTDN_REASON_FLAG_USER_DEFINED);
+                                                  SHTDN_REASON_FLAG_USER_DEFINED);
     } else if (id == QLatin1String("poweroff")) {
         ShutdownPrivilege privilege;
         if (!privilege.enabled()) {
@@ -957,8 +980,7 @@ bool WindowsBackend::setStartOnLogin(bool enabled, QString *error)
     }
     AppInstaller::Engine::Environment environment;
     QJsonObject receipt;
-    if (!AppInstaller::Engine::Environment::discover(&environment, error)
-        || !environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt, error)) return false;
+    if (!AppInstaller::Engine::Environment::discover(&environment, error) || !environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt, error)) return false;
     if (!receipt.isEmpty()) return installedLogin(environment, receipt, enabled, error);
     if (enabled) {
         const QString executable = QFileInfo(QCoreApplication::applicationFilePath()).canonicalFilePath();
@@ -968,7 +990,7 @@ bool WindowsBackend::setStartOnLogin(bool enabled, QString *error)
             return false;
         }
         if (!temporary.isEmpty() && (executable.compare(temporary, Qt::CaseInsensitive) == 0 ||
-            executable.startsWith(temporary + QDir::separator(), Qt::CaseInsensitive))) {
+                                     executable.startsWith(temporary + QDir::separator(), Qt::CaseInsensitive))) {
             assignError(error, QStringLiteral("Move Arcade Wheel out of the temporary directory before enabling start on login."));
             return false;
         }
@@ -1010,14 +1032,12 @@ bool WindowsBackend::startOnLogin() const
     if (QThread::currentThread() == thread()) return loginWorker([&] { return startOnLogin(); });
     AppInstaller::Engine::Environment environment;
     QJsonObject receipt;
-    if (AppInstaller::Engine::Environment::discover(&environment)
-        && environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt) && !receipt.isEmpty()) {
+    if (AppInstaller::Engine::Environment::discover(&environment) && environment.receipts().read(ArcadeLink::Ids::Wheel, &receipt) && !receipt.isEmpty()) {
         const QString executable = receipt.value(QStringLiteral("path")).toString();
         if (!samePath(executable, QCoreApplication::applicationFilePath())) return false;
         const QString startup = receipt.value(QStringLiteral("integration")).toObject().value(QStringLiteral("autostart")).toString();
         ShortcutInfo shortcut;
-        if (!startup.isEmpty() && readShortcut(startup, &shortcut)
-            && samePath(shortcut.target, executable) && shortcut.arguments == QStringLiteral("--background")) return true;
+        if (!startup.isEmpty() && readShortcut(startup, &shortcut) && samePath(shortcut.target, executable) && shortcut.arguments == QStringLiteral("--background")) return true;
     }
     HKEY key = nullptr;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKey, 0, KEY_QUERY_VALUE, &key) != ERROR_SUCCESS)

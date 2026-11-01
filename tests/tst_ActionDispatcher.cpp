@@ -92,7 +92,10 @@ private slots:
     {
         FakePlatformBackend backend;
         backend.availableApplications.append({QStringLiteral("org.example.editor.desktop"),
-                                              QStringLiteral("Editor"), {}, {}, {}});
+                                              QStringLiteral("Editor"),
+                                              {},
+                                              {},
+                                              {}});
         ActionDispatcher dispatcher(&backend);
         dispatcher.setApplications(backend.availableApplications);
 
@@ -111,7 +114,10 @@ private slots:
     {
         FakePlatformBackend backend;
         backend.availableApplications.append({QStringLiteral("org.example.editor.desktop"),
-                                              QStringLiteral("Editor"), {}, {}, {}});
+                                              QStringLiteral("Editor"),
+                                              {},
+                                              {},
+                                              {}});
         backend.launchResult = false;
         ActionDispatcher dispatcher(&backend);
         dispatcher.setApplications(backend.availableApplications);

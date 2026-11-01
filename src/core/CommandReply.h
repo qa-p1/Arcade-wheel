@@ -19,4 +19,4 @@ inline QByteArray readReply(QLocalSocket &socket, int timeoutMs = 5000)
         if (!socket.waitForReadyRead(remaining) && socket.bytesAvailable() == 0) return {};
     }
 }
-}
+} // namespace WheelCommands

@@ -19,13 +19,13 @@ private slots:
         QTest::addColumn<bool>("buffered");
         QTest::addColumn<QByteArray>("expected");
         QTest::newRow("slow import") << 1100 << QByteArray("O") << QByteArray("K\n")
-            << 0 << false << QByteArray("OK\n");
+                                     << 0 << false << QByteArray("OK\n");
         QTest::newRow("already buffered") << 0 << QByteArray("OK\n") << QByteArray()
-            << 5000 << true << QByteArray("OK\n");
+                                          << 5000 << true << QByteArray("OK\n");
         QTest::newRow("unconfirmed partial reply") << 0 << QByteArray("OK") << QByteArray()
-            << 5000 << false << QByteArray();
+                                                   << 5000 << false << QByteArray();
         QTest::newRow("deadline") << 300 << QByteArray("OK\n") << QByteArray()
-            << 100 << false << QByteArray();
+                                  << 100 << false << QByteArray();
     }
     void replies()
     {

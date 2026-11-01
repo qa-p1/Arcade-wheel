@@ -91,27 +91,21 @@ jobs:
         if: runner.os == 'Linux'
         run: >-
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          -DWHEEL_WARNINGS_AS_ERRORS=ON
           -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/deps;$QT_ROOT_DIR"
           -DARCADE_REQUIRE_LAYERSHELLQT=ON
 
       - name: Configure Windows
         if: runner.os == 'Windows'
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON -DWHEEL_WARNINGS_AS_ERRORS=ON
 
       - name: Configure macOS
         if: runner.os == 'macOS'
         env:
           TARGET_ARCH: ${{ matrix.cpu }}
         run: >-
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DWHEEL_WARNINGS_AS_ERRORS=ON
           -DCMAKE_OSX_ARCHITECTURES="$TARGET_ARCH" -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
-
-      - name: Build
-        run: cmake --build build --config Release --parallel 2
-
-      - name: Test release publication rules
-        if: runner.os == 'Linux'
-        run: python3 -m unittest discover -s tests -p 'test_release.py' -v
 
       - name: Check out the pinned Arcade Link source
         if: runner.os == 'Linux'
@@ -122,33 +116,6 @@ jobs:
           path: .arcade-link-upstream
           persist-credentials: false
 
-      - name: Compare the vendored Qt module and vectors with the pinned source
-        if: runner.os == 'Linux'
-        run: python3 packaging/check-link-vendor.py --source .arcade-link-upstream
-
-      - name: Compare vendored packaging and shortcut tools with the pinned source
-        if: runner.os == 'Linux'
-        run: python3 packaging/check-vendored-tools.py --source .arcade-link-upstream
-
-      - name: Verify vendored bytes on native checkouts
-        if: runner.os != 'Linux'
-        run: |
-          python packaging/check-link-vendor.py
-          python packaging/check-vendored-tools.py
-
-      - name: Validate shortcut data and generated Markdown
-        if: runner.os == 'Linux'
-        run: |
-          python3 scripts/validate_shortcuts.py docs/user/shortcuts.json \
-            --manifest tests/fixtures/wheel-shortcut-manifest.json
-          python3 scripts/validate_shortcuts.py docs/user/shortcuts.json \
-            --manifest tests/fixtures/wheel-shortcut-manifest.json --markdown > "$RUNNER_TEMP/shortcuts.md"
-          diff -u docs/user/shortcuts.md "$RUNNER_TEMP/shortcuts.md"
-
-      - name: Check documentation links
-        if: runner.os == 'Linux'
-        run: python3 packaging/check-docs.py
-
       - name: Build the released Link CLI for interop and isolated lifecycle checks
         if: runner.os == 'Linux'
         env:
@@ -157,12 +124,26 @@ jobs:
           rustup toolchain install 1.88.0 --profile minimal
           cargo build --manifest-path .arcade-link-upstream/Cargo.toml -p arcade-link-cli --locked
 
-      - name: Test
+      - name: Install clang-format 18
+        if: runner.os == 'Linux'
+        run: python3 -m pip install --user clang-format==18.1.8
+
+      # Build (warnings as errors), format, qmllint, vendored files, shortcut
+      # data, doc links, release tools and every test: what a contributor runs.
+      - name: scripts/check
+        shell: bash
         env:
           QT_QPA_PLATFORM: offscreen
           QT_QUICK_BACKEND: software
           ARCADE_LINK_CLI: ${{ runner.os == 'Linux' && format('{0}/.arcade-link-upstream/target/debug/arcade-link', github.workspace) || '' }}
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 120
+        run: |
+          args=(--build build --config Release)
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            args+=(--link-source .arcade-link-upstream)
+            export CLANG_FORMAT="$HOME/.local/bin/clang-format"
+          fi
+          python=$(command -v python3 || command -v python)
+          "$python" scripts/check.py "${args[@]}"
 
       - name: Wheel hub lifecycle in Link's isolated session
         if: runner.os == 'Linux'

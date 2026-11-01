@@ -44,8 +44,7 @@ QString migrate(const ArcadeLink::UserDirs &user, const QString &platform)
             kept << legacyFile + QStringLiteral(": couldn't rename it to settings.json");
     }
     if (kept.isEmpty()) return {};
-    return QStringLiteral("Couldn't move all of Arcade Wheel's settings to the new folder. The originals were kept. ")
-        + kept.join(QStringLiteral("; "));
+    return QStringLiteral("Couldn't move all of Arcade Wheel's settings to the new folder. The originals were kept. ") + kept.join(QStringLiteral("; "));
 }
 
 } // namespace WheelPaths

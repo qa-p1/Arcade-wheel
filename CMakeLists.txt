@@ -146,6 +146,23 @@ set(ARCADE_ASSET_FILES
     assets/arcade-wheel.png
 )
 qt_add_resources(arcade-wheel arcade_assets PREFIX "/" FILES ${ARCADE_ASSET_FILES})
+# Compiler warnings on Wheel's own code; CI turns them into errors with
+# -DWHEEL_WARNINGS_AS_ERRORS=ON (STANDARD §10). The vendored Link module and
+# Qt's generated QML code keep their own flags.
+option(WHEEL_WARNINGS_AS_ERRORS "Fail the build on a compiler warning in Wheel's code" OFF)
+set(WHEEL_OWN_TARGETS arcade_core arcade-wheel)
+if(TARGET arcade_macos)
+    list(APPEND WHEEL_OWN_TARGETS arcade_macos)
+endif()
+foreach(target IN LISTS WHEEL_OWN_TARGETS)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 $<$<BOOL:${WHEEL_WARNINGS_AS_ERRORS}>:/WX>)
+    else()
+        # -Wshadow (GCC) is the Linux check for MSVC's C4456-C4459.
+        target_compile_options(${target} PRIVATE -Wall -Wextra $<$<CXX_COMPILER_ID:GNU>:-Wshadow>
+                               $<$<BOOL:${WHEEL_WARNINGS_AS_ERRORS}>:-Werror>)
+    endif()
+endforeach()
 # The QML gate (STANDARD §10): qmllint over Wheel's module at zero warnings.
 add_custom_target(qmllint_gate
     COMMAND $<TARGET_FILE:Qt6::qmllint> "@${CMAKE_BINARY_DIR}/.rcc/qmllint/wheel_ui.rsp" --max-warnings 0

@@ -86,7 +86,7 @@ All notable changes to Arcade Wheel are documented here.
 
 ## 0.2.0 — 2026-10-04
 
-Builds of this version are published automatically from `main` as `v0.2.0+build.N`. See [Packaging and releases](docs/PACKAGING.md).
+Builds of this version are published automatically from `main` as `v0.2.0+build.N`. See [Packaging and releases](docs/dev/packaging.md).
 
 ### Added
 
@@ -133,5 +133,5 @@ Builds of this version are published automatically from `main` as `v0.2.0+build.
 - Rewrote the README for the open-source release: features, requirements (Qt 6.8+), build, usage, CLI reference, configuration, platform notes, layout, and contributing.
 - Updated the architecture notes for schema version 3, center gesture recognition, and how the wheel is positioned.
 - Added single-click checks to the manual release checklist.
-- Added [packaging and release documentation](docs/PACKAGING.md) and download instructions to the README.
+- Added [packaging and release documentation](docs/dev/packaging.md) and download instructions to the README.
 - Added macOS to the architecture notes and the manual release checklist.

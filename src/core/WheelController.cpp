@@ -30,7 +30,8 @@
 #include <cmath>
 
 namespace {
-template <typename F> auto configWorker(F work)
+template <typename F>
+auto configWorker(F work)
 {
     using Result = decltype(work());
     Result result{};
@@ -54,14 +55,14 @@ bool capturesScreen(const QJsonArray &actions)
 {
     return std::any_of(actions.begin(), actions.end(), [](const QJsonValue &value) {
         const auto action = value.toObject();
-        return action.value(QStringLiteral("type")).toString() == QStringLiteral("system")
-            && action.value(QStringLiteral("payload")).toObject().value(QStringLiteral("id")).toString()
-                   == QStringLiteral("screenshot")
-            || action.value("type").toString() == "arcade" && (action.value("payload").toObject().value("input").toString() == "lens-selection"
-                || action.value("payload").toObject().value("action").toString().startsWith("lens.capture"));
+        const QString type = action.value(QStringLiteral("type")).toString();
+        const QJsonObject payload = action.value(QStringLiteral("payload")).toObject();
+        const bool screenshot = type == QStringLiteral("system") && payload.value(QStringLiteral("id")).toString() == QStringLiteral("screenshot");
+        const bool lensCapture = type == QStringLiteral("arcade") && (payload.value(QStringLiteral("input")).toString() == QStringLiteral("lens-selection") || payload.value(QStringLiteral("action")).toString().startsWith(QStringLiteral("lens.capture")));
+        return screenshot || lensCapture;
     });
 }
-}
+} // namespace
 
 WheelController::WheelController(PlatformBackend *backend, QObject *parent, QString configPath)
     : QObject(parent), m_backend(backend), m_store(std::move(configPath)), m_dispatcher(backend)
@@ -69,19 +70,22 @@ WheelController::WheelController(PlatformBackend *backend, QObject *parent, QStr
     auto &arcade = m_dispatcher.arcade();
     connect(&arcade, &ArcadeLinkProvider::openFailed, this, [this](const QString &error) { reportError(error); emit actionFailed(error); });
     connect(&arcade, &ArcadeLinkProvider::changed, this, [this] {
-        emit providersChanged(); emit currentDeckChanged();
+        emit providersChanged();
+        emit currentDeckChanged();
     });
     connect(&arcade, &ArcadeLinkProvider::jobStarted, this,
-        [this](const QString &job, const QString &app, const QString &title, const QString &preview, bool outbound) {
-            m_linkJobs.append(QVariantMap{{"id", job}, {"app", app}, {"title", title}, {"preview", preview},
-                {"outbound", outbound}, {"running", true}, {"fraction", -1.0}, {"message", "Working…"}});
-            emit linkJobsChanged(); emit linkActivityRequested();
-        });
+            [this](const QString &job, const QString &app, const QString &title, const QString &preview, bool outbound) {
+                m_linkJobs.append(QVariantMap{{"id", job}, {"app", app}, {"title", title}, {"preview", preview}, {"outbound", outbound}, {"running", true}, {"fraction", -1.0}, {"message", "Working…"}});
+                emit linkJobsChanged();
+                emit linkActivityRequested();
+            });
     connect(&arcade, &ArcadeLinkProvider::jobProgress, this, [this](const QString &job, double fraction, const QString &message) {
         for (auto &value : m_linkJobs) {
             auto row = value.toMap();
             if (row.value("id").toString() != job) continue;
-            row.insert("fraction", fraction); row.insert("message", message); value = row;
+            row.insert("fraction", fraction);
+            row.insert("message", message);
+            value = row;
         }
         emit linkJobsChanged();
     });
@@ -89,12 +93,17 @@ WheelController::WheelController(PlatformBackend *backend, QObject *parent, QStr
         for (auto &value : m_linkJobs) {
             auto row = value.toMap();
             if (row.value("id").toString() != job) continue;
-            row.insert("running", false); row.insert("fraction", error.isEmpty() ? 1.0 : -1.0);
+            row.insert("running", false);
+            row.insert("fraction", error.isEmpty() ? 1.0 : -1.0);
             row.insert("message", error.isEmpty() ? result.value("message").toString("Done.") : error);
-            row.insert("outputs", result.value("outputs").toArray().toVariantList()); value = row;
+            row.insert("outputs", result.value("outputs").toArray().toVariantList());
+            value = row;
         }
         emit linkJobsChanged();
-        if (!error.isEmpty() && error != "Cancelled.") { reportError(error); emit actionFailed(error); }
+        if (!error.isEmpty() && error != "Cancelled.") {
+            reportError(error);
+            emit actionFailed(error);
+        }
     });
     m_holdTimer.setSingleShot(true);
     m_closeTimer.setSingleShot(true);
@@ -174,8 +183,7 @@ void WheelController::setOverlayView(QQuickView *view)
         m_lastPointer = m_origin;
         setSelectedIndex(-1);
         m_revealed = true;
-        emit overlayRevealedChanged();
-    }, Qt::QueuedConnection);
+        emit overlayRevealedChanged(); }, Qt::QueuedConnection);
     connect(view, &QQuickView::widthChanged, this, &WheelController::updateOverlayGeometry);
     connect(view, &QQuickView::heightChanged, this, &WheelController::updateOverlayGeometry);
     connect(qGuiApp, &QGuiApplication::screenRemoved, this, [this] { cancelTrigger(); });
@@ -241,15 +249,17 @@ void WheelController::pressTrigger()
     m_mode = Mode::Hold;
     m_pressed = true;
     m_triggerPressClock.restart();
-    const int threshold = std::clamp(m_config.value(QStringLiteral("trigger")).toObject()
-                                         .value(QStringLiteral("holdThresholdMs")).toInt(), 0, 1000);
+    const int threshold = std::clamp(m_config.value(QStringLiteral("trigger")).toObject().value(QStringLiteral("holdThresholdMs")).toInt(), 0, 1000);
     if (threshold == 0) openOverlay();
     else m_holdTimer.start(threshold);
 }
 
 void WheelController::releaseTrigger()
 {
-    if (m_mode == Mode::Preview) { cancelTrigger(); return; }
+    if (m_mode == Mode::Preview) {
+        cancelTrigger();
+        return;
+    }
     if (!m_pressed) return;
     m_pressed = false;
     m_holdTimer.stop();
@@ -257,13 +267,10 @@ void WheelController::releaseTrigger()
         finishCenterClicks();
         if (!m_visible) return;
     }
-    const QString shortcut = m_config.value(QStringLiteral("trigger")).toObject()
-                                 .value(QStringLiteral("shortcut")).toString();
+    const QString shortcut = m_config.value(QStringLiteral("trigger")).toObject().value(QStringLiteral("shortcut")).toString();
     const QKeySequence sequence(shortcut, QKeySequence::PortableText);
-    const bool muteKey = (!sequence.isEmpty() && sequence[0].key() == Qt::Key_VolumeMute)
-        || shortcut.compare(QStringLiteral("XF86AudioMute"), Qt::CaseInsensitive) == 0;
-    if (m_mode == Mode::Hold && muteKey && m_triggerPressClock.isValid()
-        && m_triggerPressClock.elapsed() < 35) {
+    const bool muteKey = (!sequence.isEmpty() && sequence[0].key() == Qt::Key_VolumeMute) || shortcut.compare(QStringLiteral("XF86AudioMute"), Qt::CaseInsensitive) == 0;
+    if (m_mode == Mode::Hold && muteKey && m_triggerPressClock.isValid() && m_triggerPressClock.elapsed() < 35) {
         // A consumer-control pulse contains no usable physical release edge.
         // Keep hold semantics; never silently substitute a click/toggle mode.
         cancelTrigger();
@@ -276,7 +283,10 @@ void WheelController::releaseTrigger()
 
 void WheelController::showWheel()
 {
-    if (m_visible && m_mode == Mode::Click) { cancelTrigger(); return; }
+    if (m_visible && m_mode == Mode::Click) {
+        cancelTrigger();
+        return;
+    }
     cancelTrigger();
     m_mode = Mode::Click;
     openOverlay();
@@ -302,7 +312,10 @@ void WheelController::executeSelection(int index)
 {
     const auto actions = deckAt(m_deckIndex).value(QStringLiteral("actions")).toArray();
     const QJsonObject action = index >= 0 && index < actions.size() ? actions.at(index).toObject() : QJsonObject{};
-    if (action.value("type").toString() == "arcade" && !m_dispatcher.unavailableReason(action).isEmpty()) { hideOverlay(); return; }
+    if (action.value("type").toString() == "arcade" && !m_dispatcher.unavailableReason(action).isEmpty()) {
+        hideOverlay();
+        return;
+    }
     executeActions(action.isEmpty() ? QJsonArray{} : QJsonArray{action});
 }
 
@@ -317,8 +330,7 @@ void WheelController::executeActions(const QJsonArray &actions)
     // Screen captures are the exception: they would record the fading wheel.
     QTimer::singleShot(capturesScreen(actions) ? kScreenCaptureDelayMs : 0, this, [this, actions] {
         QStringList errors;
-        const bool focus = m_config.value(QStringLiteral("behaviour")).toObject()
-                               .value(QStringLiteral("focusExisting")).toBool(true);
+        const bool focus = m_config.value(QStringLiteral("behaviour")).toObject().value(QStringLiteral("focusExisting")).toBool(true);
         for (const auto &value : actions) {
             const auto action = value.toObject();
             if (action.value(QStringLiteral("type")).toString() == QStringLiteral("none")) continue;
@@ -463,7 +475,10 @@ void WheelController::selectDeck(int index)
 
 bool WheelController::commit(QJsonObject updated, bool triggerChanged, Persist persist)
 {
-    if (m_persisting) { reportError(QStringLiteral("A settings save is in progress. Try again in a moment.")); return false; }
+    if (m_persisting) {
+        reportError(QStringLiteral("A settings save is in progress. Try again in a moment."));
+        return false;
+    }
     QString error;
     updated = ConfigStore::normalize(updated, &error);
     if (updated.isEmpty()) {
@@ -697,7 +712,8 @@ void WheelController::setPeerEnabled(const QString &app, bool enabled)
 {
     if (!AppMetadata::apps().contains(app) && app != ArcadeLink::Ids::Tools) return;
     auto peers = m_config.value("link").toObject().value("disabledPeers").toArray();
-    for (int i = peers.size() - 1; i >= 0; --i) if (peers.at(i).toString() == app) peers.removeAt(i);
+    for (int i = peers.size() - 1; i >= 0; --i)
+        if (peers.at(i).toString() == app) peers.removeAt(i);
     if (!enabled) peers.append(app);
     updateSetting("link", "disabledPeers", peers.toVariantList());
 }
@@ -721,7 +737,8 @@ QString WheelController::peerDisplayName(const QString &app) const
 
 void WheelController::setLinkDiagnostics(const QString &endpoint, const QString &error)
 {
-    m_linkEndpointState = endpoint; m_linkLastError = error;
+    m_linkEndpointState = endpoint;
+    m_linkLastError = error;
     emit linkDiagnosticsChanged();
 }
 
@@ -739,11 +756,8 @@ QVariantMap WheelController::arcadeActionInfo(const QVariantMap &slot) const
     const auto payload = QJsonObject::fromVariantMap(slot.value("payload").toMap());
     const auto action = WheelInvoke::actionFor(m_dispatcher.arcade().manifestFor(payload.value("app").toString()), payload);
     const auto effects = action.value("effects").toArray();
-    const bool outbound = effects.contains("sends-to-device") || effects.contains("network") || effects.contains("uploads-content")
-        || action.value("privacy").toString() == "cloud" || action.value("privacy").toString() == "network";
-    return {{"reason", actionUnavailableReason(slot)}, {"outbound", outbound},
-        {"preview", payload.value("input").toString("none")},
-        {"glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(payload.value("app").toString())}};
+    const bool outbound = effects.contains("sends-to-device") || effects.contains("network") || effects.contains("uploads-content") || action.value("privacy").toString() == "cloud" || action.value("privacy").toString() == "network";
+    return {{"reason", actionUnavailableReason(slot)}, {"outbound", outbound}, {"preview", payload.value("input").toString("none")}, {"glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(payload.value("app").toString())}};
 }
 
 QString WheelController::localPath(const QString &urlOrPath)
@@ -754,21 +768,27 @@ QString WheelController::localPath(const QString &urlOrPath)
 
 bool WheelController::importConfig(const QString &urlOrPath)
 {
-    if (m_persisting) { reportError(QStringLiteral("A settings save is in progress.")); return false; }
+    if (m_persisting) {
+        reportError(QStringLiteral("A settings save is in progress."));
+        return false;
+    }
     QJsonObject imported;
     QString error;
     {
         const QScopedValueRollback<bool> saving(m_persisting, true);
         if (!configWorker([&] {
-            if (!m_store.importFrom(localPath(urlOrPath), &imported, &error)) return false;
-            if (m_savePending && !m_store.save(m_config, &error)) return false;
-            QString backup;
-            if (!m_store.backupCurrent(&backup, &error)) {
-                error = QStringLiteral("Could not back up current settings; import was not applied: %1").arg(error);
-                return false;
-            }
-            return m_store.save(imported, &error);
-        })) { reportError(error); return false; }
+                if (!m_store.importFrom(localPath(urlOrPath), &imported, &error)) return false;
+                if (m_savePending && !m_store.save(m_config, &error)) return false;
+                QString backup;
+                if (!m_store.backupCurrent(&backup, &error)) {
+                    error = QStringLiteral("Could not back up current settings; import was not applied: %1").arg(error);
+                    return false;
+                }
+                return m_store.save(imported, &error);
+            })) {
+            reportError(error);
+            return false;
+        }
     }
     if (!commit(imported, true, Persist::Prepared)) return false;
     applyStartOnLogin();
@@ -794,8 +814,7 @@ void WheelController::applyStartOnLogin()
 {
     // Import and reset replace the saved flag wholesale; make the OS login
     // entry follow it, or record the real state if the OS refuses.
-    const bool wanted = m_config.value(QStringLiteral("general")).toObject()
-                            .value(QStringLiteral("startOnLogin")).toBool();
+    const bool wanted = m_config.value(QStringLiteral("general")).toObject().value(QStringLiteral("startOnLogin")).toBool();
     if (wanted == m_backend->startOnLogin()) return;
     QString error;
     if (m_backend->setStartOnLogin(wanted, &error)) return;
@@ -819,7 +838,7 @@ QString WheelController::shortcutFromKey(int key, int modifiers) const
     if (key == Qt::Key_Control || key == Qt::Key_Shift || key == Qt::Key_Alt ||
         key == Qt::Key_Meta || key == Qt::Key_AltGr || key == Qt::Key_unknown) return {};
     const auto mods = Qt::KeyboardModifiers(modifiers) &
-        (Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier | Qt::MetaModifier);
+                      (Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier | Qt::MetaModifier);
     QString sequence = QKeySequence(QKeyCombination(mods, Qt::Key(key))).toString(QKeySequence::PortableText);
     if (key == Qt::Key_Plus && sequence.endsWith(QLatin1Char('+'))) sequence.chop(1), sequence += QStringLiteral("Plus");
     return sequence;
@@ -847,7 +866,7 @@ QString swapModifierNames(const QString &sequence, bool toKit)
     }
     return parts.join(QLatin1Char('+'));
 }
-}
+} // namespace
 
 QString WheelController::shortcutFromKit(const QString &sequence) const
 {
@@ -892,10 +911,13 @@ bool WheelController::applyShortcut(const QString &shortcut, bool overrideConfli
     auto updated = m_config;
     auto trigger = updated.value(QStringLiteral("trigger")).toObject();
     trigger.remove(QStringLiteral("preferredTrigger"));
-    trigger.insert(QStringLiteral("shortcut"),shortcut.trimmed());
-    trigger.insert(QStringLiteral("overrideConflict"),overrideConflict);
-    updated.insert(QStringLiteral("trigger"),trigger);
-    if (!commit(updated,true)) { m_shortcutFailureCode = QStringLiteral("internal"); return false; }
+    trigger.insert(QStringLiteral("shortcut"), shortcut.trimmed());
+    trigger.insert(QStringLiteral("overrideConflict"), overrideConflict);
+    updated.insert(QStringLiteral("trigger"), trigger);
+    if (!commit(updated, true)) {
+        m_shortcutFailureCode = QStringLiteral("internal");
+        return false;
+    }
     const auto registration = m_backend->shortcutRegistration();
     if (!registration.value("applied").toBool() && registration.value("via").toString() != u"manual") {
         commit(previous, true);
@@ -913,16 +935,14 @@ bool WheelController::applyShortcut(const QString &shortcut, bool overrideConfli
 namespace {
 bool validCenterGesture(const QString &gesture)
 {
-    return gesture == QStringLiteral("singleClick") || gesture == QStringLiteral("doubleClick")
-        || gesture == QStringLiteral("tripleClick") || gesture == QStringLiteral("longPress");
+    return gesture == QStringLiteral("singleClick") || gesture == QStringLiteral("doubleClick") || gesture == QStringLiteral("tripleClick") || gesture == QStringLiteral("longPress");
 }
-}
+} // namespace
 
 bool WheelController::inCenter(qreal x, qreal y) const
 {
     const auto appearance = m_config.value(QStringLiteral("appearance")).toObject();
-    const qreal radius = std::clamp(appearance.value("centerRadius").toDouble(56), 32.0, 72.0)
-        * std::clamp(appearance.value("scale").toDouble(1), 0.75, 1.4);
+    const qreal radius = std::clamp(appearance.value("centerRadius").toDouble(56), 32.0, 72.0) * std::clamp(appearance.value("scale").toDouble(1), 0.75, 1.4);
     return std::hypot(x - m_origin.x(), y - m_origin.y()) <= radius;
 }
 
@@ -950,7 +970,10 @@ void WheelController::centerReleased(qreal x, qreal y)
     if (!m_visible || !m_centerPressed) return;
     m_centerPressed = false;
     emit centerGestureChanged();
-    if (!inCenter(x, y)) { cancelCenterGesture(); return; }
+    if (!inCenter(x, y)) {
+        cancelCenterGesture();
+        return;
+    }
     ++m_centerClicks;
     const bool triple = centerGestureEnabled(QStringLiteral("tripleClick"));
     const bool doubleClick = centerGestureEnabled(QStringLiteral("doubleClick"));
@@ -1106,8 +1129,7 @@ QString WheelController::diagnostics() const
     header.linkEnabled = m_config.value(QStringLiteral("link")).toObject().value(QStringLiteral("enabled")).toBool(true);
     header.peersFrom(ArcadeLink::Locations::discover());
     QString text = header.render();
-    text += QStringLiteral("Shortcut: %1 (%2)\n").arg(m_config.value(QStringLiteral("trigger")).toObject().value(QStringLiteral("shortcut")).toString(),
-                                                        m_triggerStatus.isEmpty() ? QStringLiteral("unknown") : m_triggerStatus);
+    text += QStringLiteral("Shortcut: %1 (%2)\n").arg(m_config.value(QStringLiteral("trigger")).toObject().value(QStringLiteral("shortcut")).toString(), m_triggerStatus.isEmpty() ? QStringLiteral("unknown") : m_triggerStatus);
     text += QStringLiteral("Decks: %1\n").arg(deckCount());
     text += QStringLiteral("Platform: %1\n").arg(QGuiApplication::platformName());
     return text;

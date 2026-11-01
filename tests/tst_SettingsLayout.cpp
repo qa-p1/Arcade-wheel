@@ -28,10 +28,14 @@ public:
     void configureTrigger(const QJsonObject &) override {}
     bool prepareOverlay(QQuickWindow *, QString *) override { return true; }
     QPointF cursorPosition() const override { return {5, 5}; }
-    QVector<DiscoveredApplication> applications() const override {
+    QVector<DiscoveredApplication> applications() const override
+    {
         return {{"org.gnome.Nautilus.desktop", "Files", "org.gnome.Nautilus", {}, {}},
                 {"org.example.with-a-really-long-identifier-that-should-elide.desktop",
-                 "An application with a deliberately long display name", {}, {}, {}}};
+                 "An application with a deliberately long display name",
+                 {},
+                 {},
+                 {}}};
     }
     bool launchApplication(const QString &, bool, QString *) override { return true; }
     bool performSystemAction(const QString &, QString *) override { return true; }
@@ -51,11 +55,9 @@ void collectOverflow(QQuickItem *item, const QRectF &bounds, QStringList *proble
     QRectF rect = item->mapRectToScene(QRectF(0, 0, item->width(), item->height()));
     const QVariant painted = item->property("paintedWidth");
     const int alignment = item->property("horizontalAlignment").toInt();
-    if (painted.isValid() && !item->property("text").toString().isEmpty()
-        && painted.toReal() > item->width() + 1 && alignment == Qt::AlignLeft)
+    if (painted.isValid() && !item->property("text").toString().isEmpty() && painted.toReal() > item->width() + 1 && alignment == Qt::AlignLeft)
         rect.setWidth(item->mapRectToScene(QRectF(0, 0, painted.toReal(), 1)).width());
-    if (item->width() > 0 && item->height() > 0
-        && (rect.right() > bounds.right() + 1 || rect.left() < bounds.left() - 1)) {
+    if (item->width() > 0 && item->height() > 0 && (rect.right() > bounds.right() + 1 || rect.left() < bounds.left() - 1)) {
         QString name = item->objectName();
         if (name.isEmpty()) name = QString::fromLatin1(item->metaObject()->className());
         const QString text = item->property("text").toString();
@@ -64,8 +66,12 @@ void collectOverflow(QQuickItem *item, const QRectF &bounds, QStringList *proble
             chain << (p->objectName().isEmpty() ? QString::fromLatin1(p->metaObject()->className()) : p->objectName());
         name += QStringLiteral("[%1x%2,%3 children]").arg(item->width()).arg(item->height()).arg(item->childItems().size());
         problems->append(QStringLiteral("%1 '%2' spans x %3..%4, visible %5..%6 (in %7)")
-                             .arg(name, text.left(40)).arg(rect.left()).arg(rect.right())
-                             .arg(bounds.left()).arg(bounds.right()).arg(chain.join(QStringLiteral(" < "))));
+                             .arg(name, text.left(40))
+                             .arg(rect.left())
+                             .arg(rect.right())
+                             .arg(bounds.left())
+                             .arg(bounds.right())
+                             .arg(chain.join(QStringLiteral(" < "))));
         return; // one report per branch
     }
     // Only horizontal clipping matters: vertical overflow scrolls.
@@ -92,19 +98,22 @@ class SettingsLayoutTest final : public QObject {
     Q_OBJECT
     QTemporaryDir arcadeHome; // keep the real Arcade registry out of the layout
 private slots:
-    void initTestCase() {
+    void initTestCase()
+    {
         QVERIFY(arcadeHome.isValid());
         qputenv("ARCADE_HOME", arcadeHome.path().toUtf8());
         QCoreApplication::setApplicationVersion(QStringLiteral("9.8.7"));
     }
-    void pagesFitHorizontally_data() {
+    void pagesFitHorizontally_data()
+    {
         QTest::addColumn<QSize>("size");
         QTest::addColumn<QString>("theme");
         for (const char *theme : {"light", "dark"})
             for (const QSize size : {QSize(1920, 1080), QSize(1080, 720), QSize(900, 600), QSize(720, 520)})
                 QTest::addRow("%s-%dx%d", theme, size.width(), size.height()) << size << QString::fromLatin1(theme);
     }
-    void pagesFitHorizontally() {
+    void pagesFitHorizontally()
+    {
         QFETCH(QSize, size);
         QFETCH(QString, theme);
         QTemporaryDir dir;
@@ -154,7 +163,8 @@ private slots:
     }
     // The action picker opens over Settings; each type's fields fit too.
     void actionPickerFits_data() { pagesFitHorizontally_data(); }
-    void actionPickerFits() {
+    void actionPickerFits()
+    {
         QFETCH(QSize, size);
         QFETCH(QString, theme);
         QTemporaryDir dir;
@@ -198,7 +208,8 @@ private slots:
     }
     // The first-run prompt on the kit: Link's shared strings, the main
     // action rightmost and in Wheel's accent, both options.
-    void installPromptUsesTheKit() {
+    void installPromptUsesTheKit()
+    {
         const QJsonObject strings = ArcadeLink::ArcadeInstall::strings();
         const QJsonObject notInstalled = strings.value(QStringLiteral("notInstalled")).toObject();
         QVERIFY(!notInstalled.isEmpty());
@@ -219,7 +230,8 @@ private slots:
         QVERIFY(QTest::qWaitForWindowExposed(window));
         auto *primary = itemNamed(window->contentItem(), QStringLiteral("installButton-0"));
         auto *secondary = itemNamed(window->contentItem(), QStringLiteral("installButton-1"));
-        QVERIFY(primary); QVERIFY(secondary);
+        QVERIFY(primary);
+        QVERIFY(secondary);
         QCOMPARE(primary->property("variant").toString(), QStringLiteral("primary"));
         // Opened in Wheel's amber, not fading from the kit's default accent.
         const QQuickItem *fill = primary->property("background").value<QQuickItem *>();

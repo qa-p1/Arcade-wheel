@@ -10,10 +10,10 @@
 namespace IconTheme {
 
 struct Sources {
-    QString platformTheme;               // QT_QPA_PLATFORMTHEME
-    QString configHome;                  // XDG_CONFIG_HOME or ~/.config
-    QStringList searchPaths;             // QIcon::themeSearchPaths()
-    std::function<QString()> gsettings;  // org.gnome.desktop.interface icon-theme, raw output
+    QString platformTheme;              // QT_QPA_PLATFORMTHEME
+    QString configHome;                 // XDG_CONFIG_HOME or ~/.config
+    QStringList searchPaths;            // QIcon::themeSearchPaths()
+    std::function<QString()> gsettings; // org.gnome.desktop.interface icon-theme, raw output
 };
 
 // Small readers, exposed for tests. Each returns an empty string when the

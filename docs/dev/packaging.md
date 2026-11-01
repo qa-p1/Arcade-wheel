@@ -1,35 +1,38 @@
 # Packaging and releases
 
-The [workflow](../.github/workflows/ci.yml) builds a Release configuration, runs CTest, bundles dependencies, launches the deployed Settings and overlay with build-time Qt paths removed, then uploads installers and SHA-256 checksums. Failed builds or package checks do not upload installable artifacts for that job. Windows additionally tests silent installation and uninstallation.
+The [workflow](../../.github/workflows/ci.yml) builds a Release configuration, runs CTest, bundles dependencies, launches the deployed Settings and overlay with build-time Qt paths removed, then uploads installers and SHA-256 checksums. Failed builds or package checks do not upload installable artifacts for that job. Windows additionally tests silent installation and uninstallation.
 
 ## Triggers and downloads
 
-- Every successful push to `main` publishes a **stable GitHub Release** with the Windows setup EXE and portable ZIP, Linux AppImage, both macOS DMGs, one `SHA256SUMS.txt`, and `arcade-release.json`. CI artifacts are also retained for 30 days; release downloads do not have that artifact expiry.
-- Pull requests targeting `main` run the same checks and packaging. Superseded PR runs are cancelled.
-- **Run workflow** starts a manual build; successful runs on `main` also publish a stable release.
-- Main releases use `vX.Y.Z+build.N`, where `X.Y.Z` is the version in `CMakeLists.txt` and `N` is the GitHub Actions run number. Build metadata gives each run a unique tag without modifying source files or creating a commit loop. These releases are explicitly marked stable, not prereleases. Installer filenames and the installed application's version retain `X.Y.Z`.
-- Explicit `vX.Y.Z` tags still publish a release with that exact tag, after verifying the version matches `CMakeLists.txt` and all platform jobs succeed.
-- Pull requests, failed jobs, and cancelled runs never publish releases. A rerun preserves an already published release. Interrupted uploads leave a draft and can be retried. A slower build of an older commit cannot replace a newer release as **Latest**.
+- [`ci.yml`](../../.github/workflows/ci.yml) runs on pushes to `main`, on pull requests and on demand. It builds, checks and packages all three systems and uploads the packages as run artifacts for 30 days. It never publishes anything. Superseded PR runs are cancelled.
+- [`release.yml`](../../.github/workflows/release.yml) is started by hand with a `channel`:
+  - `beta` on `main` calls `ci.yml`, then publishes `v<version>-beta.<run>` as a **draft prerelease**. It is the rehearsal: nobody sees it and Tools ignores it.
+  - `stable` on the `v<version>` tag calls `ci.yml` on that tag, then publishes `v<version>` as **Latest**.
+- [`tag.yml`](../../.github/workflows/tag.yml) creates the `v<version>` tag from `CMakeLists.txt` on a commit of `main`. Tags are never pushed by hand.
+- The version comes only from `CMakeLists.txt`; installer filenames, the installed app and the tag all use it. The CI run number appears in the release notes as the build number.
+- Failed or cancelled runs never publish. A rerun preserves an already published release. Interrupted uploads leave a draft that a rerun resumes. A slower run of an older commit cannot replace a newer release as **Latest**.
 
-Use [Releases](https://github.com/qa-p1/Arcade-wheel/releases) for direct installer downloads. Release notes link to the exact tested commit and CI run and include GitHub-generated change notes. All five packages are checksum-verified before upload, and the complete upload is checked before the draft is published. Alternatively, choose an Actions run and download its platform **Artifacts**; GitHub wraps these in ZIPs.
+Release order: merge to `main`, run `release.yml` with `beta` on `main`, check the draft, run `tag.yml`, then `release.yml` with `stable` on the new tag.
 
-Each platform artifact includes its own checksum list and manifest. The release job downloads these into separate directories, verifies every original package, then combines the five packages and regenerates one manifest and checksum list. Corrupt, missing or duplicate packages stop publication. The manifest uses the full release version, including `+build.N`; it marks the Windows ZIP as `portable` and records `--install --silent` for AppImage and DMG assets. Windows installer entries use Inno's `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER` flags.
+Use [Releases](https://github.com/qa-p1/Arcade-wheel/releases) for direct installer downloads. Release notes link to the exact tested commit and run and include GitHub-generated change notes. All five packages are checksum-verified before upload, and the complete upload is checked before the draft is published. Alternatively, choose an Actions run and download its platform **Artifacts**; GitHub wraps these in ZIPs.
+
+Each platform artifact includes its own checksum list and manifest. The release job downloads these into separate directories, verifies every original package, then combines the five packages and regenerates one manifest and checksum list. Corrupt, missing or duplicate packages stop publication. The manifest version is the plain `X.Y.Z`; stable releases use the `stable` channel and beta drafts `nightly`. It marks the Windows ZIP as `portable` and records `--install --silent` for AppImage and DMG assets. Windows installer entries use Inno's `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER` flags.
 
 The Qt bundle, conformance vectors, embedded install strings, release generator,
 shortcut validator and Windows Inno/NSIS integration are all vendored from
-Arcade Link commit `4c75f3a` (after `v0.3.0`). The bundle follows the vendoring tool's
+Arcade Link `v0.4.15` (commit `56798545`). The bundle follows the vendoring tool's
 layout under `src/link/`, with hashes in `src/link/VENDORED.json`;
 `scripts/VENDORED` and `packaging/windows/VENDORED` pin the shared copies.
 Local checks need no network:
 
 ```sh
-python3 packaging/check-link-vendor.py --source ../../Rust/Arcade-link
+python3 packaging/check-link-vendor.py --source ../Arcade-Link
 python3 packaging/check-vendored-tools.py
 python3 scripts/validate_shortcuts.py docs/user/shortcuts.json --manifest tests/fixtures/wheel-shortcut-manifest.json
 python3 -m unittest discover -s tests -p 'test_release.py' -v
 ```
 
-No repository secrets are needed for unsigned builds. Build jobs have read-only repository permissions; only the release job gets `contents: write`. The built-in `GITHUB_TOKEN` publishes releases and creates tags without triggering another CI run. GitHub Actions must be enabled. Actions and downloaded Linux packaging tools/dependency sources are pinned to revisions or checksums. Qt is fixed at 6.8.3; upgrade Qt and rebuild LayerShellQt together because the latter uses Qt's private API.
+No repository secrets are needed for unsigned builds. Build jobs have read-only repository permissions; only the publish job in `release.yml` and `tag.yml` get `contents: write`. The built-in `GITHUB_TOKEN` publishes releases and creates tags without triggering another run. GitHub Actions must be enabled. Actions and downloaded Linux packaging tools/dependency sources are pinned to revisions or checksums. Qt is fixed at 6.8.3; upgrade Qt and rebuild LayerShellQt together because the latter uses Qt's private API.
 
 ## What is bundled
 

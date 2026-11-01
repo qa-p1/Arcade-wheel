@@ -25,6 +25,8 @@ public:
 
 private:
     QString m_path;
+    // A pre-0.5 config.json to start from while settings.json doesn't exist yet.
+    QString m_legacyPath;
     mutable bool m_writeBlocked = false;
     static bool writeJson(const QJsonObject &config, const QString &path, QString *error, bool privateFile = false);
 };

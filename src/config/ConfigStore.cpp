@@ -36,7 +36,8 @@ QJsonObject migrateAction(QJsonObject action)
     payload.insert("version", 1);
     const auto oldInput = legacy.value("input").toString();
     const QStringList modes{"none", "clipboard", "lens-selection", "file-selection"};
-    payload.insert("input", modes.contains(oldInput) ? oldInput : oldInput.startsWith("clipboard") ? "clipboard" : "none");
+    payload.insert("input", modes.contains(oldInput) ? oldInput : oldInput.startsWith("clipboard") ? "clipboard"
+                                                                                                   : "none");
     payload.insert("legacyPayload", legacy);
     action.insert("type", "arcade");
     action.insert("payload", payload);
@@ -63,15 +64,8 @@ bool isSensitiveField(QString key)
 {
     key = key.toLower();
     key.remove(QRegularExpression(QStringLiteral("[^a-z0-9]")));
-    const bool deviceIdentity = key.contains(QStringLiteral("device"))
-        && (key.contains(QStringLiteral("id")) || key.contains(QStringLiteral("identity"))
-            || key.contains(QStringLiteral("key")) || key.contains(QStringLiteral("fingerprint")));
-    return key.contains(QStringLiteral("secret")) || key.contains(QStringLiteral("password"))
-        || key.contains(QStringLiteral("credential")) || key == QStringLiteral("auth")
-        || key.contains(QStringLiteral("authorization")) || key == QStringLiteral("token")
-        || key.endsWith(QStringLiteral("token")) || key == QStringLiteral("apikey")
-        || key.endsWith(QStringLiteral("apikey")) || key == QStringLiteral("privatekey")
-        || key.endsWith(QStringLiteral("privatekey")) || deviceIdentity;
+    const bool deviceIdentity = key.contains(QStringLiteral("device")) && (key.contains(QStringLiteral("id")) || key.contains(QStringLiteral("identity")) || key.contains(QStringLiteral("key")) || key.contains(QStringLiteral("fingerprint")));
+    return key.contains(QStringLiteral("secret")) || key.contains(QStringLiteral("password")) || key.contains(QStringLiteral("credential")) || key == QStringLiteral("auth") || key.contains(QStringLiteral("authorization")) || key == QStringLiteral("token") || key.endsWith(QStringLiteral("token")) || key == QStringLiteral("apikey") || key.endsWith(QStringLiteral("apikey")) || key == QStringLiteral("privatekey") || key.endsWith(QStringLiteral("privatekey")) || deviceIdentity;
 }
 
 QJsonValue portableValue(const QJsonValue &value)
@@ -91,11 +85,12 @@ QJsonValue portableValue(const QJsonValue &value)
     }
     return value;
 }
-}
+} // namespace
 
 ConfigStore::ConfigStore(QString path)
-    : m_path(path.isEmpty() ? WheelPaths::settingsFile() : std::move(path))
+    : m_path(path.isEmpty() ? WheelPaths::settingsFile() : std::move(path)), m_legacyPath(path.isEmpty() ? WheelPaths::readableSettingsFile() : QString())
 {
+    if (m_legacyPath == m_path) m_legacyPath.clear();
 }
 
 QString ConfigStore::freshId()
@@ -139,8 +134,7 @@ QJsonObject ConfigStore::defaults(const QVector<DiscoveredApplication> &applicat
         {QStringLiteral("celluloid"), QStringLiteral("vlc"), QStringLiteral("mpv"),
          QStringLiteral("media player")},
         {QStringLiteral("screenshot"), QStringLiteral("spectacle"), QStringLiteral("flameshot"),
-         QStringLiteral("calculator"), QStringLiteral("settings")}
-    };
+         QStringLiteral("calculator"), QStringLiteral("settings")}};
     for (const auto &hints : roles) {
         bool found = false;
         for (const auto &hint : hints) {
@@ -165,42 +159,40 @@ QJsonObject ConfigStore::defaults(const QVector<DiscoveredApplication> &applicat
 
     return {{QStringLiteral("schemaVersion"), SchemaVersion},
             {QStringLiteral("general"), QJsonObject{{QStringLiteral("startOnLogin"), false},
-                                                      {QStringLiteral("showNotifications"), true},
-                                                      {QStringLiteral("theme"), QStringLiteral("system")}}},
+                                                    {QStringLiteral("showNotifications"), true},
+                                                    {QStringLiteral("theme"), QStringLiteral("system")}}},
             {QStringLiteral("link"), QJsonObject{{QStringLiteral("enabled"), true},
-                                                   {QStringLiteral("disabledPeers"), QJsonArray{}}}},
+                                                 {QStringLiteral("disabledPeers"), QJsonArray{}}}},
             {QStringLiteral("trigger"), QJsonObject{{QStringLiteral("shortcut"), QStringLiteral("F8")},
-                                                      {QStringLiteral("holdThresholdMs"), 0}}},
+                                                    {QStringLiteral("holdThresholdMs"), 0}}},
             {QStringLiteral("appearance"), QJsonObject{{QStringLiteral("radius"), 148},
-                                                         {QStringLiteral("scale"), 1.0},
-                                                         {QStringLiteral("centerRadius"), 56},
-                                                         {QStringLiteral("cardSize"), 96},
-                                                         {QStringLiteral("gap"), 8},
-                                                         {QStringLiteral("iconSize"), 40},
-                                                         {QStringLiteral("labels"), false},
-                                                         {QStringLiteral("opacity"), 0.94},
-                                                         {QStringLiteral("dim"), 0.08},
-                                                         {QStringLiteral("animationSpeed"), 1.0},
-                                                         {QStringLiteral("selectedScale"), 1.06},
-                                                         {QStringLiteral("reduceMotion"), false},
-                                                         {QStringLiteral("customAccent"), false},
-                                                         {QStringLiteral("accentColor"), QStringLiteral("#f59e0b")}}},
+                                                       {QStringLiteral("scale"), 1.0},
+                                                       {QStringLiteral("centerRadius"), 56},
+                                                       {QStringLiteral("cardSize"), 96},
+                                                       {QStringLiteral("gap"), 8},
+                                                       {QStringLiteral("iconSize"), 40},
+                                                       {QStringLiteral("labels"), false},
+                                                       {QStringLiteral("opacity"), 0.94},
+                                                       {QStringLiteral("dim"), 0.08},
+                                                       {QStringLiteral("animationSpeed"), 1.0},
+                                                       {QStringLiteral("selectedScale"), 1.06},
+                                                       {QStringLiteral("reduceMotion"), false},
+                                                       {QStringLiteral("customAccent"), false},
+                                                       {QStringLiteral("accentColor"), QStringLiteral("#f59e0b")}}},
             {QStringLiteral("behaviour"), QJsonObject{{QStringLiteral("wrapDecks"), true},
-                                                        {QStringLiteral("deadZone"), 64},
-                                                        {QStringLiteral("selectionSensitivity"), 1.0},
-                                                        {QStringLiteral("scrollCooldownMs"), 110},
-                                                        {QStringLiteral("scrollReverse"), false},
-                                                        {QStringLiteral("focusExisting"), true}}},
+                                                      {QStringLiteral("deadZone"), 64},
+                                                      {QStringLiteral("selectionSensitivity"), 1.0},
+                                                      {QStringLiteral("scrollCooldownMs"), 110},
+                                                      {QStringLiteral("scrollReverse"), false},
+                                                      {QStringLiteral("focusExisting"), true}}},
             {QStringLiteral("centerGestures"), QJsonObject{
-                {QStringLiteral("clickIntervalMs"), 280},
-                {QStringLiteral("longPressMs"), 500},
-                {QStringLiteral("singleClick"), QJsonObject{{"name", "Quick launch"}, {"enabled", false}, {"actions", QJsonArray{}}}},
-                {QStringLiteral("doubleClick"), QJsonObject{{"name", "Default workspace"}, {"enabled", false}, {"actions", QJsonArray{}}}},
-                {QStringLiteral("tripleClick"), QJsonObject{{"name", "Alternate workspace"}, {"enabled", false}, {"actions", QJsonArray{}}}},
-                {QStringLiteral("longPress"), QJsonObject{{"name", "Quick routine"}, {"enabled", false}, {"actions", QJsonArray{}}}}}},
-            {QStringLiteral("decks"), QJsonArray{QJsonObject{{QStringLiteral("id"), freshId()},
-                                                           {QStringLiteral("name"), QStringLiteral("Applications")},
-                                                           {QStringLiteral("actions"), actions}}}}};
+                                                   {QStringLiteral("clickIntervalMs"), 280},
+                                                   {QStringLiteral("longPressMs"), 500},
+                                                   {QStringLiteral("singleClick"), QJsonObject{{"name", "Quick launch"}, {"enabled", false}, {"actions", QJsonArray{}}}},
+                                                   {QStringLiteral("doubleClick"), QJsonObject{{"name", "Default workspace"}, {"enabled", false}, {"actions", QJsonArray{}}}},
+                                                   {QStringLiteral("tripleClick"), QJsonObject{{"name", "Alternate workspace"}, {"enabled", false}, {"actions", QJsonArray{}}}},
+                                                   {QStringLiteral("longPress"), QJsonObject{{"name", "Quick routine"}, {"enabled", false}, {"actions", QJsonArray{}}}}}},
+            {QStringLiteral("decks"), QJsonArray{QJsonObject{{QStringLiteral("id"), freshId()}, {QStringLiteral("name"), QStringLiteral("Applications")}, {QStringLiteral("actions"), actions}}}}};
 }
 
 QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
@@ -221,12 +213,11 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
     }
     if (version < 2) {
         auto appearance = config.value(QStringLiteral("appearance")).toObject();
-        const QJsonObject oldStyle{{"radius",164},{"centerRadius",54},{"cardSize",82},
-            {"gap",10},{"iconSize",30},{"opacity",0.88},{"selectedScale",1.10}};
+        const QJsonObject oldStyle{{"radius", 164}, {"centerRadius", 54}, {"cardSize", 82}, {"gap", 10}, {"iconSize", 30}, {"opacity", 0.88}, {"selectedScale", 1.10}};
         const auto newStyle = defaults().value(QStringLiteral("appearance")).toObject();
-        for (auto it=oldStyle.begin(); it!=oldStyle.end(); ++it)
-            if (appearance.value(it.key()) == it.value()) appearance.insert(it.key(),newStyle.value(it.key()));
-        config.insert(QStringLiteral("appearance"),appearance);
+        for (auto it = oldStyle.begin(); it != oldStyle.end(); ++it)
+            if (appearance.value(it.key()) == it.value()) appearance.insert(it.key(), newStyle.value(it.key()));
+        config.insert(QStringLiteral("appearance"), appearance);
     }
     {
         // Before 0.5 the ring used appearance.accentColor whenever it was set
@@ -318,6 +309,12 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
 QJsonObject ConfigStore::load(const QVector<DiscoveredApplication> &applications, QString *error) const
 {
     m_writeBlocked = false;
+    // The folder move failed or hasn't run: start from a copy of the old file and
+    // leave the original where it is.
+    if (!QFileInfo::exists(m_path) && !m_legacyPath.isEmpty() && QFileInfo::exists(m_legacyPath)) {
+        QDir().mkpath(QFileInfo(m_path).absolutePath());
+        QFile::copy(m_legacyPath, m_path);
+    }
     if (!QFileInfo::exists(m_path)) {
         auto config = defaults(applications);
         save(config, error);
@@ -401,7 +398,10 @@ bool ConfigStore::importFrom(const QString &path, QJsonObject *config, QString *
 {
     QString readError;
     const auto raw = readJson(path, &readError);
-    if (raw.isEmpty()) { if (error) *error = readError; return false; }
+    if (raw.isEmpty()) {
+        if (error) *error = readError;
+        return false;
+    }
     // Validate before sanitizing: unknown/newer schemas must never be made
     // valid merely by omitting their schemaVersion field.
     const auto validated = normalize(raw, &readError);
@@ -418,19 +418,21 @@ QJsonObject ConfigStore::portable(const QJsonObject &config)
 {
     const auto select = [](const QJsonObject &object, const QStringList &keys) {
         QJsonObject out;
-        for (const auto &key : keys) if (object.contains(key)) out.insert(key, portableValue(object.value(key)));
+        for (const auto &key : keys)
+            if (object.contains(key)) out.insert(key, portableValue(object.value(key)));
         return out;
     };
     const auto action = [&](const QJsonObject &object) {
         auto out = select(object, {"id", "type", "name", "icon"});
         out.insert("payload", select(object.value("payload").toObject(),
-            {"desktopId", "command", "workingDirectory", "url", "path", "id", "app", "action",
-             "version", "input", "options", "preset", "providerId", "toolId"}));
+                                     {"desktopId", "command", "workingDirectory", "url", "path", "id", "app", "action",
+                                      "version", "input", "options", "preset", "providerId", "toolId"}));
         return out;
     };
     const auto actions = [&](const QJsonArray &array) {
         QJsonArray out;
-        for (const auto &entry : array) if (entry.isObject()) out.append(action(entry.toObject()));
+        for (const auto &entry : array)
+            if (entry.isObject()) out.append(action(entry.toObject()));
         return out;
     };
     QJsonObject out{{"schemaVersion", config.value("schemaVersion")}};

@@ -37,7 +37,8 @@ namespace {
 using Engine = AppInstaller::Engine;
 // The nested event loop keeps dialogs responsive. Only the worker touches
 // receipts, app files, registry discovery and installers.
-template <typename F> auto onWorker(F work)
+template <typename F>
+auto onWorker(F work)
 {
     using Result = decltype(work());
     Result result{};
@@ -58,8 +59,7 @@ QJsonObject identity(const QString &path)
 {
     const QFileInfo file(path);
     if (!file.exists()) return {};
-    return {{"path", file.canonicalFilePath()}, {"size", file.size()},
-            {"modified", file.lastModified().toMSecsSinceEpoch()}};
+    return {{"path", file.canonicalFilePath()}, {"size", file.size()}, {"modified", file.lastModified().toMSecsSinceEpoch()}};
 }
 QJsonArray dismissals(const QString &directory)
 {
@@ -88,19 +88,24 @@ bool handoff(const Engine &engine, const QString &version, QString *message)
     Registry registry(engine.environment().locations);
     registry.refresh();
     const auto tools = registry.app(Ids::Tools);
-    if (tools.isEmpty()) { *message = QStringLiteral("Arcade Tools isn't installed."); return false; }
+    if (tools.isEmpty()) {
+        *message = QStringLiteral("Arcade Tools isn't installed.");
+        return false;
+    }
     QJsonObject action;
     for (const auto &value : tools.value("actions").toArray()) {
         const auto candidate = value.toObject();
-        if (candidate.value("id").toString().section('#', 0, 0) == u"tools.install"
-            && candidate.value("available").toBool(true)) action = candidate;
+        if (candidate.value("id").toString().section('#', 0, 0) == u"tools.install" && candidate.value("available").toBool(true)) action = candidate;
     }
-    if (action.isEmpty()) { *message = QStringLiteral("This version of Arcade Tools cannot install Wheel."); return false; }
+    if (action.isEmpty()) {
+        *message = QStringLiteral("This version of Arcade Tools cannot install Wheel.");
+        return false;
+    }
     const QJsonObject request{{"action", action.value("id").toString().section('#', 0, 0)},
-        {"version", action.value("version").toInt(1)},
-        {"inputs", QJsonArray{textContent(QStringLiteral("text/plain"), Ids::Wheel)}},
-        {"options", QJsonObject{{"app", Ids::Wheel}}},
-        {"context", QJsonObject{{"source", Ids::Wheel}}}};
+                              {"version", action.value("version").toInt(1)},
+                              {"inputs", QJsonArray{textContent(QStringLiteral("text/plain"), Ids::Wheel)}},
+                              {"options", QJsonObject{{"app", Ids::Wheel}}},
+                              {"context", QJsonObject{{"source", Ids::Wheel}}}};
     Error error;
     const bool ok = invokeAction(engine.environment().locations, Ids::Wheel, version, tools, request, nullptr, &error);
     if (!ok) *message = error.userMessage(QStringLiteral("Arcade Tools"));
@@ -114,13 +119,19 @@ bool quitResident(const Engine &engine, const QString &version, QString *message
     auto client = Client::connect(engine.environment().locations, Ids::Wheel, Ids::Tools, version, 1000, &error);
     if (!client) {
         // A stale endpoint does not make uninstalling an offline app fail.
-        QLocalSocket probe; probe.connectToServer(endpoint.address);
+        QLocalSocket probe;
+        probe.connectToServer(endpoint.address);
         if (!probe.waitForConnected(150)) return true;
-        *message = error.userMessage(QStringLiteral("Arcade Wheel")); return false;
+        *message = error.userMessage(QStringLiteral("Arcade Wheel"));
+        return false;
     }
     const auto result = client->call("app.quit", {}, &error, 3000).toObject();
-    if (error.isError() || !result.value("quitting").toBool()) { *message = error.userMessage(QStringLiteral("Arcade Wheel")); return false; }
-    QElapsedTimer deadline; deadline.start();
+    if (error.isError() || !result.value("quitting").toBool()) {
+        *message = error.userMessage(QStringLiteral("Arcade Wheel"));
+        return false;
+    }
+    QElapsedTimer deadline;
+    deadline.start();
     QJsonObject notification;
     while (deadline.elapsed() < 3000) {
         if (!client->nextNotification(&notification, &error, int(3000 - deadline.elapsed()))) {
@@ -136,7 +147,10 @@ QString format(const QString &text, const QString &version, const QString &from 
     return Engine::formatString(text, QStringLiteral("Arcade Wheel"), version, from, to);
 }
 // button -1: the window was closed, which answers nothing (no install, no start).
-struct Choice { int button = -1; AppInstaller::Options options; };
+struct Choice {
+    int button = -1;
+    AppInstaller::Options options;
+};
 bool loginEnabled(const QJsonObject &receipt)
 {
     // Fresh installs start at login like every Arcade app; an existing install
@@ -253,32 +267,22 @@ bool macReceipt(const Engine &engine, const QString &bundle, const QString &vers
     QString cli;
     const auto status = engine.integrationStatus(Ids::Wheel, qEnvironmentVariable("SHELL"), error);
     if (!error->isEmpty()) return false;
-    if (status.value("binOnPath").toBool()
-        && !engine.installCli(QStringLiteral("arcade-wheel"), QDir(bundle).filePath("Contents/MacOS/arcade-wheel"), &cli, error)) return false;
+    if (status.value("binOnPath").toBool() && !engine.installCli(QStringLiteral("arcade-wheel"), QDir(bundle).filePath("Contents/MacOS/arcade-wheel"), &cli, error)) return false;
     const QString now = nowRfc3339();
-    QJsonObject receipt{{"schema", 1}, {"id", Ids::Wheel}, {"version", version}, {"channel", channel},
-        {"method", "macos-bundle"}, {"managedBy", old.value("managedBy").toString("self")}, {"path", bundle},
-        {"integration", QJsonObject{{"desktopEntry", QJsonValue::Null}, {"icons", QJsonArray{}},
-            {"cli", cli.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(cli)},
-            {"autostart", QJsonValue::Null}, {"uninstaller", QJsonValue::Null}}},
-        {"installedAt", old.value("installedAt").toString(now)}, {"updatedAt", now}};
+    QJsonObject receipt{{"schema", 1}, {"id", Ids::Wheel}, {"version", version}, {"channel", channel}, {"method", "macos-bundle"}, {"managedBy", old.value("managedBy").toString("self")}, {"path", bundle}, {"integration", QJsonObject{{"desktopEntry", QJsonValue::Null}, {"icons", QJsonArray{}}, {"cli", cli.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(cli)}, {"autostart", QJsonValue::Null}, {"uninstaller", QJsonValue::Null}}}, {"installedAt", old.value("installedAt").toString(now)}, {"updatedAt", now}};
     if (old.contains("previous")) receipt.insert("previous", old.value("previous"));
     if (!engine.environment().receipts().write(receipt, error)) return false;
     *out = receipt;
     return true;
 }
 #endif
-}
+} // namespace
 
 Engine::AppInfo AppInstaller::appInfo()
 {
     // dev.arcade.Wheel since 0.5 (STANDARD §10); the launcher was
     // com.arcadewheel.ArcadeWheel and the login entry arcade-wheel before.
-    return {Ids::Wheel, QStringLiteral("Arcade Wheel"), QStringLiteral("Arcade-Wheel.AppImage"),
-            QStringLiteral("dev.arcade.Wheel"), QStringLiteral("arcade-wheel"),
-            {QStringLiteral("--background")},
-            {QStringLiteral("com.arcadewheel.ArcadeWheel"), QStringLiteral("arcade-wheel")},
-            QStringLiteral("dev.arcade.Wheel")};
+    return {Ids::Wheel, QStringLiteral("Arcade Wheel"), QStringLiteral("Arcade-Wheel.AppImage"), QStringLiteral("dev.arcade.Wheel"), QStringLiteral("arcade-wheel"), {QStringLiteral("--background")}, {QStringLiteral("com.arcadewheel.ArcadeWheel"), QStringLiteral("arcade-wheel")}, QStringLiteral("dev.arcade.Wheel")};
 }
 QString AppInstaller::promptKind(const Engine::Detection &d, const QString &version)
 {
@@ -288,8 +292,7 @@ QString AppInstaller::promptKind(const Engine::Detection &d, const QString &vers
         const auto newVersion = QVersionNumber::fromString(version);
         if (!oldVersion.isNull() && !newVersion.isNull() && oldVersion < newVersion) return QStringLiteral("older");
         // Say so when this file is the older one, not just "already installed".
-        if (!oldVersion.isNull() && !newVersion.isNull() && oldVersion > newVersion
-            && Engine::strings().contains(QStringLiteral("newerInstalled"))) return QStringLiteral("newerInstalled");
+        if (!oldVersion.isNull() && !newVersion.isNull() && oldVersion > newVersion && Engine::strings().contains(QStringLiteral("newerInstalled"))) return QStringLiteral("newerInstalled");
         return QStringLiteral("sameOrNewer");
     }
 #ifdef Q_OS_MACOS
@@ -318,20 +321,35 @@ bool AppInstaller::dismissed(const QString &path, const QString &directory)
 bool AppInstaller::dismiss(const QString &path, const QString &directory, QString *error)
 {
     const auto id = identity(path);
-    if (id.isEmpty()) { if (error) *error = QStringLiteral("The downloaded file no longer exists."); return false; }
+    if (id.isEmpty()) {
+        if (error) *error = QStringLiteral("The downloaded file no longer exists.");
+        return false;
+    }
     QJsonArray list;
     for (const auto &value : dismissals(directory))
         if (value.toObject().value("path") != id.value("path")) list.append(value);
     if (list.size() >= 128) list.removeAt(0);
     list.append(id);
-    if (!ensurePrivateDir(directory)) { if (error) *error = QStringLiteral("Could not create the settings directory."); return false; }
+    if (!ensurePrivateDir(directory)) {
+        if (error) *error = QStringLiteral("Could not create the settings directory.");
+        return false;
+    }
     QSaveFile file(QDir(directory).filePath("install-dismissed.json"));
-    if (!file.open(QIODevice::WriteOnly)) { if (error) *error = file.errorString(); return false; }
+    if (!file.open(QIODevice::WriteOnly)) {
+        if (error) *error = file.errorString();
+        return false;
+    }
 #ifdef Q_OS_UNIX
-    if (!file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)) { if (error) *error = file.errorString(); return false; }
+    if (!file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
+        if (error) *error = file.errorString();
+        return false;
+    }
 #endif
     const auto bytes = QJsonDocument(list).toJson();
-    if (file.write(bytes) != bytes.size() || !file.commit()) { if (error) *error = file.errorString(); return false; }
+    if (file.write(bytes) != bytes.size() || !file.commit()) {
+        if (error) *error = file.errorString();
+        return false;
+    }
     return true;
 }
 QString AppInstaller::installMethod()
@@ -340,8 +358,7 @@ QString AppInstaller::installMethod()
     if (runtime.devBuild || Engine::isDevBuild(runtime.runningFrom())) return QStringLiteral("dev");
     Engine::Environment environment;
     QJsonObject receipt;
-    if (Engine::Environment::discover(&environment)
-        && environment.receipts().read(Ids::Wheel, &receipt) && !receipt.isEmpty())
+    if (Engine::Environment::discover(&environment) && environment.receipts().read(Ids::Wheel, &receipt) && !receipt.isEmpty())
         return receipt.value("method").toString(QStringLiteral("manual"));
     return QStringLiteral("manual");
 }
@@ -351,7 +368,10 @@ bool AppInstaller::installCopy(const Engine &engine, const Engine::Runtime &runt
 {
     Engine::Detection d;
     if (!engine.detect(Ids::Wheel, runtime, &d, error)) return false;
-    if (d.state == u"devBuild") { *error = Engine::strings().value("errors").toObject().value("devBuild").toString(); return false; }
+    if (d.state == u"devBuild") {
+        *error = Engine::strings().value("errors").toObject().value("devBuild").toString();
+        return false;
+    }
 #ifdef Q_OS_LINUX
     if (!runtime.isAppImage()) {
         // A second install window, after the first one installed (and removed) this download.
@@ -367,7 +387,9 @@ bool AppInstaller::installCopy(const Engine &engine, const Engine::Runtime &runt
         return false;
     }
     Engine::InstallOptions opts;
-    opts.app = appInfo(); opts.runtime = runtime; opts.version = version;
+    opts.app = appInfo();
+    opts.runtime = runtime;
+    opts.version = version;
     opts.channel = options.channel;
     opts.managedBy = d.receipt.value("managedBy").toString(QStringLiteral("self"));
     opts.startAtLogin = options.startAtLogin;
@@ -375,29 +397,51 @@ bool AppInstaller::installCopy(const Engine &engine, const Engine::Runtime &runt
     opts.icons = {{QStringLiteral(":/assets/arcade-wheel.svg"), 0}};
     QTemporaryDir icons;
     const QImage image(QStringLiteral(":/assets/arcade-wheel.png"));
-    if (!icons.isValid() || image.isNull()) { *error = QStringLiteral("Could not prepare Wheel's launcher icons."); return false; }
+    if (!icons.isValid() || image.isNull()) {
+        *error = QStringLiteral("Could not prepare Wheel's launcher icons.");
+        return false;
+    }
     for (const int pixels : {16, 32, 48, 64, 128, 256, 512}) {
         const QString path = icons.filePath(QString::number(pixels) + QStringLiteral(".png"));
-        if (!image.scaled(pixels, pixels, Qt::KeepAspectRatio, Qt::SmoothTransformation).save(path)) { *error = QStringLiteral("Could not prepare Wheel's launcher icon."); return false; }
+        if (!image.scaled(pixels, pixels, Qt::KeepAspectRatio, Qt::SmoothTransformation).save(path)) {
+            *error = QStringLiteral("Could not prepare Wheel's launcher icon.");
+            return false;
+        }
         opts.icons.append({path, pixels});
     }
     return engine.install(opts, receipt, error);
 #elif defined(Q_OS_MACOS)
     QString bundle = Engine::bundleFor(runtime.executable);
-    if (bundle.isEmpty()) { *error = QStringLiteral("Self-install requires a macOS app bundle."); return false; }
+    if (bundle.isEmpty()) {
+        *error = QStringLiteral("Self-install requires a macOS app bundle.");
+        return false;
+    }
     if (!engine.inApplications(bundle)) {
         const QString destination = qEnvironmentVariableIsEmpty("ARCADE_HOME") && QFileInfo(QStringLiteral("/Applications")).isWritable()
-            ? QStringLiteral("/Applications") : QDir(engine.environment().home).filePath("Applications");
+                                        ? QStringLiteral("/Applications")
+                                        : QDir(engine.environment().home).filePath("Applications");
         const QString target = QDir(destination).filePath(QFileInfo(bundle).fileName());
         QString previous;
         if (QFileInfo::exists(target)) {
-            if (d.receipt.value("path").toString() != target) { *error = QStringLiteral("Applications already contains a copy without Wheel's receipt."); return false; }
+            if (d.receipt.value("path").toString() != target) {
+                *error = QStringLiteral("Applications already contains a copy without Wheel's receipt.");
+                return false;
+            }
             previous = QDir(destination).filePath(".previous/" + QFileInfo(bundle).fileName());
             if (QFileInfo::exists(previous)) {
-                if (d.receipt.value("previous").toObject().value("path").toString() != previous) { *error = QStringLiteral("The rollback location is already occupied."); return false; }
-                if (!QDir(previous).removeRecursively()) { *error = QStringLiteral("Could not replace the previous bundle."); return false; }
+                if (d.receipt.value("previous").toObject().value("path").toString() != previous) {
+                    *error = QStringLiteral("The rollback location is already occupied.");
+                    return false;
+                }
+                if (!QDir(previous).removeRecursively()) {
+                    *error = QStringLiteral("Could not replace the previous bundle.");
+                    return false;
+                }
             }
-            if (!QDir().mkpath(QFileInfo(previous).absolutePath()) || !QDir().rename(target, previous)) { *error = QStringLiteral("Could not preserve the installed bundle."); return false; }
+            if (!QDir().mkpath(QFileInfo(previous).absolutePath()) || !QDir().rename(target, previous)) {
+                *error = QStringLiteral("Could not preserve the installed bundle.");
+                return false;
+            }
         }
         QString installed;
         if (!engine.moveToApplications(bundle, destination, &installed, error)) {
@@ -409,7 +453,9 @@ bool AppInstaller::installCopy(const Engine &engine, const Engine::Runtime &runt
     }
     return macReceipt(engine, bundle, version, options.channel, d.receipt, receipt, error);
 #else
-    Q_UNUSED(options); Q_UNUSED(version); Q_UNUSED(receipt);
+    Q_UNUSED(options);
+    Q_UNUSED(version);
+    Q_UNUSED(receipt);
     *error = QStringLiteral("Use the per-user Windows setup installer to install Arcade Wheel.");
     return false;
 #endif
@@ -421,14 +467,19 @@ bool AppInstaller::setStartOnLogin(const Engine &engine, bool enabled, QString *
 #ifdef Q_OS_LINUX
     Engine::Detection d;
     if (!engine.detect(Ids::Wheel, Engine::Runtime::discover(), &d, error)) return false;
-    if (d.receipt.isEmpty()) { *error = QStringLiteral("Install Arcade Wheel before enabling start at login."); return false; }
+    if (d.receipt.isEmpty()) {
+        *error = QStringLiteral("Install Arcade Wheel before enabling start at login.");
+        return false;
+    }
     const QString path = d.receipt.value("path").toString();
     Engine::InstallOptions opts;
-    opts.app = appInfo(); opts.runtime.executable = path;
+    opts.app = appInfo();
+    opts.runtime.executable = path;
     opts.version = d.receipt.value("version").toString();
     opts.channel = d.receipt.value("channel").toString();
     opts.managedBy = d.receipt.value("managedBy").toString();
-    opts.startAtLogin = enabled; opts.refreshCaches = false;
+    opts.startAtLogin = enabled;
+    opts.refreshCaches = false;
     QJsonObject installed;
     if (!engine.install(opts, &installed, error)) return false;
     // The pinned installer rebuilds receipts. Keep fields added by Tools or
@@ -440,7 +491,8 @@ bool AppInstaller::setStartOnLogin(const Engine &engine, bool enabled, QString *
     if (!enabled) {
         const QString autostart = integration.value("autostart").toString();
         if (!autostart.isEmpty() && QFileInfo::exists(autostart) && !QFile::remove(autostart)) {
-            *error = QStringLiteral("Could not remove Wheel's login entry."); return false;
+            *error = QStringLiteral("Could not remove Wheel's login entry.");
+            return false;
         }
         integration.insert("autostart", QJsonValue::Null);
     }
@@ -448,7 +500,10 @@ bool AppInstaller::setStartOnLogin(const Engine &engine, bool enabled, QString *
     receipt.insert("updatedAt", nowRfc3339());
     return engine.environment().receipts().write(receipt, error);
 #else
-    Q_UNUSED(engine); Q_UNUSED(enabled); Q_UNUSED(error); return false;
+    Q_UNUSED(engine);
+    Q_UNUSED(enabled);
+    Q_UNUSED(error);
+    return false;
 #endif
 }
 bool AppInstaller::migrateIntegration(const Engine::Environment &environment, const Engine::Runtime &runtime, QString *error)
@@ -515,7 +570,10 @@ bool AppInstaller::migrateIntegration(const Engine::Environment &environment, co
     }
     return true;
 #else
-    Q_UNUSED(environment); Q_UNUSED(runtime); Q_UNUSED(error); return true;
+    Q_UNUSED(environment);
+    Q_UNUSED(runtime);
+    Q_UNUSED(error);
+    return true;
 #endif
 }
 bool AppInstaller::repairDesktop(const Engine &engine, QString *error)
@@ -537,17 +595,25 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
         else if (arg == u"--no-launch" && cmd == u"--install") noLaunch = true;
         else if (arg == u"--keep-download" && cmd == u"--install") options.removeDownload = false;
         else if (arg == u"--remove-data" && cmd == u"--uninstall") removeData = true;
-        else if (arg == u"--channel" && cmd == u"--install" && i + 1 < arguments.size()
-                 && (arguments.at(i+1) == u"stable" || arguments.at(i+1) == u"nightly")) options.channel = arguments.at(++i);
-        else { QTextStream(stderr) << "Invalid options for " << cmd << ". See arcade-wheel --help.\n"; return 2; }
+        else if (arg == u"--channel" && cmd == u"--install" && i + 1 < arguments.size() && (arguments.at(i + 1) == u"stable" || arguments.at(i + 1) == u"nightly")) options.channel = arguments.at(++i);
+        else {
+            QTextStream(stderr) << "Invalid options for " << cmd << ". See arcade-wheel --help.\n";
+            return 2;
+        }
     }
     Engine::Environment environment;
     QString error;
-    if (!Engine::Environment::discover(&environment, &error)) { QTextStream(stderr) << error << '\n'; return 1; }
+    if (!Engine::Environment::discover(&environment, &error)) {
+        QTextStream(stderr) << error << '\n';
+        return 1;
+    }
     Engine engine(environment);
     const auto runtime = Engine::Runtime::discover();
     Engine::Detection detection;
-    if (!onWorker([&] { return engine.detect(Ids::Wheel, runtime, &detection, &error); })) { QTextStream(stderr) << error << '\n'; return 1; }
+    if (!onWorker([&] { return engine.detect(Ids::Wheel, runtime, &detection, &error); })) {
+        QTextStream(stderr) << error << '\n';
+        return 1;
+    }
     options.startAtLogin = loginEnabled(detection.receipt);
     if (cmd == u"--install" && !silent && detection.state != u"devBuild") {
         auto dialogDetection = detection;
@@ -556,20 +622,25 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
         const auto legacy = onWorker([&] { return engine.legacyCopies(appInfo()); });
         const auto choice = ask(dialogDetection, version, managed, legacy);
         if (choice.button != 0) {
-            if (choice.button == 2 && !onWorker([&] { return dismiss(detection.runningFrom, configDirectory(), &error); })) { QTextStream(stderr) << error << '\n'; return 1; }
+            if (choice.button == 2 && !onWorker([&] { return dismiss(detection.runningFrom, configDirectory(), &error); })) {
+                QTextStream(stderr) << error << '\n';
+                return 1;
+            }
             return 0;
         }
         const QString channel = options.channel;
         const bool keep = !options.removeDownload;
-        options = choice.options; options.channel = channel;
+        options = choice.options;
+        options.channel = channel;
         if (keep) options.removeDownload = false;
     }
-    if (cmd == u"--uninstall" && !silent
-        && QMessageBox::question(nullptr, QStringLiteral("Uninstall Arcade Wheel?"),
-            removeData ? QStringLiteral("Remove Arcade Wheel and its settings and data?") : QStringLiteral("Remove Arcade Wheel? Your settings and data will be kept.")) != QMessageBox::Yes) return 0;
+    if (cmd == u"--uninstall" && !silent && QMessageBox::question(nullptr, QStringLiteral("Uninstall Arcade Wheel?"), removeData ? QStringLiteral("Remove Arcade Wheel and its settings and data?") : QStringLiteral("Remove Arcade Wheel? Your settings and data will be kept.")) != QMessageBox::Yes) return 0;
     QJsonObject receipt;
     const bool ok = onWorker([&] {
-        if (cmd == u"--integration-status") { receipt = engine.integrationStatus(Ids::Wheel, qEnvironmentVariable("SHELL"), &error); return error.isEmpty(); }
+        if (cmd == u"--integration-status") {
+            receipt = engine.integrationStatus(Ids::Wheel, qEnvironmentVariable("SHELL"), &error);
+            return error.isEmpty();
+        }
         if (cmd == u"--install") {
             if (!silent && detection.receipt.value("managedBy").toString() == u"tools" && toolsAvailable(engine)) return handoff(engine, version, &error);
             return installCopy(engine, runtime, options, version, &receipt, &error);
@@ -580,14 +651,22 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
             return engine.repair(appInfo(), moved, &receipt, &error);
 #elif defined(Q_OS_MACOS)
             const QString bundle = detection.installedPath.isEmpty() ? Engine::bundleFor(runtime.executable) : detection.installedPath;
-            if (detection.receipt.isEmpty() || !engine.inApplications(bundle)) { error = QStringLiteral("No installed bundle receipt was found."); return false; }
+            if (detection.receipt.isEmpty() || !engine.inApplications(bundle)) {
+                error = QStringLiteral("No installed bundle receipt was found.");
+                return false;
+            }
             return macReceipt(engine, bundle, detection.receipt.value("version").toString(), detection.receipt.value("channel").toString(), detection.receipt, &receipt, &error);
 #else
-            if (detection.receipt.isEmpty()) { error = QStringLiteral("No installation receipt was found."); return false; }
+            if (detection.receipt.isEmpty()) {
+                error = QStringLiteral("No installation receipt was found.");
+                return false;
+            }
             receipt = detection.receipt;
             QString shim;
             if (!validateNativeReceiptPaths(receipt, &error) || !engine.writeWindowsShim("arcade-wheel", receipt.value("path").toString(), &shim, &error)) return false;
-            auto integration = receipt.value("integration").toObject(); integration.insert("cli", shim); receipt.insert("integration", integration);
+            auto integration = receipt.value("integration").toObject();
+            integration.insert("cli", shim);
+            receipt.insert("integration", integration);
             return environment.receipts().write(receipt, &error);
 #endif
         }
@@ -602,11 +681,22 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
         if (detection.receipt.isEmpty()) return true;
         if (!validateNativeReceiptPaths(detection.receipt, &error)) return false;
         const auto uninstaller = detection.receipt.value("integration").toObject().value("uninstaller").toString();
-        if (uninstaller.isEmpty()) { error = QStringLiteral("Use Apps & features to uninstall this copy."); return false; }
+        if (uninstaller.isEmpty()) {
+            error = QStringLiteral("Use Apps & features to uninstall this copy.");
+            return false;
+        }
         QProcess process;
         process.start(uninstaller, {"/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"});
-        if (!process.waitForFinished(-1) || process.exitCode() != 0) { error = QStringLiteral("The Windows uninstaller failed."); return false; }
-        if (removeData) for (const auto &path : opts.dataFolders) if (!path.isEmpty() && !QDir(path).removeRecursively()) { error = QStringLiteral("Could not remove Wheel data."); return false; }
+        if (!process.waitForFinished(-1) || process.exitCode() != 0) {
+            error = QStringLiteral("The Windows uninstaller failed.");
+            return false;
+        }
+        if (removeData)
+            for (const auto &path : opts.dataFolders)
+                if (!path.isEmpty() && !QDir(path).removeRecursively()) {
+                    error = QStringLiteral("Could not remove Wheel data.");
+                    return false;
+                }
         return true;
 #else
 #ifdef Q_OS_MACOS
@@ -616,34 +706,47 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
         if (!detection.receipt.isEmpty() && !validateNativeReceiptPaths(detection.receipt, &error)) return false;
         const QString cli = detection.receipt.value("integration").toObject().value("cli").toString();
         const QFileInfo link(cli);
-        if (!cli.isEmpty() && link.isSymLink() && link.symLinkTarget() == launchPath(detection.receipt)
-            && !QFile::remove(cli)) { error = QStringLiteral("Could not remove Wheel's CLI symlink."); return false; }
+        if (!cli.isEmpty() && link.isSymLink() && link.symLinkTarget() == launchPath(detection.receipt) && !QFile::remove(cli)) {
+            error = QStringLiteral("Could not remove Wheel's CLI symlink.");
+            return false;
+        }
 #endif
         return engine.uninstall(Ids::Wheel, opts, nullptr, &error);
 #endif
     });
-    if (!ok) { QTextStream(stderr) << error << '\n'; return 1; }
+    if (!ok) {
+        QTextStream(stderr) << error << '\n';
+        return 1;
+    }
     if (!receipt.isEmpty()) QTextStream(stdout) << QJsonDocument(receipt).toJson(QJsonDocument::Indented);
     if (cmd == u"--install" && !noLaunch && !receipt.isEmpty()) {
         // The installed copy replaces an older one still running.
         onWorker([&] { return Engine::quitRunning(environment.locations, Ids::Wheel, 10000); });
-        if (!launchInstalled(launchPath(receipt), {}, &error)) { QTextStream(stderr) << error << '\n'; return 1; }
+        if (!launchInstalled(launchPath(receipt), {}, &error)) {
+            QTextStream(stderr) << error << '\n';
+            return 1;
+        }
     }
     return 0;
 }
 bool AppInstaller::firstRun(const QStringList &arguments, const QString &version, bool noPrompt)
 {
     if (noPrompt || qEnvironmentVariable("ARCADE_NO_INSTALL_PROMPT") == u"1") return true;
-    for (const auto &arg : arguments) if (arg.startsWith("--") && arg != u"--settings") return true;
+    for (const auto &arg : arguments)
+        if (arg.startsWith("--") && arg != u"--settings") return true;
     const auto runtime = Engine::Runtime::discover();
 #ifdef Q_OS_LINUX
     if (!runtime.isAppImage()) return true;
 #elif defined(Q_OS_WIN)
-    Q_UNUSED(version); return true;
+    Q_UNUSED(version);
+    return true;
 #endif
     Engine::Environment environment;
     QString error;
-    if (!Engine::Environment::discover(&environment, &error)) { QTextStream(stderr) << error << '\n'; return true; }
+    if (!Engine::Environment::discover(&environment, &error)) {
+        QTextStream(stderr) << error << '\n';
+        return true;
+    }
     Engine engine(environment);
     Engine::Detection detection;
     bool managed = false, prompt = false;
@@ -653,18 +756,23 @@ bool AppInstaller::firstRun(const QStringList &arguments, const QString &version
         const QString bundle = Engine::bundleFor(runtime.executable);
         if (bundle.isEmpty() || detection.state == u"devBuild") return true;
         if (engine.inApplications(bundle)) {
-            if (detection.receipt.isEmpty()) { QJsonObject receipt; return macReceipt(engine, bundle, version, "stable", {}, &receipt, &error); }
+            if (detection.receipt.isEmpty()) {
+                QJsonObject receipt;
+                return macReceipt(engine, bundle, version, "stable", {}, &receipt, &error);
+            }
             return true;
         }
-        const bool move = Engine::isTranslocated(bundle) || bundle.startsWith(QDir(environment.home).filePath("Downloads/"))
-            || bundle.startsWith("/Volumes/") || !QFileInfo(bundle).isWritable();
+        const bool move = Engine::isTranslocated(bundle) || bundle.startsWith(QDir(environment.home).filePath("Downloads/")) || bundle.startsWith("/Volumes/") || !QFileInfo(bundle).isWritable();
         if (!move) return true;
 #endif
         prompt = Engine::shouldPrompt(detection, arguments, false, dismissed(detection.runningFrom, configDirectory()));
         managed = detection.receipt.value("managedBy").toString() == u"tools" && toolsAvailable(engine);
         return true;
     });
-    if (!detected) { QTextStream(stderr) << error << '\n'; return true; }
+    if (!detected) {
+        QTextStream(stderr) << error << '\n';
+        return true;
+    }
     if (!prompt) return true;
     const auto legacy = onWorker([&] { return engine.legacyCopies(appInfo()); });
     const auto choice = ask(detection, version, managed, legacy);
@@ -678,7 +786,10 @@ bool AppInstaller::firstRun(const QStringList &arguments, const QString &version
     if (kind == u"sameOrNewer" || kind == u"newerInstalled") receipt = detection.receipt;
     else {
         const bool ok = onWorker([&] { return managed ? handoff(engine, version, &error) : installCopy(engine, runtime, choice.options, version, &receipt, &error); });
-        if (!ok) { QMessageBox::warning(nullptr, "Arcade Wheel", format(Engine::strings().value("errors").toObject().value("install").toString(), version, error)); return true; }
+        if (!ok) {
+            QMessageBox::warning(nullptr, "Arcade Wheel", format(Engine::strings().value("errors").toObject().value("install").toString(), version, error));
+            return true;
+        }
         if (managed) return false;
         const auto status = onWorker([&] { return engine.integrationStatus(Ids::Wheel, qEnvironmentVariable("SHELL"), &error); });
         if (status.value("pathHint").isString()) {
@@ -691,6 +802,9 @@ bool AppInstaller::firstRun(const QStringList &arguments, const QString &version
         // The installed copy replaces an older one still running.
         onWorker([&] { return Engine::quitRunning(environment.locations, Ids::Wheel, 10000); });
     }
-    if (!launchInstalled(launchPath(receipt), arguments, &error)) { QMessageBox::warning(nullptr, "Arcade Wheel", error); return true; }
+    if (!launchInstalled(launchPath(receipt), arguments, &error)) {
+        QMessageBox::warning(nullptr, "Arcade Wheel", error);
+        return true;
+    }
     return false;
 }

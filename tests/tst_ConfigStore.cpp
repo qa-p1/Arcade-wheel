@@ -18,10 +18,13 @@ private slots:
         QTemporaryDir dir;
         const auto path = dir.filePath("config.json");
         const auto source = QFINDTESTDATA("fixtures/wheel-schema3.json");
-        QVERIFY(!source.isEmpty()); QVERIFY(QFile::copy(source, path));
-        QFile fixture(source); QVERIFY(fixture.open(QIODevice::ReadOnly));
+        QVERIFY(!source.isEmpty());
+        QVERIFY(QFile::copy(source, path));
+        QFile fixture(source);
+        QVERIFY(fixture.open(QIODevice::ReadOnly));
         const auto original = QJsonDocument::fromJson(fixture.readAll()).object();
-        ConfigStore store(path); QString error;
+        ConfigStore store(path);
+        QString error;
         const auto migrated = store.load({}, &error);
         QVERIFY2(error.isEmpty(), qPrintable(error));
         QCOMPARE(migrated.value("schemaVersion").toInt(), 4);
@@ -40,16 +43,17 @@ private slots:
         const auto gesture = group.value("actions").toArray().first().toObject();
         QCOMPARE(gesture.value("type").toString(), QStringLiteral("arcade"));
         QCOMPARE(gesture.value("payload").toObject().value("legacyPayload"),
-            original.value("centerGestures").toObject().value("doubleClick").toObject().value("actions").toArray().first().toObject().value("payload"));
-        QFile saved(path); QVERIFY(saved.open(QIODevice::ReadOnly));
+                 original.value("centerGestures").toObject().value("doubleClick").toObject().value("actions").toArray().first().toObject().value("payload"));
+        QFile saved(path);
+        QVERIFY(saved.open(QIODevice::ReadOnly));
         QCOMPARE(QJsonDocument::fromJson(saved.readAll()).object(), migrated);
         QCOMPARE(store.load({}), migrated);
     }
     void boxSlotsMigrateWithoutLosingPayload()
     {
-        auto old = ConfigStore::defaults(); old.insert("schemaVersion", 3);
-        const QJsonObject payload{{"toolId", "arcade.image.convert"}, {"preset", "webp"},
-            {"input", "clipboard-url"}, {"custom", QJsonObject{{"keep", true}}}};
+        auto old = ConfigStore::defaults();
+        old.insert("schemaVersion", 3);
+        const QJsonObject payload{{"toolId", "arcade.image.convert"}, {"preset", "webp"}, {"input", "clipboard-url"}, {"custom", QJsonObject{{"keep", true}}}};
         const QJsonObject slot{{"id", "legacy"}, {"type", "arcade_box"}, {"name", "My tool"}, {"payload", payload}};
         old.insert("decks", QJsonArray{QJsonObject{{"id", "deck"}, {"actions", QJsonArray{slot}}}});
         auto gestures = old.value("centerGestures").toObject();
@@ -70,47 +74,50 @@ private slots:
         QCOMPARE(converted.value("custom"), payload.value("custom"));
         QCOMPARE(upgraded.value("centerGestures").toObject().value("singleClick").toObject().value("actions").toArray().first().toObject().value("type").toString(), QStringLiteral("arcade"));
         QCOMPARE(ConfigStore::normalize(upgraded), upgraded);
-        QTemporaryDir dir; ConfigStore store(dir.filePath("config.json"));
-        QVERIFY(store.save(upgraded)); QCOMPARE(store.load({}), upgraded);
+        QTemporaryDir dir;
+        ConfigStore store(dir.filePath("config.json"));
+        QVERIFY(store.save(upgraded));
+        QCOMPARE(store.load({}), upgraded);
     }
 
     void centerGesturesMigrateAndRoundTrip()
     {
         auto old = ConfigStore::defaults();
-        old.insert("schemaVersion",2);
+        old.insert("schemaVersion", 2);
         old.remove("centerGestures");
-        old.insert("trigger",QJsonObject{{"shortcut","Tab"},{"overrideConflict",true}});
-        auto migrated=ConfigStore::normalize(old);
-        QCOMPARE(migrated.value("trigger").toObject().value("shortcut").toString(),QString("Tab"));
-        auto gestures=migrated.value("centerGestures").toObject();
+        old.insert("trigger", QJsonObject{{"shortcut", "Tab"}, {"overrideConflict", true}});
+        auto migrated = ConfigStore::normalize(old);
+        QCOMPARE(migrated.value("trigger").toObject().value("shortcut").toString(), QString("Tab"));
+        auto gestures = migrated.value("centerGestures").toObject();
         QVERIFY(!gestures.value("doubleClick").toObject().value("enabled").toBool());
-        auto withoutSingle=migrated;
-        auto existingGestures=gestures;
+        auto withoutSingle = migrated;
+        auto existingGestures = gestures;
         existingGestures.remove("singleClick");
-        withoutSingle.insert("centerGestures",existingGestures);
-        const auto single=ConfigStore::normalize(withoutSingle).value("centerGestures").toObject().value("singleClick").toObject();
+        withoutSingle.insert("centerGestures", existingGestures);
+        const auto single = ConfigStore::normalize(withoutSingle).value("centerGestures").toObject().value("singleClick").toObject();
         QVERIFY(!single.value("enabled").toBool());
         QVERIFY(single.value("actions").toArray().isEmpty());
         QJsonArray actions;
-        for (int i=0;i<5;++i)
-            actions.append(QJsonObject{{"id","duplicate"},{"type","application"},{"name",QString::number(i)},
-                {"payload",QJsonObject{{"desktopId",QString::number(i)+".desktop"}}}});
-        gestures.insert("doubleClick",QJsonObject{{"name","Work"},{"enabled",true},{"actions",actions}});
-        gestures.insert("clickIntervalMs",1);
-        migrated.insert("centerGestures",gestures);
-        migrated=ConfigStore::normalize(migrated);
-        QCOMPARE(migrated.value("centerGestures").toObject().value("clickIntervalMs").toInt(),160);
-        const auto normalized=migrated.value("centerGestures").toObject().value("doubleClick").toObject().value("actions").toArray();
+        for (int i = 0; i < 5; ++i)
+            actions.append(QJsonObject{{"id", "duplicate"}, {"type", "application"}, {"name", QString::number(i)}, {"payload", QJsonObject{{"desktopId", QString::number(i) + ".desktop"}}}});
+        gestures.insert("doubleClick", QJsonObject{{"name", "Work"}, {"enabled", true}, {"actions", actions}});
+        gestures.insert("clickIntervalMs", 1);
+        migrated.insert("centerGestures", gestures);
+        migrated = ConfigStore::normalize(migrated);
+        QCOMPARE(migrated.value("centerGestures").toObject().value("clickIntervalMs").toInt(), 160);
+        const auto normalized = migrated.value("centerGestures").toObject().value("doubleClick").toObject().value("actions").toArray();
         QSet<QString> ids;
-        for(const auto &a:normalized) ids.insert(a.toObject().value("id").toString());
-        QCOMPARE(ids.size(),5);
-        QTemporaryDir dir; ConfigStore store(dir.filePath("config.json")); QString error;
-        QVERIFY2(store.save(migrated,&error),qPrintable(error));
-        QVERIFY2(store.exportTo(migrated,dir.filePath("export.json"),&error),qPrintable(error));
+        for (const auto &a : normalized) ids.insert(a.toObject().value("id").toString());
+        QCOMPARE(ids.size(), 5);
+        QTemporaryDir dir;
+        ConfigStore store(dir.filePath("config.json"));
+        QString error;
+        QVERIFY2(store.save(migrated, &error), qPrintable(error));
+        QVERIFY2(store.exportTo(migrated, dir.filePath("export.json"), &error), qPrintable(error));
         QJsonObject imported;
-        QVERIFY2(store.importFrom(dir.filePath("export.json"),&imported,&error),qPrintable(error));
-        QCOMPARE(imported,migrated);
-        QCOMPARE(store.load({},&error),migrated);
+        QVERIFY2(store.importFrom(dir.filePath("export.json"), &imported, &error), qPrintable(error));
+        QCOMPARE(imported, migrated);
+        QCOMPARE(store.load({}, &error), migrated);
     }
     void defaultsUseSixDiscoveredApplications()
     {
@@ -118,7 +125,9 @@ private slots:
         for (int i = 0; i < 8; ++i) {
             applications.append({QStringLiteral("org.example.app%1.desktop").arg(i),
                                  QStringLiteral("Application %1").arg(i),
-                                 QStringLiteral("app-icon-%1").arg(i), {}, {}});
+                                 QStringLiteral("app-icon-%1").arg(i),
+                                 {},
+                                 {}});
         }
 
         const QJsonObject config = ConfigStore::defaults(applications);
@@ -131,8 +140,7 @@ private slots:
             const QJsonObject action = actions.at(i).toObject();
             QCOMPARE(action.value(QStringLiteral("type")).toString(), QStringLiteral("application"));
             QCOMPARE(action.value(QStringLiteral("name")).toString(), QStringLiteral("Application %1").arg(i));
-            QCOMPARE(action.value(QStringLiteral("payload")).toObject()
-                         .value(QStringLiteral("desktopId")).toString(),
+            QCOMPARE(action.value(QStringLiteral("payload")).toObject().value(QStringLiteral("desktopId")).toString(),
                      QStringLiteral("org.example.app%1.desktop").arg(i));
             QVERIFY(!action.value(QStringLiteral("id")).toString().isEmpty());
         }
@@ -143,8 +151,12 @@ private slots:
         const QVector<DiscoveredApplication> applications{
             {QStringLiteral("org.example.only.desktop"), QStringLiteral("Only app"), {}, {}, {}}};
         const QJsonArray actions = ConfigStore::defaults(applications)
-                                       .value(QStringLiteral("decks")).toArray().first().toObject()
-                                       .value(QStringLiteral("actions")).toArray();
+                                       .value(QStringLiteral("decks"))
+                                       .toArray()
+                                       .first()
+                                       .toObject()
+                                       .value(QStringLiteral("actions"))
+                                       .toArray();
         QCOMPARE(actions.size(), 6);
         QCOMPARE(actions.first().toObject().value(QStringLiteral("name")).toString(), QStringLiteral("Only app"));
         QCOMPARE(actions.at(1).toObject().value(QStringLiteral("type")).toString(), QStringLiteral("none"));
@@ -155,8 +167,7 @@ private slots:
         const QJsonArray legacyItems{
             QJsonObject{{QStringLiteral("type"), QStringLiteral("url")},
                         {QStringLiteral("name"), QStringLiteral("Legacy link")},
-                        {QStringLiteral("payload"), QJsonObject{{QStringLiteral("url"), QStringLiteral("https://example.invalid")}}}}
-        };
+                        {QStringLiteral("payload"), QJsonObject{{QStringLiteral("url"), QStringLiteral("https://example.invalid")}}}}};
         const QJsonObject legacy{{QStringLiteral("pages"), QJsonArray{QJsonObject{{QStringLiteral("items"), legacyItems}}}}};
 
         QString error;
@@ -174,8 +185,7 @@ private slots:
         const QJsonArray actions = deck.value(QStringLiteral("actions")).toArray();
         QCOMPARE(actions.size(), 4);
         QCOMPARE(actions.first().toObject().value(QStringLiteral("name")).toString(), QStringLiteral("Legacy link"));
-        QCOMPARE(actions.first().toObject().value(QStringLiteral("payload")).toObject()
-                     .value(QStringLiteral("url")).toString(),
+        QCOMPARE(actions.first().toObject().value(QStringLiteral("payload")).toObject().value(QStringLiteral("url")).toString(),
                  QStringLiteral("https://example.invalid"));
         QVERIFY(!actions.first().toObject().value(QStringLiteral("id")).toString().isEmpty());
     }
@@ -191,7 +201,7 @@ private slots:
         }
         const QJsonObject input{{QStringLiteral("schemaVersion"), 1},
                                 {QStringLiteral("decks"), QJsonArray{QJsonObject{
-                                     {QStringLiteral("actions"), actions}}}}};
+                                                              {QStringLiteral("actions"), actions}}}}};
 
         QString error;
         const QJsonObject normalized = ConfigStore::normalize(input, &error);
@@ -210,10 +220,9 @@ private slots:
 
         const QJsonObject tooSmall{{QStringLiteral("schemaVersion"), 1},
                                    {QStringLiteral("decks"), QJsonArray{QJsonObject{
-                                        {QStringLiteral("id"), QStringLiteral("short")},
-                                        {QStringLiteral("actions"), QJsonArray{QJsonObject{}}}}}}};
-        const QJsonArray padded = ConfigStore::normalize(tooSmall).value(QStringLiteral("decks"))
-                                      .toArray().first().toObject().value(QStringLiteral("actions")).toArray();
+                                                                 {QStringLiteral("id"), QStringLiteral("short")},
+                                                                 {QStringLiteral("actions"), QJsonArray{QJsonObject{}}}}}}};
+        const QJsonArray padded = ConfigStore::normalize(tooSmall).value(QStringLiteral("decks")).toArray().first().toObject().value(QStringLiteral("actions")).toArray();
         QCOMPARE(padded.size(), 4);
     }
 
@@ -235,8 +244,7 @@ private slots:
         QString error;
         QVERIFY2(store.importFrom(exportPath, &imported, &error), qPrintable(error));
         QCOMPARE(imported, original);
-        QCOMPARE(imported.value(QStringLiteral("general")).toObject()
-                     .value(QStringLiteral("startOnLogin")).toBool(), true);
+        QCOMPARE(imported.value(QStringLiteral("general")).toObject().value(QStringLiteral("startOnLogin")).toBool(), true);
     }
 
     void portableExportOmitsSecretsAndDeviceIdentity()
@@ -250,14 +258,14 @@ private slots:
         auto actions = deck.value(QStringLiteral("actions")).toArray();
         auto action = actions.first().toObject();
         action.insert(QStringLiteral("payload"), QJsonObject{
-            {QStringLiteral("command"), QStringLiteral("safe-command")},
-            {QStringLiteral("apiToken"), QStringLiteral("never-export-this")},
-            {QStringLiteral("options"), QJsonObject{
-                {QStringLiteral("client_secret"), QStringLiteral("also-private")},
-                {QStringLiteral("device_id"), QStringLiteral("device-123")},
-                {QStringLiteral("deviceIdentityHash"), QStringLiteral("device-hash")},
-                {QStringLiteral("device_fingerprint"), QStringLiteral("device-fingerprint")},
-                {QStringLiteral("keep"), true}}}});
+                                                     {QStringLiteral("command"), QStringLiteral("safe-command")},
+                                                     {QStringLiteral("apiToken"), QStringLiteral("never-export-this")},
+                                                     {QStringLiteral("options"), QJsonObject{
+                                                                                     {QStringLiteral("client_secret"), QStringLiteral("also-private")},
+                                                                                     {QStringLiteral("device_id"), QStringLiteral("device-123")},
+                                                                                     {QStringLiteral("deviceIdentityHash"), QStringLiteral("device-hash")},
+                                                                                     {QStringLiteral("device_fingerprint"), QStringLiteral("device-fingerprint")},
+                                                                                     {QStringLiteral("keep"), true}}}});
         actions[0] = action;
         deck.insert(QStringLiteral("actions"), actions);
         decks[0] = deck;
@@ -278,8 +286,7 @@ private slots:
 
         QJsonObject imported;
         QVERIFY2(store.importFrom(path, &imported, &error), qPrintable(error));
-        const auto importedPayload = imported.value(QStringLiteral("decks")).toArray().first().toObject()
-            .value(QStringLiteral("actions")).toArray().first().toObject().value(QStringLiteral("payload")).toObject();
+        const auto importedPayload = imported.value(QStringLiteral("decks")).toArray().first().toObject().value(QStringLiteral("actions")).toArray().first().toObject().value(QStringLiteral("payload")).toObject();
         QVERIFY(!importedPayload.contains(QStringLiteral("apiToken")));
         const auto nested = importedPayload.value(QStringLiteral("options")).toObject();
         QVERIFY(!nested.contains(QStringLiteral("client_secret")));
@@ -316,17 +323,27 @@ private slots:
 
     void portableSettingsAllowlistAndInvalidSchema()
     {
-        QTemporaryDir directory; QVERIFY(directory.isValid());
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
         ConfigStore store(directory.filePath("config.json"));
         auto config = ConfigStore::defaults();
         config.insert("privateSession", QJsonObject{{"opaque", "private-value"}});
-        auto general = config.value("general").toObject(); general.insert("account", "private-account"); config.insert("general", general);
+        auto general = config.value("general").toObject();
+        general.insert("account", "private-account");
+        config.insert("general", general);
         const auto portable = ConfigStore::portable(config);
-        QVERIFY(!portable.contains("privateSession")); QVERIFY(!portable.value("general").toObject().contains("account"));
-        auto newer = config; newer.insert("schemaVersion", ConfigStore::SchemaVersion + 1);
-        QFile file(directory.filePath("newer.json")); QVERIFY(file.open(QIODevice::WriteOnly)); file.write(QJsonDocument(newer).toJson()); file.close();
-        QJsonObject imported; QString error;
-        QVERIFY(!store.importFrom(file.fileName(), &imported, &error)); QVERIFY(error.contains("Unsupported"));
+        QVERIFY(!portable.contains("privateSession"));
+        QVERIFY(!portable.value("general").toObject().contains("account"));
+        auto newer = config;
+        newer.insert("schemaVersion", ConfigStore::SchemaVersion + 1);
+        QFile file(directory.filePath("newer.json"));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QJsonDocument(newer).toJson());
+        file.close();
+        QJsonObject imported;
+        QString error;
+        QVERIFY(!store.importFrom(file.fileName(), &imported, &error));
+        QVERIFY(error.contains("Unsupported"));
     }
 
     void loadPersistsMigrationSoIdsAreStable()
@@ -337,10 +354,10 @@ private slots:
         // A hand-written v1 file: no deck or action IDs.
         const QJsonObject legacy{{QStringLiteral("schemaVersion"), 1},
                                  {QStringLiteral("decks"), QJsonArray{QJsonObject{
-                                      {QStringLiteral("name"), QStringLiteral("Mine")},
-                                      {QStringLiteral("actions"), QJsonArray{QJsonObject{
-                                           {QStringLiteral("type"), QStringLiteral("url")},
-                                           {QStringLiteral("payload"), QJsonObject{{QStringLiteral("url"), QStringLiteral("https://example.invalid")}}}}}}}}}};
+                                                               {QStringLiteral("name"), QStringLiteral("Mine")},
+                                                               {QStringLiteral("actions"), QJsonArray{QJsonObject{
+                                                                                               {QStringLiteral("type"), QStringLiteral("url")},
+                                                                                               {QStringLiteral("payload"), QJsonObject{{QStringLiteral("url"), QStringLiteral("https://example.invalid")}}}}}}}}}};
         QFile file(path);
         QVERIFY(file.open(QIODevice::WriteOnly));
         file.write(QJsonDocument(legacy).toJson());

@@ -71,6 +71,10 @@ private:
     bool m_enabled = true;
     QJsonArray m_disabledPeers;
     int m_timeoutMs;
-    struct ActiveJob { QString app; std::shared_ptr<std::atomic_bool> cancel; QThread *thread; };
+    struct ActiveJob {
+        QString app;
+        std::shared_ptr<std::atomic_bool> cancel;
+        QThread *thread;
+    };
     QHash<QString, ActiveJob> m_jobs;
 };

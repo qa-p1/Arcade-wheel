@@ -100,8 +100,8 @@ editor or recording a shortcut reads the cache only. There is no idle timer
 or polling. Bounded waits occur only during a user-requested invocation,
 startup authentication or cancellation of a pending add request.
 
-The Qt protocol-1 bundle is vendored unchanged from Arcade Link commit
-`4c75f3a` (after `v0.3.0`) under `src/link/qt/`, with its vectors, fixtures and shared
+The Qt protocol-1 bundle is vendored unchanged from Arcade Link v0.4.15
+(commit `56798545`) under `src/link/qt/`, with its vectors, fixtures and shared
 install strings in the vendoring tool's layout. `src/link/VENDORED.json` records
 every bundled hash. Shared release/shortcut tools and Windows installer pieces
 use the same release commit, recorded in `scripts/VENDORED` and
@@ -143,8 +143,8 @@ reports `status.tray` as `own`, `hosted` or `none`; the manifest adds `menu`,
 `logs`, `docs.version` and the installation method.
 
 The Qt first-run dialog and lifecycle CLI use Link's shared installation
-engine and strings. See [installation](user/getting-started.md),
-[packaging](PACKAGING.md) and [vendored files](VENDORED.md). macOS keeps its
+engine and strings. See [installation](../user/getting-started.md),
+[packaging](packaging.md) and [vendored files](vendored.md). macOS keeps its
 native login item; Windows uses the pinned per-user Inno include.
 
 `link.enabled` is the master switch. Off publishes an installed manifest with

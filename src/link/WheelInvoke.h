@@ -11,4 +11,4 @@ bool run(const ArcadeLink::Locations &locations, const QJsonObject &manifest,
          const QJsonObject &request, QJsonObject *result, ArcadeLink::Error *error,
          const std::function<void(double, const QString &)> &progress,
          const std::atomic_bool *cancel, int timeoutMs = 120000);
-}
+} // namespace WheelInvoke

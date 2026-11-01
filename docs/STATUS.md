@@ -78,8 +78,8 @@ checks require `ARCADE_LINK_CLI`; without it those cases report skips.
 | Document | Contents |
 |---|---|
 | [README](../README.md) | Install, features, usage, CLI, configuration, platform notes |
-| [ARCHITECTURE](ARCHITECTURE.md) | Core classes, config schema, trigger path, gestures, coordinates |
-| [ARCADE_LINK](ARCADE_LINK.md) | Peer actions, `wheel.*` actions, Settings, verification, platform table |
-| [PACKAGING](PACKAGING.md) | Packages, release publishing, vendored files |
-| [MANUAL_TESTING](MANUAL_TESTING.md) | Release checks to run on a real desktop |
+| [architecture](dev/architecture.md) | Core classes, config schema, trigger path, gestures, coordinates |
+| [link](dev/link.md) | Peer actions, `wheel.*` actions, Settings, verification, platform table |
+| [packaging](dev/packaging.md) | Packages, release publishing, vendored files |
+| [testing](dev/testing.md) | Release checks to run on a real desktop |
 | [CHANGELOG](../CHANGELOG.md) | Changes by version |

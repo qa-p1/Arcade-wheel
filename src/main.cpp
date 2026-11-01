@@ -143,7 +143,8 @@ int main(int argc, char **argv)
             "  arcade-wheel --background  Start the resident launcher without a window\n"
             "  arcade-wheel --show        Open the wheel; click an action or right-click to cancel\n"
             "  arcade-wheel --preview     Show a safe visual preview\n"
-            "  arcade-wheel --cancel      Dismiss the wheel\n"
+            "  arcade-wheel --hide        Dismiss the wheel (also --cancel)\n"
+            "  arcade-wheel --toggle      Open the wheel, or dismiss it when open\n"
             "  arcade-wheel --press       Simulate pressing the trigger\n"
             "  arcade-wheel --release     Simulate releasing the trigger (runs the selection)\n"
             "  arcade-wheel --status      Show resident status as JSON\n"
@@ -238,7 +239,7 @@ int main(int argc, char **argv)
     // there mid-copy. Commands that only ask or dismiss leave them alone.
     QString migrationNote;
     const bool query = QStringList{QStringLiteral("--status"), QStringLiteral("--quit"), QStringLiteral("--release"),
-                                   QStringLiteral("--cancel")}.contains(command);
+                                   QStringLiteral("--cancel"), QStringLiteral("--hide")}.contains(command);
     if (!smokeTest && !headlessPlatform && !query) {
         const auto legacy = ArcadeLink::legacyDirs(ArcadeLink::Ids::Wheel);
         if (std::any_of(legacy.begin(), legacy.end(), [](const auto &dir) { return QFileInfo::exists(dir.path); })) {
@@ -316,9 +317,11 @@ int main(int argc, char **argv)
             return 0;
         }
         if (command == QStringLiteral("--release") || command == QStringLiteral("--cancel")
-            || command == QStringLiteral("--quit")) return 0;
+            || command == QStringLiteral("--hide") || command == QStringLiteral("--quit")) return 0;
         if (command == QStringLiteral("--status")) {
-            QTextStream(stdout) << "Arcade Wheel is not running\n";
+            // One line of JSON either way (STANDARD §10); exit status 1 when not running.
+            QTextStream(stdout) << QJsonDocument(QJsonObject{{QStringLiteral("running"), false},
+                {QStringLiteral("version"), QStringLiteral(ARCADE_VERSION)}}).toJson(QJsonDocument::Compact) << '\n';
             return 1;
         }
     }
@@ -572,7 +575,12 @@ int main(int argc, char **argv)
         else if (cmd == QStringLiteral("--press")) controller.pressTrigger();
         else if (cmd == QStringLiteral("--release")) controller.releaseTrigger();
         else if (cmd == QStringLiteral("--preview")) controller.previewOverlay();
-        else if (cmd == QStringLiteral("--cancel")) controller.cancelTrigger();
+        // --hide is the standard name for --cancel (STANDARD §10).
+        else if (cmd == QStringLiteral("--cancel") || cmd == QStringLiteral("--hide")) controller.cancelTrigger();
+        else if (cmd == QStringLiteral("--toggle")) {
+            if (controller.overlayVisible()) controller.cancelTrigger();
+            else controller.showWheel();
+        }
         else if (cmd == QStringLiteral("--quit")) app.quit();
         else if (cmd == QStringLiteral("--restart")) restart();
         else if (cmd == QStringLiteral("--settings") || cmd.isEmpty()) showSettings();
@@ -597,7 +605,12 @@ int main(int argc, char **argv)
                     value = envelope.object().value(QStringLiteral("path")).toString();
                 }
                 if (cmd == QStringLiteral("--status")) {
+                    const bool linkEnabled = controller.config().value(QStringLiteral("link")).toMap()
+                                                 .value(QStringLiteral("enabled"), true).toBool();
                     const QJsonObject status{{QStringLiteral("running"), true},
+                        {QStringLiteral("version"), QStringLiteral(ARCADE_VERSION)},
+                        {QStringLiteral("link"), QJsonObject{{QStringLiteral("enabled"), linkEnabled},
+                                                             {QStringLiteral("listening"), link && link->listening()}}},
                         {QStringLiteral("pid"), QCoreApplication::applicationPid()},
                         {QStringLiteral("tray"), arcadeTrayHost.state()},
                         {QStringLiteral("platform"), QGuiApplication::platformName()},

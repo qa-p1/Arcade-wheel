@@ -2,6 +2,7 @@
 #include "core/IconTheme.h"
 #include "core/CommandReply.h"
 #include "core/WheelController.h"
+#include "core/WheelPaths.h"
 #include "link/WheelLink.h"
 #include "link/qt/ArcadeLink.h"
 #include "link/qt/ArcadeTrayHost.h"
@@ -26,6 +27,9 @@
 #include <QLockFile>
 #include <QTextStream>
 #include <QIcon>
+#include <QPainter>
+#include <QPixmap>
+#include <QSvgRenderer>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMenu>
@@ -55,10 +59,39 @@ static void releaseFreedHeap()
 #endif
 }
 
+// The tray icon: Wheel's glyph, monochrome (STANDARD §8). White on the usual
+// dark Linux and Windows panels; on macOS a black template image the menu bar
+// tints for its appearance.
+static QIcon trayIcon()
+{
+    QFile file(QStringLiteral(":/assets/arcade/arcade.wheel.svg"));
+    if (!file.open(QIODevice::ReadOnly)) return {};
+#ifdef Q_OS_MACOS
+    const QByteArray ink = "#000000";
+#else
+    const QByteArray ink = "#ffffff";
+#endif
+    QSvgRenderer renderer(file.readAll().replace("currentColor", ink));
+    QIcon icon;
+    for (const int size : {16, 22, 24, 32, 48, 64}) {
+        QPixmap pixmap(size, size);
+        pixmap.fill(Qt::transparent);
+        {
+            QPainter painter(&pixmap);
+            painter.setRenderHint(QPainter::Antialiasing);
+            renderer.render(&painter);
+        }
+        icon.addPixmap(pixmap);
+    }
+#ifdef Q_OS_MACOS
+    icon.setIsMask(true);
+#endif
+    return icon;
+}
+
 static bool readSettingsForExport(QJsonObject *config, QString *error)
 {
-    const ConfigStore store;
-    QFile file(store.path());
+    QFile file(WheelPaths::readableSettingsFile());
     if (!file.exists()) {
         *config = ConfigStore::defaults();
         return true;
@@ -89,7 +122,9 @@ int main(int argc, char **argv)
     QCoreApplication::setApplicationName(QStringLiteral("Arcade Wheel"));
     QCoreApplication::setApplicationVersion(QStringLiteral(ARCADE_VERSION));
     app.setQuitOnLastWindowClosed(false);
-    app.setDesktopFileName(QStringLiteral("com.arcadewheel.ArcadeWheel"));
+    // The OS identifier (STANDARD §10): Wayland app_id, the desktop file and
+    // the portal's app id. Before 0.5 it was com.arcadewheel.ArcadeWheel.
+    app.setDesktopFileName(QStringLiteral("dev.arcade.Wheel"));
 
     const QStringList cliArguments = app.arguments().mid(1);
     const QString command = cliArguments.isEmpty() ? QStringLiteral("--settings") : cliArguments.first();
@@ -137,7 +172,7 @@ int main(int argc, char **argv)
     if (command == QStringLiteral("--arcade-manifest")) {
         // Read the configuration without the store, which would write defaults.
         QJsonObject config;
-        QFile file(ConfigStore().path());
+        QFile file(WheelPaths::readableSettingsFile());
         if (file.open(QIODevice::ReadOnly)) config = ConfigStore::normalize(QJsonDocument::fromJson(file.readAll()).object());
         if (config.isEmpty()) config = ConfigStore::defaults();
         QTextStream(stdout) << QJsonDocument(WheelLink::manifest(config, QStringLiteral(ARCADE_VERSION))).toJson(QJsonDocument::Indented);
@@ -177,23 +212,62 @@ int main(int argc, char **argv)
     }
     const int installCommand = AppInstaller::command(cliArguments, QStringLiteral(ARCADE_VERSION));
     if (installCommand >= 0) return installCommand;
-    if (!AppInstaller::firstRun(cliArguments, QStringLiteral(ARCADE_VERSION), smokeTest
-        || QGuiApplication::platformName() == u"offscreen" || QGuiApplication::platformName() == u"minimal")) return 0;
-    QByteArray identity = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation).toUtf8()
-        + qgetenv("ARCADE_WHEEL_INSTANCE") + qgetenv("WAYLAND_DISPLAY");
-    // Test/offscreen instances must never intercept commands for the desktop.
-    if (QGuiApplication::platformName() == QStringLiteral("offscreen") ||
-        QGuiApplication::platformName() == QStringLiteral("minimal")) identity += "-headless";
-    const auto hash = QCryptographicHash::hash(identity, QCryptographicHash::Sha256).toHex().left(12);
-    const QString instanceKey = QStringLiteral("arcade-wheel-%1").arg(QString::fromLatin1(hash));
+    const bool headlessPlatform = QGuiApplication::platformName() == u"offscreen"
+        || QGuiApplication::platformName() == u"minimal";
+    // One resident per user and display: the command socket's name comes
+    // from the settings folder, so isolated test profiles get their own.
     const QString runtime = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    const auto instanceKeyFor = [&](const QString &folder) {
+        QByteArray identity = folder.toUtf8() + qgetenv("ARCADE_WHEEL_INSTANCE") + qgetenv("WAYLAND_DISPLAY");
+        // Test/offscreen instances must never intercept commands for the desktop.
+        if (headlessPlatform) identity += "-headless";
+        const auto hash = QCryptographicHash::hash(identity, QCryptographicHash::Sha256).toHex().left(12);
+        return QStringLiteral("arcade-wheel-%1").arg(QString::fromLatin1(hash));
+    };
+    const auto serverNameFor = [&](const QString &key) {
 #ifdef Q_OS_WIN
-    const QString serverName = instanceKey;
+        return key;
 #else
-    // A bare name would live in the shared /tmp, where another local user
-    // could pre-create it. The runtime directory is private to this user.
-    const QString serverName = QDir(runtime).filePath(instanceKey + QStringLiteral(".sock"));
+        // A bare name would live in the shared /tmp, where another local user
+        // could pre-create it. The runtime directory is private to this user.
+        return QDir(runtime).filePath(key + QStringLiteral(".sock"));
 #endif
+    };
+    // A real start moves the folders from before 0.5 (STANDARD §10). An older
+    // Wheel still running from them is asked to quit first, so nothing writes
+    // there mid-copy. Commands that only ask or dismiss leave them alone.
+    QString migrationNote;
+    const bool query = QStringList{QStringLiteral("--status"), QStringLiteral("--quit"), QStringLiteral("--release"),
+                                   QStringLiteral("--cancel")}.contains(command);
+    if (!smokeTest && !headlessPlatform && !query) {
+        const auto legacy = ArcadeLink::legacyDirs(ArcadeLink::Ids::Wheel);
+        if (std::any_of(legacy.begin(), legacy.end(), [](const auto &dir) { return QFileInfo::exists(dir.path); })) {
+            // Before 0.5 the key came from Qt's "Arcade Wheel/Arcade Wheel" config folder.
+            QLocalSocket older;
+            older.connectToServer(serverNameFor(instanceKeyFor(
+                QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))));
+            if (older.waitForConnected(150)) {
+                older.write("--quit\n");
+                older.waitForBytesWritten(300);
+                older.waitForDisconnected(5000);
+            }
+            migrationNote = WheelPaths::migrate();
+        }
+    }
+    if (!AppInstaller::firstRun(cliArguments, QStringLiteral(ARCADE_VERSION), smokeTest || headlessPlatform)) return 0;
+#ifdef Q_OS_LINUX
+    // An installed copy from before 0.5: its launcher and login entry move to dev.arcade.Wheel.
+    if (!smokeTest && !headlessPlatform && !query) {
+        AppInstaller::Engine::Environment environment;
+        QString error;
+        if (!AppInstaller::Engine::Environment::discover(&environment, &error)
+            || !AppInstaller::migrateIntegration(environment, AppInstaller::Engine::Runtime::discover(), &error))
+            migrationNote += (migrationNote.isEmpty() ? QString() : QStringLiteral(" "))
+                + QStringLiteral("Couldn't move the launcher to its new name: ") + error;
+    }
+#endif
+    const QString instanceKey = instanceKeyFor(WheelPaths::dirs().config);
+    const QString serverName = serverNameFor(instanceKey);
     if (command == QStringLiteral("--restarting")) {
         QLocalSocket probe;
         probe.connectToServer(serverName);
@@ -263,8 +337,8 @@ int main(int argc, char **argv)
     }
     // Started at login or by Tools, stderr often goes to /dev/null: keep
     // Qt's warnings in the log folder the manifest advertises instead.
-    ArcadeLink::captureStderr(QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/logs"),
-                              QStringLiteral("arcade-wheel"));
+    ArcadeLink::captureStderr(WheelPaths::logsDir(), QStringLiteral("arcade-wheel"));
+    if (!migrationNote.isEmpty()) qWarning("%s", qPrintable(migrationNote));
 
 #ifdef Q_OS_WIN
     WindowsBackend backend;
@@ -426,7 +500,8 @@ int main(int argc, char **argv)
 
     QSystemTrayIcon tray;
     tray.setToolTip(QStringLiteral("Arcade Wheel"));
-    tray.setIcon(appIcon);
+    const QIcon glyph = trayIcon();
+    tray.setIcon(glyph.isNull() ? appIcon : glyph);
     QMenu menu;
     auto *wheelAction = menu.addAction(QStringLiteral("Open wheel"));
     QObject::connect(wheelAction, &QAction::triggered, &controller, &WheelController::showWheel);

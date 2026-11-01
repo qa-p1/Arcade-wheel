@@ -1,5 +1,6 @@
 #include "link/AppMetadata.h"
 #include "core/WheelController.h"
+#include "core/WheelPaths.h"
 
 #include "core/IconTheme.h"
 #include "core/WheelLogic.h"
@@ -1061,7 +1062,7 @@ void WheelController::moveCenterGestureAction(const QString &gesture, int from, 
 QString WheelController::logsPath() const
 {
     // Where main.cpp captures stderr (the folder the manifest advertises).
-    return QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/logs");
+    return WheelPaths::logsDir();
 }
 
 QString WheelController::channel() const

@@ -338,7 +338,7 @@ LinuxBackend::LinuxBackend(QObject *parent)
     // Qt's theme/file-dialog plugins may already have used sessionBus().
     , m_bus(QDBusConnection::connectToBus(QDBusConnection::SessionBus,
               QStringLiteral("arcade-wheel-shortcuts-%1").arg(QUuid::createUuid().toString(QUuid::Id128))))
-    , m_appId(QStringLiteral("com.arcadewheel.ArcadeWheel"))
+    , m_appId(QStringLiteral("dev.arcade.Wheel"))
 {
     qDBusRegisterMetaType<PortalShortcut>();
     qDBusRegisterMetaType<QList<PortalShortcut>>();
@@ -1492,7 +1492,7 @@ QString LinuxBackend::autostartDesktopFile() const
 {
     const QString config = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
     if (config.isEmpty()) return {};
-    return QDir(config).filePath(QStringLiteral("autostart/arcade-wheel.desktop"));
+    return QDir(config).filePath(QStringLiteral("autostart/dev.arcade.Wheel.desktop"));
 }
 
 bool LinuxBackend::launchDetached(const QString &program,

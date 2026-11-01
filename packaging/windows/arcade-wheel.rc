@@ -1,0 +1,2 @@
+// The executable's icon: the kit's app icon (packaging/icons, from Arcade Link).
+IDI_ICON1 ICON "../icons/arcade-wheel.ico"

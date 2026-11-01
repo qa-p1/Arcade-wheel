@@ -200,7 +200,7 @@ QVector<DiscoveredApplication> MacOSBackend::applications() const
                 if (![[url pathExtension] isEqualToString:@"app"]) continue;
                 NSBundle *bundle = [NSBundle bundleWithURL:url];
                 NSString *identifier = [bundle bundleIdentifier];
-                if (!identifier || [identifier isEqualToString:@"com.arcadewheel.ArcadeWheel"]) continue;
+                if (!identifier || ([identifier isEqualToString:@"dev.arcade.Wheel"] || [identifier isEqualToString:@"com.arcadewheel.ArcadeWheel"])) continue;
                 const QString id = QString::fromNSString(identifier);
                 if (seen.contains(id)) continue;
                 seen.insert(id);

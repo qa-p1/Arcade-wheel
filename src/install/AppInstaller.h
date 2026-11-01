@@ -24,6 +24,10 @@ public:
                             QJsonObject *receipt, QString *error);
     static bool setStartOnLogin(const Engine &engine, bool enabled, QString *error);
     static bool repairDesktop(const Engine &engine, QString *error);
+    // Linux, once after an update from before 0.5: the launcher and login
+    // entry move to dev.arcade.Wheel (STANDARD §10). Start at login keeps its
+    // state; the old entries are removed. Nothing to do returns true.
+    static bool migrateIntegration(const Engine::Environment &environment, const Engine::Runtime &runtime, QString *error);
     // Returns -1 for ordinary app commands; otherwise the CLI exit status.
     static int command(const QStringList &arguments, const QString &version);
     // Called before creating the resident UI. True means continue this copy.

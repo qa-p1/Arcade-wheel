@@ -1,4 +1,5 @@
 #include "config/ConfigStore.h"
+#include "core/WheelPaths.h"
 
 #include <QColor>
 #include <QDir>
@@ -93,10 +94,7 @@ QJsonValue portableValue(const QJsonValue &value)
 }
 
 ConfigStore::ConfigStore(QString path)
-    : m_path(path.isEmpty()
-                 ? QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation)
-                       + QStringLiteral("/config.json")
-                 : std::move(path))
+    : m_path(path.isEmpty() ? WheelPaths::settingsFile() : std::move(path))
 {
 }
 

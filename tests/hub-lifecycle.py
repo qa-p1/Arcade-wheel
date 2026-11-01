@@ -129,7 +129,7 @@ try:
         desktop = Path(integration["desktopEntry"])
         cli = Path(integration["cli"])
         text = desktop.read_text()
-        assert desktop.name == "com.arcadewheel.ArcadeWheel.desktop"
+        assert desktop.name == "dev.arcade.Wheel.desktop"
         assert "X-Arcade-Id=arcade.wheel" in text and "Actions=Settings;Quit;Uninstall;" in text
         assert str(installed) in text and str(appdir) not in text
         assert cli.is_symlink() and cli.resolve() == installed
@@ -156,7 +156,7 @@ try:
         Path(exported[0]["path"]).write_text(json.dumps(portable))
         imported = json.loads(run(link_cli, "call", "wheel", "app.settings.import", "--params", json.dumps({"inputs": exported})).stdout)
         assert imported["imported"] and not imported["restartRequired"]
-        assert list(Path(os.environ["XDG_CONFIG_HOME"]).rglob("config.json.backup-*.json"))
+        assert list(Path(os.environ["XDG_CONFIG_HOME"]).rglob("settings.json.backup-*.json"))
         host.stdin.write("exclude wheel\n"); host.stdin.flush()
         wait_for(installed, lambda s: s.get("tray") == "own")
         host.stdin.write("include wheel\n"); host.stdin.flush()
@@ -200,7 +200,7 @@ try:
         host.kill(); host.wait(timeout=5)
         assert updated["previous"]["version"] == "0.1.0"
         assert Path(updated["previous"]["path"]).exists()
-        config = next(Path(env["XDG_CONFIG_HOME"]).rglob("config.json"))
+        config = next(Path(env["XDG_CONFIG_HOME"]).rglob("settings.json"))
         assert json.loads(config.read_text())["trigger"]["shortcut"] == "F9"
         # Repair a moved file and then remove only receipt-owned integration.
         moved = image_root / "Moved Wheel.AppImage"

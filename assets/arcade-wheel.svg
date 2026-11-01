@@ -1,14 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect x="4" y="4" width="120" height="120" rx="31" fill="#111a29"/>
-  <rect x="5" y="5" width="118" height="118" rx="30" fill="none" stroke="#5773a3" stroke-opacity=".45" stroke-width="2"/>
-  <g fill="#87a9d8">
-    <rect x="54" y="18" width="20" height="23" rx="8"/>
-    <rect x="54" y="87" width="20" height="23" rx="8"/>
-    <rect x="88" y="36" width="20" height="23" rx="8" transform="rotate(60 98 47.5)"/>
-    <rect x="88" y="69" width="20" height="23" rx="8" transform="rotate(120 98 80.5)"/>
-    <rect x="20" y="36" width="20" height="23" rx="8" transform="rotate(-60 30 47.5)"/>
-    <rect x="20" y="69" width="20" height="23" rx="8" transform="rotate(-120 30 80.5)"/>
-  </g>
-  <circle cx="64" cy="64" r="19" fill="#20314a" stroke="#b1caea" stroke-opacity=".7" stroke-width="2"/>
-  <circle cx="64" cy="64" r="4" fill="#d7e7fb"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#af8133"/><stop offset="1" stop-color="#9e6506"/></linearGradient></defs>
+  <rect width="1024" height="1024" rx="230.4" fill="url(#g)"/>
+  <g transform="translate(225.28 225.28) scale(35.84)" fill="none" stroke="#ffffff" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.25"/><circle cx="8" cy="8" r="1.75"/><path d="M8 1.75v4.5M8 9.75v4.5M1.75 8h4.5M9.75 8h4.5"/></g>
 </svg>

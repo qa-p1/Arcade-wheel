@@ -139,7 +139,7 @@ private slots:
         QTRY_VERIFY(!status.isEmpty() && status.last().first().toString().startsWith("Ready"));
         QCOMPARE(portal->calls.first(),QString("Register"));
         QCOMPARE(portal->registrations,1);
-        QVERIFY(QFile::exists(data.filePath("applications/com.arcadewheel.ArcadeWheel.desktop")));
+        QVERIFY(QFile::exists(data.filePath("applications/dev.arcade.Wheel.desktop")));
         const auto session=portal->created.last();
         portal->edge(session,"Activated"); portal->edge(session,"Activated");
         QTRY_COMPARE(press.size(),1);
@@ -158,7 +158,7 @@ private slots:
         QVERIFY(portal->created.isEmpty());
     }
     void newlyCreatedDesktopEntryIsRetried() {
-        portal->registrationError="App info not found for 'com.arcadewheel.ArcadeWheel'";
+        portal->registrationError="App info not found for 'dev.arcade.Wheel'";
         LinuxBackend backend; QSignalSpy status(&backend,&PlatformBackend::triggerStatusChanged);
         backend.configureTrigger(trigger());
         QTRY_COMPARE(portal->registrations,1);

@@ -1,4 +1,6 @@
 #include "install/AppInstaller.h"
+#include "core/WheelPaths.h"
+#include <ArcadePaths.h>
 #include "config/ConfigStore.h"
 
 #include <QCheckBox>
@@ -270,9 +272,13 @@ bool macReceipt(const Engine &engine, const QString &bundle, const QString &vers
 
 Engine::AppInfo AppInstaller::appInfo()
 {
+    // dev.arcade.Wheel since 0.5 (STANDARD §10); the launcher was
+    // com.arcadewheel.ArcadeWheel and the login entry arcade-wheel before.
     return {Ids::Wheel, QStringLiteral("Arcade Wheel"), QStringLiteral("Arcade-Wheel.AppImage"),
-            QStringLiteral("com.arcadewheel.ArcadeWheel"), QStringLiteral("arcade-wheel"),
-            {QStringLiteral("--background")}, {QStringLiteral("arcade-wheel")}, QStringLiteral("arcade-wheel")};
+            QStringLiteral("dev.arcade.Wheel"), QStringLiteral("arcade-wheel"),
+            {QStringLiteral("--background")},
+            {QStringLiteral("com.arcadewheel.ArcadeWheel"), QStringLiteral("arcade-wheel")},
+            QStringLiteral("dev.arcade.Wheel")};
 }
 QString AppInstaller::promptKind(const Engine::Detection &d, const QString &version)
 {
@@ -445,6 +451,73 @@ bool AppInstaller::setStartOnLogin(const Engine &engine, bool enabled, QString *
     Q_UNUSED(engine); Q_UNUSED(enabled); Q_UNUSED(error); return false;
 #endif
 }
+bool AppInstaller::migrateIntegration(const Engine::Environment &environment, const Engine::Runtime &runtime, QString *error)
+{
+#ifdef Q_OS_LINUX
+    if (QThread::currentThread() == QCoreApplication::instance()->thread())
+        return onWorker([&] { return migrateIntegration(environment, runtime, error); });
+    const auto app = appInfo();
+    const QDir autostartDir(QDir(environment.config).filePath(QStringLiteral("autostart")));
+    const QString legacyLogin = autostartDir.filePath(QStringLiteral("arcade-wheel.desktop"));
+    const QString login = autostartDir.filePath(app.autostartId + QStringLiteral(".desktop"));
+    QJsonObject receipt;
+    if (!environment.receipts().read(Ids::Wheel, &receipt, error)) return false;
+    if (receipt.isEmpty()) {
+        // Not installed: a login entry Wheel wrote itself just takes the new name.
+        QFile legacy(legacyLogin);
+        if (QFileInfo::exists(login) || !legacy.open(QIODevice::ReadOnly)) return true;
+        const bool own = legacy.readAll().startsWith("[Desktop Entry]\nType=Application\nName=Arcade Wheel\n");
+        legacy.close();
+        if (own && !QFile::rename(legacyLogin, login)) {
+            *error = QStringLiteral("Couldn't move Wheel's login entry to %1.").arg(login);
+            return false;
+        }
+        return true;
+    }
+    const Engine engine(environment);
+    Engine::Detection d;
+    if (!engine.detect(Ids::Wheel, runtime, &d, error)) return false;
+    if (d.state != u"installedHere" || d.receipt.value("method").toString() != u"appimage") return true;
+    const auto integration = d.receipt.value("integration").toObject();
+    const QString oldEntry = integration.value("desktopEntry").toString();
+    const QString oldLogin = integration.value("autostart").toString();
+    const bool entryMoved = oldEntry.isEmpty() || QFileInfo(oldEntry).completeBaseName() == app.desktopId;
+    const bool loginMoved = (oldLogin.isEmpty() || oldLogin == login) && !QFileInfo::exists(legacyLogin);
+    if (entryMoved && loginMoved) return true;
+    // An entry switched off in the desktop's startup settings stays off.
+    const QString recordedLogin = oldLogin.isEmpty() ? legacyLogin : oldLogin;
+    const bool starting = QFileInfo::exists(recordedLogin) && Engine::autostartEnabled(recordedLogin);
+    Engine::InstallOptions opts;
+    opts.app = app;
+    opts.runtime.executable = d.receipt.value("path").toString();
+    opts.version = d.receipt.value("version").toString();
+    opts.channel = d.receipt.value("channel").toString();
+    opts.managedBy = d.receipt.value("managedBy").toString();
+    opts.startAtLogin = starting;
+    QJsonObject installed;
+    if (!engine.install(opts, &installed, error)) return false;
+    // Keep receipt fields added by Tools or newer Link versions.
+    auto updated = d.receipt;
+    auto merged = integration;
+    const auto fresh = installed.value("integration").toObject();
+    for (auto it = fresh.begin(); it != fresh.end(); ++it) merged.insert(it.key(), it.value());
+    if (!starting) merged.insert("autostart", QJsonValue::Null);
+    updated.insert("integration", merged);
+    updated.insert("updatedAt", nowRfc3339());
+    if (!environment.receipts().write(updated, error)) return false;
+    const QString newEntry = merged.value("desktopEntry").toString();
+    for (const QString &old : {oldEntry, oldLogin, legacyLogin}) {
+        if (old.isEmpty() || old == newEntry || old == login || !QFileInfo::exists(old)) continue;
+        if (!QFile::remove(old)) {
+            *error = QStringLiteral("Couldn't remove Wheel's old entry %1.").arg(old);
+            return false;
+        }
+    }
+    return true;
+#else
+    Q_UNUSED(environment); Q_UNUSED(runtime); Q_UNUSED(error); return true;
+#endif
+}
 bool AppInstaller::repairDesktop(const Engine &engine, QString *error)
 {
     return onWorker([&] { return engine.repair(appInfo(), {}, nullptr, error); });
@@ -521,7 +594,10 @@ int AppInstaller::command(const QStringList &arguments, const QString &version)
         Engine::UninstallOptions opts;
         if (!quitResident(engine, version, &error)) return false;
         opts.removeData = removeData;
-        opts.dataFolders = {configDirectory(), QStandardPaths::writableLocation(QStandardPaths::CacheLocation), QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)};
+        // The arcade/wheel folders, and any from before 0.5 a failed move kept.
+        const auto dirs = WheelPaths::dirs();
+        opts.dataFolders = {dirs.config, dirs.cache, dirs.data};
+        for (const auto &legacy : ArcadeLink::legacyDirs(Ids::Wheel)) opts.dataFolders << legacy.path;
 #ifdef Q_OS_WIN
         if (detection.receipt.isEmpty()) return true;
         if (!validateNativeReceiptPaths(detection.receipt, &error)) return false;

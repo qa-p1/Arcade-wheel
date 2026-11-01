@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Widgets Network)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Svg Widgets Network)
 qt_standard_project_setup(REQUIRES 6.8)
 set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml")
 
@@ -24,6 +24,7 @@ add_library(arcade_core STATIC
     src/config/ConfigStore.h src/config/ConfigStore.cpp
     src/core/WheelLogic.h src/core/WheelLogic.cpp
     src/core/WheelController.h src/core/WheelController.cpp
+    src/core/WheelPaths.h src/core/WheelPaths.cpp
     src/core/IconImageProvider.h src/core/IconImageProvider.cpp
     src/core/IconTheme.h src/core/IconTheme.cpp
     src/actions/ActionDispatcher.h src/actions/ActionDispatcher.cpp
@@ -83,12 +84,21 @@ set_target_properties(arcade-wheel PROPERTIES
     WIN32_EXECUTABLE TRUE
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_BUNDLE_NAME "Arcade Wheel"
-    MACOSX_BUNDLE_GUI_IDENTIFIER "com.arcadewheel.ArcadeWheel"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "dev.arcade.Wheel"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
 )
 target_compile_definitions(arcade-wheel PRIVATE ARCADE_VERSION="${PROJECT_VERSION}")
-target_link_libraries(arcade-wheel PRIVATE arcade_core wheel_uiplugin arcade_kitplugin Qt6::Widgets Qt6::QuickControls2 Qt6::Network)
+target_link_libraries(arcade-wheel PRIVATE arcade_core wheel_uiplugin arcade_kitplugin Qt6::Widgets Qt6::QuickControls2 Qt6::Network Qt6::Svg)
+# The kit's app icon for the executable and the bundle (packaging/icons, from
+# Arcade Link's design/app-icons/wheel).
+if(WIN32)
+    target_sources(arcade-wheel PRIVATE packaging/windows/arcade-wheel.rc)
+elseif(APPLE)
+    set_target_properties(arcade-wheel PROPERTIES MACOSX_BUNDLE_ICON_FILE arcade-wheel.icns)
+    set_source_files_properties(packaging/icons/arcade-wheel.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    target_sources(arcade-wheel PRIVATE packaging/icons/arcade-wheel.icns)
+endif()
 
 if(WIN32)
     target_sources(arcade-wheel PRIVATE
@@ -146,14 +156,14 @@ install(TARGETS arcade-wheel RUNTIME DESTINATION bin BUNDLE DESTINATION .)
 install(FILES LICENSE README.md DESTINATION share/doc/arcade-wheel)
 install(DIRECTORY docs/user/ DESTINATION share/doc/arcade-wheel/docs/user)
 if(UNIX AND NOT APPLE)
-    install(FILES packaging/linux/com.arcadewheel.ArcadeWheel.desktop DESTINATION share/applications)
-    install(FILES assets/arcade-wheel.svg DESTINATION share/icons/hicolor/scalable/apps)
+    install(FILES packaging/linux/dev.arcade.Wheel.desktop DESTINATION share/applications)
+    install(FILES assets/arcade-wheel.svg DESTINATION share/icons/hicolor/scalable/apps RENAME dev.arcade.Wheel.svg)
 endif()
 
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
-    foreach(test_name IN ITEMS WheelLogic ConfigStore ActionDispatcher WheelController CommandReply)
+    foreach(test_name IN ITEMS WheelLogic ConfigStore ActionDispatcher WheelController CommandReply WheelPaths)
         qt_add_executable(test_${test_name} tests/tst_${test_name}.cpp)
         target_link_libraries(test_${test_name} PRIVATE arcade_core Qt6::Test)
         add_test(NAME ${test_name} COMMAND test_${test_name})

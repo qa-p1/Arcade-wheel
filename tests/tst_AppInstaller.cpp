@@ -61,8 +61,9 @@ private slots:
         QVERIFY(!AppInstaller::Engine::shouldPrompt(d, {}, false, true));
         d.state = "devBuild"; QVERIFY(!AppInstaller::Engine::shouldPrompt(d, {}));
         const auto info = AppInstaller::appInfo();
-        QCOMPARE(info.desktopId, QStringLiteral("com.arcadewheel.ArcadeWheel"));
-        QCOMPARE(info.autostartId, QStringLiteral("arcade-wheel"));
+        QCOMPARE(info.desktopId, QStringLiteral("dev.arcade.Wheel"));
+        QCOMPARE(info.autostartId, QStringLiteral("dev.arcade.Wheel"));
+        QCOMPARE(info.legacyDesktopIds, (QStringList{"com.arcadewheel.ArcadeWheel", "arcade-wheel"}));
         QCOMPARE(info.backgroundArgs, QStringList{"--background"});
     }
     void cliValidatesOptionsWithoutMutation()
@@ -94,8 +95,8 @@ private slots:
         QVERIFY2(AppInstaller::installCopy(engine, runtime, options, "0.3.0", &receipt, &error), qPrintable(error));
         QCOMPARE(receipt.value("method").toString(), QStringLiteral("appimage"));
         const auto integration = receipt.value("integration").toObject();
-        QVERIFY(integration.value("desktopEntry").toString().endsWith("com.arcadewheel.ArcadeWheel.desktop"));
-        QVERIFY(integration.value("autostart").toString().endsWith("arcade-wheel.desktop"));
+        QVERIFY(integration.value("desktopEntry").toString().endsWith("/applications/dev.arcade.Wheel.desktop"));
+        QVERIFY(integration.value("autostart").toString().endsWith("/autostart/dev.arcade.Wheel.desktop"));
         QVERIFY(QFile::remove(integration.value("desktopEntry").toString()));
         QVERIFY2(engine.repair(AppInstaller::appInfo(), {}, nullptr, &error), qPrintable(error));
         QVERIFY(QFileInfo::exists(integration.value("desktopEntry").toString()));
@@ -117,6 +118,69 @@ private slots:
         QVERIFY(!QFileInfo::exists(receipt.value("path").toString()));
         QVERIFY(!QFileInfo::exists(integration.value("autostart").toString()));
         QVERIFY(QFileInfo::exists(source));
+#endif
+    }
+    // A copy installed before 0.5 (launcher com.arcadewheel.ArcadeWheel, login
+    // entry arcade-wheel) moves to dev.arcade.Wheel on its first start, keeps
+    // start at login on or off, and leaves no old entry behind.
+    void integrationMovesToTheNewIdOnce_data()
+    {
+        QTest::addColumn<bool>("startAtLogin");
+        QTest::addRow("starting at login") << true;
+        QTest::addRow("not starting at login") << false;
+    }
+    void integrationMovesToTheNewIdOnce()
+    {
+#ifndef Q_OS_LINUX
+        QSKIP("Linux launchers and login entries");
+#else
+        QFETCH(bool, startAtLogin);
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const auto env = AppInstaller::Engine::Environment::under(dir.path()); AppInstaller::Engine engine(env);
+        const QString source = dir.filePath("Downloads/Wheel.AppImage"), executable = dir.filePath("mount/usr/bin/arcade-wheel");
+        QVERIFY(QDir().mkpath(QFileInfo(source).absolutePath())); QVERIFY(QDir().mkpath(QFileInfo(executable).absolutePath()));
+        for (const auto &path : {source, executable}) { QFile f(path); QVERIFY(f.open(QIODevice::WriteOnly)); f.write("#!/bin/sh\nexit 0\n"); f.close(); }
+        // Installed the way 0.4 did it.
+        AppInstaller::Engine::InstallOptions old;
+        old.app = AppInstaller::appInfo();
+        old.app.desktopId = QStringLiteral("com.arcadewheel.ArcadeWheel");
+        old.app.legacyDesktopIds = {QStringLiteral("arcade-wheel")};
+        old.app.autostartId = QStringLiteral("arcade-wheel");
+        old.runtime = {executable, source, dir.filePath("mount"), false};
+        old.version = QStringLiteral("0.4.5");
+        old.startAtLogin = startAtLogin;
+        QJsonObject receipt; QString error;
+        QVERIFY2(engine.install(old, &receipt, &error), qPrintable(error));
+        receipt.insert("toolsExtension", QJsonObject{{"keep", true}});
+        QVERIFY2(env.receipts().write(receipt, &error), qPrintable(error));
+        const QString oldEntry = receipt.value("integration").toObject().value("desktopEntry").toString();
+        const QString oldLogin = QDir(env.config).filePath("autostart/arcade-wheel.desktop");
+        QVERIFY(oldEntry.endsWith("/com.arcadewheel.ArcadeWheel.desktop"));
+        QCOMPARE(QFileInfo::exists(oldLogin), startAtLogin);
+
+        // The installed copy starts (0.5).
+        const QString installed = receipt.value("path").toString();
+        const AppInstaller::Engine::Runtime running{executable, installed, dir.filePath("mount"), false};
+        QVERIFY2(AppInstaller::migrateIntegration(env, running, &error), qPrintable(error));
+        QJsonObject moved;
+        QVERIFY2(env.receipts().read(Ids::Wheel, &moved, &error), qPrintable(error));
+        const auto integration = moved.value("integration").toObject();
+        QVERIFY(integration.value("desktopEntry").toString().endsWith("/applications/dev.arcade.Wheel.desktop"));
+        QVERIFY(QFileInfo::exists(integration.value("desktopEntry").toString()));
+        QVERIFY(!QFileInfo::exists(oldEntry));
+        QVERIFY(!QFileInfo::exists(oldLogin));
+        const QString newLogin = QDir(env.config).filePath("autostart/dev.arcade.Wheel.desktop");
+        QCOMPARE(QFileInfo::exists(newLogin), startAtLogin);
+        QCOMPARE(integration.value("autostart").isString(), startAtLogin);
+        QCOMPARE(moved.value("toolsExtension"), receipt.value("toolsExtension"));
+        QCOMPARE(moved.value("path").toString(), installed);
+
+        // A second start finds nothing to move.
+        const QByteArray before = QFile(env.receipts().path(Ids::Wheel)).exists() ? [&] {
+            QFile f(env.receipts().path(Ids::Wheel)); f.open(QIODevice::ReadOnly); return f.readAll(); }() : QByteArray();
+        QVERIFY2(AppInstaller::migrateIntegration(env, running, &error), qPrintable(error));
+        QFile after(env.receipts().path(Ids::Wheel)); QVERIFY(after.open(QIODevice::ReadOnly));
+        QCOMPARE(after.readAll(), before);
 #endif
     }
 };

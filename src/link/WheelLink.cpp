@@ -1,5 +1,6 @@
 #include "link/AppMetadata.h"
 #include "link/WheelLink.h"
+#include "core/WheelPaths.h"
 
 #include "core/WheelController.h"
 
@@ -255,7 +256,7 @@ QJsonObject WheelLink::manifest(const QJsonObject &config, const QString &versio
             {QStringLiteral("launch"), QJsonObject{{QStringLiteral("background"), QJsonArray{QStringLiteral("--background")}}}},
             {QStringLiteral("shortcuts"), shortcuts},
             {QStringLiteral("menu"), menuItems()},
-            {QStringLiteral("logs"), QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/logs")},
+            {QStringLiteral("logs"), WheelPaths::logsDir()},
             {QStringLiteral("install"), AppInstaller::installMethod()},
             {QStringLiteral("docs"), QJsonObject{{QStringLiteral("version"), version}}},
             {QStringLiteral("settings"), QJsonObject{{QStringLiteral("linkEnabled"), enabled}}},

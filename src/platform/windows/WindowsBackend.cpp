@@ -1,4 +1,5 @@
 #include "WindowsBackend.h"
+#include "core/WheelPaths.h"
 #include "install/AppInstaller.h"
 
 #ifdef Q_OS_WIN
@@ -224,7 +225,7 @@ bool installedLogin(AppInstaller::Engine::Environment environment, QJsonObject r
             return false;
         }
         if (!enabled) {
-            const QString config = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+            const QString config = WheelPaths::dirs().config;
             backup = QDir(config).filePath(QStringLiteral("startup-shortcut.backup-%1.lnk").arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
             if (config.isEmpty() || !ArcadeLink::ensurePrivateDir(config) || !QFile::copy(path, backup) || !QFile::remove(path)) {
                 assignError(error, QStringLiteral("Could not back up and remove the login shortcut."));
@@ -555,7 +556,7 @@ bool sendKeyboardChord(const QVector<UINT> &keys)
 
 QString shellIconCachePath(const QString &path)
 {
-    const QString cacheRoot = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    const QString cacheRoot = WheelPaths::cacheDir();
     if (cacheRoot.isEmpty())
         return {};
 

@@ -79,10 +79,10 @@ private slots:
         }
         QCOMPARE(autostart.entryList(QDir::Files),QStringList());
         // A hand-edited entry is still preserved before it is replaced.
-        QFile custom(autostart.filePath("arcade-wheel.desktop")); QVERIFY(custom.open(QIODevice::WriteOnly));
+        QFile custom(autostart.filePath("dev.arcade.Wheel.desktop")); QVERIFY(custom.open(QIODevice::WriteOnly));
         custom.write("[Desktop Entry]\nType=Application\nName=My launcher\nExec=true\n"); custom.close();
         QVERIFY2(backend.setStartOnLogin(true,&error),qPrintable(error));
-        QCOMPARE(autostart.entryList({"arcade-wheel.desktop.backup-*"},QDir::Files).size(),1);
+        QCOMPARE(autostart.entryList({"dev.arcade.Wheel.desktop.backup-*"},QDir::Files).size(),1);
         qunsetenv("XDG_CONFIG_HOME");
     }
     void appImageAutostartUsesDurableImagePath() {
@@ -106,7 +106,7 @@ private slots:
         qputenv("XDG_CONFIG_HOME", config.path().toUtf8());
         LinuxBackend backend; QString error;
         QVERIFY2(backend.setStartOnLogin(true, &error), qPrintable(error));
-        QFile entry(config.filePath("autostart/arcade-wheel.desktop"));
+        QFile entry(config.filePath("autostart/dev.arcade.Wheel.desktop"));
         QVERIFY(entry.open(QIODevice::ReadOnly));
         const auto contents = entry.readAll(); entry.close();
         QVERIFY(contents.contains(image.fileName().toUtf8()));

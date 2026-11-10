@@ -1,0 +1,19 @@
+/tmp/cswt-c7347b9d/p-w/cache/arcade/wheel:
+total 0
+drwxr-xr-x 3 harneet harneet 60 2026-11-06 21:25:47.297748762 +0530 .
+drwxr-xr-x 3 harneet harneet 60 2026-11-06 21:25:47.297748762 +0530 ..
+drwxr-xr-x 2 harneet harneet 40 2026-11-06 21:25:47.297748762 +0530 qtpipelinecache-x86_64-little_endian-lp64
+
+/tmp/cswt-c7347b9d/p-w/cache/Arcade Wheel/Arcade Wheel:
+total 0
+drwxr-xr-x 3 harneet harneet 60 2026-11-06 21:25:47.442750546 +0530 .
+drwxr-xr-x 3 harneet harneet 60 2026-11-06 21:25:47.442750546 +0530 ..
+drwxr-xr-x 2 harneet harneet 60 2026-11-06 21:26:13.103244614 +0530 qtpipelinecache-x86_64-little_endian-lp64
+/tmp/cswt-c7347b9d/p-w/cache
+/tmp/cswt-c7347b9d/p-w/cache/Arcade Wheel
+/tmp/cswt-c7347b9d/p-w/cache/arcade
+/tmp/cswt-c7347b9d/p-w/cache/qtshadercache-x86_64-little_endian-lp64
+/tmp/cswt-c7347b9d/p-w/cache/Arcade Wheel/Arcade Wheel
+/tmp/cswt-c7347b9d/p-w/cache/arcade/wheel
+/tmp/cswt-c7347b9d/p-w/cache/Arcade Wheel/Arcade Wheel/qtpipelinecache-x86_64-little_endian-lp64
+/tmp/cswt-c7347b9d/p-w/cache/arcade/wheel/qtpipelinecache-x86_64-little_endian-lp64

@@ -1,0 +1,77 @@
+{
+  "events": "{\"args\": [\"slot0\"], \"cwd\": \"/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/home\"}\n{\"args\": [\"slot1\"], \"cwd\": \"/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/home\"}\n{\"args\": [\"slot2\"], \"cwd\": \"/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/home\"}\n{\"args\": [\"slot3\"], \"cwd\": \"/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/home\"}\n{\"args\": [\"slot4\"], \"cwd\": \"/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/home\"}\n{\"args\": [\"slot5\"], \"cwd\": \"/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/home\"}\n{\"args\": [\"desktop\"], \"cwd\": \"/home/harneet/Work/Coding\"}\n",
+  "statuses": [
+    {
+      "deckIndex": 0,
+      "error": "",
+      "link": {
+        "enabled": true,
+        "listening": true
+      },
+      "overlayRevealed": true,
+      "overlayVisible": true,
+      "pid": 133717,
+      "platform": "xcb",
+      "running": true,
+      "selectedIndex": -1,
+      "surfaceVisible": true,
+      "tray": "hosted",
+      "trigger": "Install Arcade Wheel to register its portal shortcut, or bind arcade-wheel --show in your desktop's keyboard settings.",
+      "version": "0.5.0"
+    },
+    {
+      "deckIndex": 0,
+      "error": "",
+      "link": {
+        "enabled": true,
+        "listening": true
+      },
+      "overlayRevealed": false,
+      "overlayVisible": false,
+      "pid": 133717,
+      "platform": "xcb",
+      "running": true,
+      "selectedIndex": -1,
+      "surfaceVisible": false,
+      "tray": "hosted",
+      "trigger": "Install Arcade Wheel to register its portal shortcut, or bind arcade-wheel --show in your desktop's keyboard settings.",
+      "version": "0.5.0"
+    },
+    {
+      "deckIndex": 0,
+      "error": "",
+      "link": {
+        "enabled": true,
+        "listening": true
+      },
+      "overlayRevealed": false,
+      "overlayVisible": false,
+      "pid": 133717,
+      "platform": "xcb",
+      "running": true,
+      "selectedIndex": -1,
+      "surfaceVisible": false,
+      "tray": "hosted",
+      "trigger": "Install Arcade Wheel to register its portal shortcut, or bind arcade-wheel --show in your desktop's keyboard settings.",
+      "version": "0.5.0"
+    },
+    {
+      "deckIndex": 0,
+      "error": "",
+      "link": {
+        "enabled": true,
+        "listening": true
+      },
+      "overlayRevealed": true,
+      "overlayVisible": true,
+      "pid": 133717,
+      "platform": "xcb",
+      "running": true,
+      "selectedIndex": -1,
+      "surfaceVisible": true,
+      "tray": "hosted",
+      "trigger": "Install Arcade Wheel to register its portal shortcut, or bind arcade-wheel --show in your desktop's keyboard settings.",
+      "version": "0.5.0"
+    }
+  ]
+}

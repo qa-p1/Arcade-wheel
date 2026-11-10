@@ -1,0 +1,80 @@
+== malformed
+ERROR: Invalid JSON: unterminated array
+/bin/bash: line 2: bc: command not found
+t= md5=6928e4b8 alive
+== empty
+ERROR: Invalid JSON: illegal value
+/bin/bash: line 2: bc: command not found
+t= md5=6928e4b8 alive
+== array
+ERROR: Invalid JSON: no error occurred
+/bin/bash: line 2: bc: command not found
+t= md5=6928e4b8 alive
+== emptyobj
+ERROR: Invalid JSON: no error occurred
+/bin/bash: line 2: bc: command not found
+t= md5=6928e4b8 alive
+== null
+ERROR: Invalid JSON: illegal value
+/bin/bash: line 2: bc: command not found
+t= md5=6928e4b8 alive
+== future
+ERROR: Unsupported configuration schema version 99
+/bin/bash: line 2: bc: command not found
+t= md5=6928e4b8 alive
+== neg
+ERROR: Unsupported configuration schema version -1
+/bin/bash: line 2: bc: command not found
+t= md5=6928e4b8 alive
+== strver
+Imported settings into the running Arcade Wheel.
+/bin/bash: line 2: bc: command not found
+t= md5=6928e4b8 alive
+== nover
+Imported settings into the running Arcade Wheel.
+/bin/bash: line 2: bc: command not found
+t= md5=6928e4b8 alive
+== unknowntype
+Imported settings into the running Arcade Wheel.
+/bin/bash: line 2: bc: command not found
+t= md5=5909881f alive
+== decksstr
+Imported settings into the running Arcade Wheel.
+/bin/bash: line 2: bc: command not found
+t= md5=73e80a4f alive
+== nodecks
+Imported settings into the running Arcade Wheel.
+/bin/bash: line 2: bc: command not found
+t= md5=df2089a0 alive
+== manyactions
+Imported settings into the running Arcade Wheel.
+/bin/bash: line 2: bc: command not found
+t= md5=1d67a98c alive
+== badnums
+Imported settings into the running Arcade Wheel.
+/bin/bash: line 2: bc: command not found
+t= md5=f77beac9 alive
+== hugename
+Arcade Wheel did not confirm the settings import.
+/bin/bash: line 2: bc: command not found
+t= md5=d2fb35ae alive
+== badtrigger
+Arcade Wheel did not confirm the settings import.
+/bin/bash: line 2: bc: command not found
+t= md5=d2fb35ae alive
+== dupdecks
+Arcade Wheel did not confirm the settings import.
+/bin/bash: line 2: bc: command not found
+t= md5=d2fb35ae alive
+== huge
+Arcade Wheel did not confirm the settings import.
+/bin/bash: line 2: bc: command not found
+t= md5=d2fb35ae alive
+== nonexist
+Arcade Wheel did not confirm the settings import.
+/bin/bash: line 2: bc: command not found
+t= md5=d2fb35ae alive
+== good
+Arcade Wheel did not confirm the settings import.
+/bin/bash: line 2: bc: command not found
+t= md5=d2fb35ae alive

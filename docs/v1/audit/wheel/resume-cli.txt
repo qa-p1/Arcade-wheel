@@ -1,0 +1,37 @@
+--help (0.136s) exit=0
+Arcade Wheel
+
+  arcade-wheel               Open Settings; keep the launcher running
+  arcade-wheel --settings    Same as above
+  arcade-wheel --background  Start the resident launcher without a window
+  arcade-wheel --show        Open the wheel; click an action or right-click to cancel
+  arcade-wheel --preview     Show a safe visual preview
+  arcade-wheel --hide        Dismiss the wheel (also --cancel)
+  arcade-wheel --toggle      Open the wheel, or dismiss it when open
+  arcade-wheel --press       Simulate pressing the trigger
+  arcade-wheel --release     Simulate releasing the trigger (runs the selection)
+  arcade-wheel --status      Show resident status as JSON
+  arcade-wheel --restart     Restart the resident launcher
+  arcade-wheel --quit        Quit the resident launcher
+  arcade-wheel --menu        Print app-specific tray items as JSON
+  arcade-wheel --settings-export FILE
+                             Export portable settings without credentials or device identity
+  arcade-wheel --settings-import FILE
+                             Import portable settings after saving a private backup
+  arcade-wheel --install [--silent] [--no-launch] [--channel C]
+  arcade-wheel --uninstall [--silent] [--remove-data]
+  arcade-wheel --repair
+  arcade-wheel --integration-status
+                             Show receipt, integration entries and PATH status
+  arcade-wheel --version     Print the version
+  arcade-wheel --arcade-manifest
+                             Print the Arcade Link manifest (no side effects)
+
+Once running, hold the configured shortcut (F8 by default), move toward an action, then release.
+
+STDERR:
+
+--version (0.131s) exit=0
+Arcade Wheel 0.5.0
+
+STDERR:

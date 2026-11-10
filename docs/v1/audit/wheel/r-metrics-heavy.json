@@ -1,0 +1,424 @@
+{
+  "pid": 133717,
+  "cpuPercent": 0.06666666666666667,
+  "before": {
+    "ticks": 644,
+    "status": "Name:\tAppRun.wrapped\nUmask:\t0022\nState:\tS (sleeping)\nTgid:\t133717\nNgid:\t0\nPid:\t133717\nPPid:\t133716\nTracerPid:\t0\nUid:\t1000\t1000\t1000\t1000\nGid:\t1000\t1000\t1000\t1000\nFDSize:\t1024\nGroups:\t3 90 953 967 980 982 983 985 989 995 998 1000 \nNStgid:\t133717\nNSpid:\t133717\nNSpgid:\t133716\nNSsid:\t133716\nKthread:\t0\nVmPeak:\t 1704664 kB\nVmSize:\t 1629208 kB\nVmLck:\t       0 kB\nVmPin:\t       0 kB\nVmHWM:\t  290836 kB\nVmRSS:\t  290836 kB\nRssAnon:\t  152836 kB\nRssFile:\t  126820 kB\nRssShmem:\t   11180 kB\nVmData:\t  559476 kB\nVmStk:\t     136 kB\nVmExe:\t    2648 kB\nVmLib:\t  177548 kB\nVmPTE:\t    1244 kB\nVmSwap:\t       0 kB\nHugetlbPages:\t       0 kB\nCoreDumping:\t0\nTHP_enabled:\t1\nuntag_mask:\t0xffffffffffffffff\nThreads:\t36\nSigQ:\t15/61132\nSigPnd:\t0000000000000000\nShdPnd:\t0000000000000000\nSigBlk:\t0000000000000000\nSigIgn:\t0000000000001000\nSigCgt:\t0000000100000000\nCapInh:\t0000000800000000\nCapPrm:\t0000000000000000\nCapEff:\t0000000000000000\nCapBnd:\t000001ffffffffff\nCapAmb:\t0000000000000000\nNoNewPrivs:\t0\nSeccomp:\t0\nSeccomp_filters:\t0\nSpeculation_Store_Bypass:\tthread vulnerable\nSpeculationIndirectBranch:\tconditional enabled\nCpus_allowed:\tfff\nCpus_allowed_list:\t0-11\nMems_allowed:\t1\nMems_allowed_list:\t0\nvoluntary_ctxt_switches:\t2651\nnonvoluntary_ctxt_switches:\t153\nx86_Thread_features:\t\nx86_Thread_features_locked:\t\n",
+    "threads": {
+      "133717": {
+        "name": "AppRun.wrapped",
+        "ticks": 30
+      },
+      "133727": {
+        "name": "QXcbEventQueue",
+        "ticks": 1
+      },
+      "133730": {
+        "name": "QDBusConnection",
+        "ticks": 0
+      },
+      "133732": {
+        "name": "gmain",
+        "ticks": 0
+      },
+      "133733": {
+        "name": "QThread",
+        "ticks": 3
+      },
+      "133734": {
+        "name": "QThread",
+        "ticks": 0
+      },
+      "133743": {
+        "name": "llvmpipe-0",
+        "ticks": 47
+      },
+      "133744": {
+        "name": "llvmpipe-1",
+        "ticks": 45
+      },
+      "133745": {
+        "name": "llvmpipe-2",
+        "ticks": 46
+      },
+      "133746": {
+        "name": "llvmpipe-3",
+        "ticks": 45
+      },
+      "133747": {
+        "name": "llvmpipe-4",
+        "ticks": 46
+      },
+      "133748": {
+        "name": "llvmpipe-5",
+        "ticks": 46
+      },
+      "133749": {
+        "name": "llvmpipe-6",
+        "ticks": 44
+      },
+      "133750": {
+        "name": "llvmpipe-7",
+        "ticks": 43
+      },
+      "133751": {
+        "name": "llvmpipe-8",
+        "ticks": 42
+      },
+      "133752": {
+        "name": "llvmpipe-9",
+        "ticks": 47
+      },
+      "133753": {
+        "name": "llvmpipe-10",
+        "ticks": 45
+      },
+      "133754": {
+        "name": "llvmpipe-11",
+        "ticks": 48
+      },
+      "133755": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133756": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133757": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133758": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133759": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133760": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133761": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133762": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133763": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133764": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133765": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133766": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133767": {
+        "name": "AppRun.:disk$0",
+        "ticks": 0
+      },
+      "133768": {
+        "name": "QQmlThread",
+        "ticks": 0
+      },
+      "133769": {
+        "name": "QQmlThread",
+        "ticks": 1
+      },
+      "133779": {
+        "name": "QQuickPixmapRea",
+        "ticks": 0
+      },
+      "133797": {
+        "name": "QSGRenderThread",
+        "ticks": 17
+      },
+      "133890": {
+        "name": "QSGRenderThread",
+        "ticks": 29
+      }
+    },
+    "fds": {
+      "0": "pipe:[554172]",
+      "1": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/logs/wheel.log",
+      "2": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/logs/wheel.log",
+      "3": "pipe:[556107]",
+      "4": "socket:[556130]",
+      "5": "anon_inode:[eventfd]",
+      "6": "anon_inode:[eventfd]",
+      "7": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/run/arcade-wheel-b6ab6218836b.lock",
+      "8": "socket:[552595]",
+      "9": "anon_inode:[eventfd]",
+      "10": "socket:[554175]",
+      "11": "anon_inode:inotify",
+      "12": "anon_inode:[eventfd]",
+      "13": "anon_inode:[eventfd]",
+      "14": "anon_inode:inotify",
+      "15": "anon_inode:inotify",
+      "16": "anon_inode:inotify",
+      "17": "anon_inode:[eventfd]",
+      "18": "socket:[557253]",
+      "19": "/dev/udmabuf",
+      "20": "/memfd:lp_dma_buf (deleted)",
+      "21": "/dmabuf:",
+      "22": "anon_inode:sync_file",
+      "23": "/memfd:allocation fd (deleted)",
+      "24": "anon_inode:[eventfd]",
+      "25": "/usr/share/icons/Adwaita/icon-theme.cache",
+      "26": "/usr/share/icons/AdwaitaLegacy/icon-theme.cache",
+      "27": "socket:[552597]",
+      "28": "socket:[552600]",
+      "29": "socket:[552603]",
+      "30": "anon_inode:[eventfd]",
+      "31": "socket:[552605]",
+      "32": "anon_inode:[eventfd]",
+      "33": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/data/icons/hicolor/icon-theme.cache",
+      "34": "/usr/share/icons/hicolor/icon-theme.cache",
+      "35": "socket:[562381]",
+      "40": "anon_inode:[eventfd]",
+      "41": "anon_inode:[eventfd]",
+      "1023": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/tmp/.mount_ArcadeocHAmE"
+    }
+  },
+  "after": {
+    "ticks": 646,
+    "status": "Name:\tAppRun.wrapped\nUmask:\t0022\nState:\tS (sleeping)\nTgid:\t133717\nNgid:\t0\nPid:\t133717\nPPid:\t133716\nTracerPid:\t0\nUid:\t1000\t1000\t1000\t1000\nGid:\t1000\t1000\t1000\t1000\nFDSize:\t1024\nGroups:\t3 90 953 967 980 982 983 985 989 995 998 1000 \nNStgid:\t133717\nNSpid:\t133717\nNSpgid:\t133716\nNSsid:\t133716\nKthread:\t0\nVmPeak:\t 1704664 kB\nVmSize:\t 1629208 kB\nVmLck:\t       0 kB\nVmPin:\t       0 kB\nVmHWM:\t  290800 kB\nVmRSS:\t  290800 kB\nRssAnon:\t  152836 kB\nRssFile:\t  126784 kB\nRssShmem:\t   11180 kB\nVmData:\t  559476 kB\nVmStk:\t     136 kB\nVmExe:\t    2648 kB\nVmLib:\t  177548 kB\nVmPTE:\t    1244 kB\nVmSwap:\t       0 kB\nHugetlbPages:\t       0 kB\nCoreDumping:\t0\nTHP_enabled:\t1\nuntag_mask:\t0xffffffffffffffff\nThreads:\t36\nSigQ:\t13/61132\nSigPnd:\t0000000000000000\nShdPnd:\t0000000000000000\nSigBlk:\t0000000000000000\nSigIgn:\t0000000000001000\nSigCgt:\t0000000100000000\nCapInh:\t0000000800000000\nCapPrm:\t0000000000000000\nCapEff:\t0000000000000000\nCapBnd:\t000001ffffffffff\nCapAmb:\t0000000000000000\nNoNewPrivs:\t0\nSeccomp:\t0\nSeccomp_filters:\t0\nSpeculation_Store_Bypass:\tthread vulnerable\nSpeculationIndirectBranch:\tconditional enabled\nCpus_allowed:\tfff\nCpus_allowed_list:\t0-11\nMems_allowed:\t1\nMems_allowed_list:\t0\nvoluntary_ctxt_switches:\t2700\nnonvoluntary_ctxt_switches:\t155\nx86_Thread_features:\t\nx86_Thread_features_locked:\t\n",
+    "threads": {
+      "133717": {
+        "name": "AppRun.wrapped",
+        "ticks": 31
+      },
+      "133727": {
+        "name": "QXcbEventQueue",
+        "ticks": 1
+      },
+      "133730": {
+        "name": "QDBusConnection",
+        "ticks": 0
+      },
+      "133732": {
+        "name": "gmain",
+        "ticks": 0
+      },
+      "133733": {
+        "name": "QThread",
+        "ticks": 3
+      },
+      "133734": {
+        "name": "QThread",
+        "ticks": 0
+      },
+      "133743": {
+        "name": "llvmpipe-0",
+        "ticks": 48
+      },
+      "133744": {
+        "name": "llvmpipe-1",
+        "ticks": 45
+      },
+      "133745": {
+        "name": "llvmpipe-2",
+        "ticks": 46
+      },
+      "133746": {
+        "name": "llvmpipe-3",
+        "ticks": 45
+      },
+      "133747": {
+        "name": "llvmpipe-4",
+        "ticks": 46
+      },
+      "133748": {
+        "name": "llvmpipe-5",
+        "ticks": 46
+      },
+      "133749": {
+        "name": "llvmpipe-6",
+        "ticks": 44
+      },
+      "133750": {
+        "name": "llvmpipe-7",
+        "ticks": 43
+      },
+      "133751": {
+        "name": "llvmpipe-8",
+        "ticks": 42
+      },
+      "133752": {
+        "name": "llvmpipe-9",
+        "ticks": 47
+      },
+      "133753": {
+        "name": "llvmpipe-10",
+        "ticks": 45
+      },
+      "133754": {
+        "name": "llvmpipe-11",
+        "ticks": 48
+      },
+      "133755": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133756": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133757": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133758": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133759": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133760": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133761": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133762": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133763": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133764": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133765": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133766": {
+        "name": "AppRun.wrapped",
+        "ticks": 0
+      },
+      "133767": {
+        "name": "AppRun.:disk$0",
+        "ticks": 0
+      },
+      "133768": {
+        "name": "QQmlThread",
+        "ticks": 0
+      },
+      "133769": {
+        "name": "QQmlThread",
+        "ticks": 1
+      },
+      "133779": {
+        "name": "QQuickPixmapRea",
+        "ticks": 0
+      },
+      "133797": {
+        "name": "QSGRenderThread",
+        "ticks": 17
+      },
+      "133890": {
+        "name": "QSGRenderThread",
+        "ticks": 29
+      }
+    },
+    "fds": {
+      "0": "pipe:[554172]",
+      "1": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/logs/wheel.log",
+      "2": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/logs/wheel.log",
+      "3": "pipe:[556107]",
+      "4": "socket:[556130]",
+      "5": "anon_inode:[eventfd]",
+      "6": "anon_inode:[eventfd]",
+      "7": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/run/arcade-wheel-b6ab6218836b.lock",
+      "8": "socket:[552595]",
+      "9": "anon_inode:[eventfd]",
+      "10": "socket:[554175]",
+      "11": "anon_inode:inotify",
+      "12": "anon_inode:[eventfd]",
+      "13": "anon_inode:[eventfd]",
+      "14": "anon_inode:inotify",
+      "15": "anon_inode:inotify",
+      "16": "anon_inode:inotify",
+      "17": "anon_inode:[eventfd]",
+      "18": "socket:[557253]",
+      "19": "/dev/udmabuf",
+      "20": "/memfd:lp_dma_buf (deleted)",
+      "21": "/dmabuf:",
+      "22": "anon_inode:sync_file",
+      "23": "/memfd:allocation fd (deleted)",
+      "24": "anon_inode:[eventfd]",
+      "25": "/usr/share/icons/Adwaita/icon-theme.cache",
+      "26": "/usr/share/icons/AdwaitaLegacy/icon-theme.cache",
+      "27": "socket:[552597]",
+      "28": "socket:[552600]",
+      "29": "socket:[552603]",
+      "30": "anon_inode:[eventfd]",
+      "31": "socket:[552605]",
+      "32": "anon_inode:[eventfd]",
+      "33": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/data/icons/hicolor/icon-theme.cache",
+      "34": "/usr/share/icons/hicolor/icon-theme.cache",
+      "35": "socket:[562381]",
+      "40": "anon_inode:[eventfd]",
+      "41": "anon_inode:[eventfd]",
+      "1023": "/tmp/claude-1000/-home-harneet-Work-Coding/c7347b9d-c34f-4fc8-b57d-de9a2d5591f6/scratchpad/audit-cswt/resume/tmp/.mount_ArcadeocHAmE"
+    }
+  },
+  "threadTicks": {
+    "133717": 1,
+    "133727": 0,
+    "133730": 0,
+    "133732": 0,
+    "133733": 0,
+    "133734": 0,
+    "133743": 1,
+    "133744": 0,
+    "133745": 0,
+    "133746": 0,
+    "133747": 0,
+    "133748": 0,
+    "133749": 0,
+    "133750": 0,
+    "133751": 0,
+    "133752": 0,
+    "133753": 0,
+    "133754": 0,
+    "133755": 0,
+    "133756": 0,
+    "133757": 0,
+    "133758": 0,
+    "133759": 0,
+    "133760": 0,
+    "133761": 0,
+    "133762": 0,
+    "133763": 0,
+    "133764": 0,
+    "133765": 0,
+    "133766": 0,
+    "133767": 0,
+    "133768": 0,
+    "133769": 0,
+    "133779": 0,
+    "133797": 0,
+    "133890": 0
+  }
+}

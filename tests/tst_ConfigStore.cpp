@@ -451,7 +451,6 @@ private slots:
         timer.start();
         const bool accepted = ConfigStore(dir.filePath("settings.json")).importFrom(path, &imported, &error);
         QVERIFY2(timer.elapsed() < 2000, "the import must not take long");
-        QEXPECT_FAIL("", "WH-3: no size or length limit before parsing", Abort);
         QVERIFY(!accepted);
         QVERIFY(!error.isEmpty());
     }
@@ -467,7 +466,6 @@ private slots:
         QJsonObject imported;
         QString error;
         const bool accepted = ConfigStore(dir.filePath("settings.json")).importFrom(path, &imported, &error);
-        QEXPECT_FAIL("", "WH-3: no length limit on names", Abort);
         QVERIFY(!accepted);
         QVERIFY(error.contains("long"));
     }
@@ -489,7 +487,6 @@ private slots:
         QString error;
         const QJsonObject loaded = ConfigStore(path).load({}, &error);
         const QJsonObject deck = firstDeck(loaded);
-        QEXPECT_FAIL("", "WH-3: names are not limited on load", Abort);
         QVERIFY(deck.value("name").toString().size() <= 120);
         QVERIFY(deck.value("actions").toArray().first().toObject().value("name").toString().size() <= 120);
         QCOMPARE(loaded.value("decks").toArray().size(), 1);
@@ -498,20 +495,19 @@ private slots:
     void wrongShapesAreRefusedWithAMessage_data()
     {
         QTest::addColumn<QByteArray>("file");
-        QTest::addColumn<QString>("knownBug");
-        const auto row = [](const char *tag, const QByteArray &bytes, const char *bug = "") { QTest::newRow(tag) << bytes << QString::fromLatin1(bug); };
-        row("array", "[1,2,3]", "message:WH-4: says \"no error occurred\"");
-        row("empty object", "{}", "message:WH-4: the message is empty");
+        const auto row = [](const char *tag, const QByteArray &bytes) { QTest::newRow(tag) << bytes; };
+        row("array", "[1,2,3]");
+        row("empty object", "{}");
         row("null", "null");
         row("number", "42");
         row("string", "\"settings\"");
-        row("unrelated object", R"({"hello":"world"})", "WH-6: any object is accepted");
-        row("decks is a string", settingsWith([](QJsonObject &c) { c.insert("decks", "nope"); }), "WH-6: replaces the user's decks");
-        row("decks is empty", settingsWith([](QJsonObject &c) { c.insert("decks", QJsonArray{}); }), "WH-6: replaces the user's decks");
-        row("decks is numbers", settingsWith([](QJsonObject &c) { c.insert("decks", QJsonArray{1, 2}); }), "WH-6: replaces the user's decks");
-        row("schema is a string", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", "two"); }), "WH-6: read as version 0");
+        row("unrelated object", R"({"hello":"world"})");
+        row("decks is a string", settingsWith([](QJsonObject &c) { c.insert("decks", "nope"); }));
+        row("decks is empty", settingsWith([](QJsonObject &c) { c.insert("decks", QJsonArray{}); }));
+        row("decks is numbers", settingsWith([](QJsonObject &c) { c.insert("decks", QJsonArray{1, 2}); }));
+        row("schema is a string", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", "two"); }));
         row("schema is negative", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", -1); }));
-        row("schema is fractional", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", 1.5); }), "WH-6: read as version 1");
+        row("schema is fractional", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", 1.5); }));
         row("schema is newer", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", 99); }));
         row("unknown action type", settingsWith([](QJsonObject &c) {
                 auto deck = firstDeck(c);
@@ -521,36 +517,32 @@ private slots:
                 actions[0] = action;
                 deck.insert("actions", actions);
                 setFirstDeck(c, deck);
-            }), "WH-6: unknown action types are stored");
+            }));
         row("duplicate deck ids", settingsWith([](QJsonObject &c) {
                 QJsonArray decks;
                 for (int i = 0; i < 3; ++i) decks.append(QJsonObject{{"id", "same"}, {"name", "Copy"}, {"actions", QJsonArray{}}});
                 c.insert("decks", decks);
-            }), "WH-6: duplicate ids are stored");
+            }));
         row("too many actions", settingsWith([](QJsonObject &c) {
                 auto deck = firstDeck(c);
                 QJsonArray actions;
                 for (int i = 0; i < 500; ++i) actions.append(QJsonObject{{"type", "none"}});
                 deck.insert("actions", actions);
                 setFirstDeck(c, deck);
-            }), "WH-6: 500 actions are accepted");
-        row("appearance is a list", settingsWith([](QJsonObject &c) { c.insert("appearance", QJsonArray{1}); }), "WH-6: replaced silently");
-        row("not json", "{ nope", "");
+            }));
+        row("appearance is a list", settingsWith([](QJsonObject &c) { c.insert("appearance", QJsonArray{1}); }));
+        row("not json", "{ nope");
     }
     void wrongShapesAreRefusedWithAMessage()
     {
         QFETCH(QByteArray, file);
-        QFETCH(QString, knownBug);
         QTemporaryDir dir;
         const QString path = writeBytes(dir, "in.json", file);
         QJsonObject imported;
         QString error;
         const bool accepted = ConfigStore(dir.filePath("settings.json")).importFrom(path, &imported, &error);
-        const bool messageOnly = knownBug.startsWith(QLatin1String("message:"));
-        if (!knownBug.isEmpty() && !messageOnly) QEXPECT_FAIL("", qPrintable(knownBug), Abort);
         QVERIFY2(!accepted, "an invalid import must be refused whole");
         QVERIFY(imported.isEmpty());
-        if (messageOnly) QEXPECT_FAIL("", qPrintable(knownBug.mid(8)), Abort);
         QVERIFY2(!error.isEmpty() && !error.contains("no error occurred"), qPrintable(error));
     }
 
@@ -579,7 +571,6 @@ private slots:
         config.insert("appearance", appearance);
         const QJsonObject normalized = ConfigStore::normalize(config);
         const QJsonObject result = normalized.value("appearance").toObject();
-        QEXPECT_FAIL("", "WH-6: out-of-range values are stored unchanged", Abort);
         QVERIFY(result.value("radius").toDouble() >= 110);
         QVERIFY(result.value("opacity").toDouble() <= 1);
         QVERIFY(result.value("iconSize").toDouble() <= 42);
@@ -598,7 +589,6 @@ private slots:
             QTest::qWait(3);
         }
         const int kept = QDir(dir.path()).entryList({"settings.json.backup-*.json"}, QDir::Files).size();
-        QEXPECT_FAIL("", "WH-6: nothing prunes the backups", Abort);
         QVERIFY2(kept <= 5, qPrintable(QString::number(kept)));
         QVERIFY(kept >= 1);
     }

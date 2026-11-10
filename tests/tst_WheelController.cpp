@@ -184,7 +184,6 @@ private slots:
         file.write(R"({"schemaVersion":4,"decks":"nope"})");
         file.close();
         const bool accepted = controller.importConfig(bad);
-        QEXPECT_FAIL("", "WH-6: the user's decks are replaced by a default deck", Abort);
         QVERIFY(!accepted);
         QVERIFY(!controller.lastError().isEmpty());
         QCOMPARE(controller.config().value("decks"), before);
@@ -201,7 +200,6 @@ private slots:
         const QString good = dir.filePath("good.json");
         QVERIFY(controller.exportConfig(good));
         QVERIFY(controller.importConfig(good));
-        QEXPECT_FAIL("", "WH-4: --status keeps the error of an earlier failed import", Abort);
         QVERIFY2(controller.lastError().isEmpty(), qPrintable(controller.lastError()));
     }
     void nonObjectJsonIsNotReportedAsNoError()
@@ -216,7 +214,6 @@ private slots:
         file.write("[1,2,3]");
         file.close();
         QVERIFY(!controller.importConfig(path));
-        QEXPECT_FAIL("", "WH-4: \"Invalid JSON: no error occurred\"", Abort);
         QVERIFY2(!controller.lastError().contains("no error occurred"), qPrintable(controller.lastError()));
     }
 

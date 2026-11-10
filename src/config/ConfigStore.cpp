@@ -14,6 +14,7 @@
 #include <QStandardPaths>
 #include <QUuid>
 #include <algorithm>
+#include <cmath>
 
 namespace {
 QJsonObject mergeDefaults(const QJsonObject &defaults, const QJsonObject &actual)
@@ -44,20 +45,151 @@ QJsonObject migrateAction(QJsonObject action)
     return action;
 }
 
-QJsonObject readJson(const QString &path, QString *error)
+QJsonObject readJson(const QString &path, QString *error, qint64 maxBytes)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
         if (error) *error = file.errorString();
         return {};
     }
+    if (file.size() > maxBytes) {
+        if (error) *error = QStringLiteral("The file is larger than %1 MiB, so it is not a settings file.").arg(maxBytes / (1024 * 1024));
+        return {};
+    }
     QJsonParseError parseError;
     const auto doc = QJsonDocument::fromJson(file.readAll(), &parseError);
-    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+    if (parseError.error != QJsonParseError::NoError) {
         if (error) *error = QStringLiteral("Invalid JSON: %1").arg(parseError.errorString());
         return {};
     }
+    if (!doc.isObject()) {
+        if (error) *error = QStringLiteral("This is not a settings file: the top level must be a JSON object.");
+        return {};
+    }
     return doc.object();
+}
+
+const QStringList &actionTypes()
+{
+    static const QStringList types{QStringLiteral("none"),   QStringLiteral("application"), QStringLiteral("command"), QStringLiteral("url"),
+                                   QStringLiteral("file"),   QStringLiteral("system"),      QStringLiteral("media"),   QStringLiteral("desktop"),
+                                   QStringLiteral("arcade"), QStringLiteral("plugin"),      QStringLiteral("arcade_box")};
+    return types;
+}
+
+bool hasLongText(const QJsonValue &value, int limit)
+{
+    if (value.isString()) return value.toString().size() > limit;
+    if (value.isArray()) {
+        for (const auto &entry : value.toArray())
+            if (hasLongText(entry, limit)) return true;
+    } else if (value.isObject()) {
+        const auto object = value.toObject();
+        for (auto it = object.begin(); it != object.end(); ++it)
+            if (it.key().size() > limit || hasLongText(it.value(), limit)) return true;
+    }
+    return false;
+}
+
+QJsonValue cutText(const QJsonValue &value, int limit)
+{
+    if (value.isString()) return value.toString().left(limit);
+    if (value.isArray()) {
+        QJsonArray out;
+        for (const auto &entry : value.toArray()) out.append(cutText(entry, limit));
+        return out;
+    }
+    if (value.isObject()) {
+        QJsonObject out;
+        const auto object = value.toObject();
+        for (auto it = object.begin(); it != object.end(); ++it) out.insert(it.key().left(limit), cutText(it.value(), limit));
+        return out;
+    }
+    return value;
+}
+
+// An action must be an object with a known type and bounded text. `where`
+// names it for the message ("Deck 2, action 3"), never quoting user text.
+bool validateAction(const QJsonValue &value, const QString &where, QSet<QString> *ids, QString *error)
+{
+    const auto fail = [&](const QString &why) {
+        if (error) *error = where + QStringLiteral(": ") + why;
+        return false;
+    };
+    if (!value.isObject()) return fail(QStringLiteral("an action must be an object."));
+    const auto action = value.toObject();
+    const auto type = action.value(QStringLiteral("type"));
+    if (type.isUndefined()) return fail(QStringLiteral("the action has no type."));
+    if (!type.isString() || !actionTypes().contains(type.toString())) return fail(QStringLiteral("unknown action type."));
+    for (const auto &key : {QStringLiteral("name"), QStringLiteral("icon"), QStringLiteral("id")}) {
+        const auto field = action.value(key);
+        if (field.isUndefined()) continue;
+        if (!field.isString()) return fail(QStringLiteral("%1 must be text.").arg(key));
+        if (field.toString().size() > (key == QStringLiteral("name") ? ConfigStore::MaxNameLength : ConfigStore::MaxTextLength))
+            return fail(QStringLiteral("%1 is too long.").arg(key));
+    }
+    const QString id = action.value(QStringLiteral("id")).toString();
+    if (!id.isEmpty() && ids) {
+        if (ids->contains(id)) return fail(QStringLiteral("this id is already used by another deck or action."));
+        ids->insert(id);
+    }
+    const auto payload = action.value(QStringLiteral("payload"));
+    if (!payload.isUndefined() && !payload.isObject()) return fail(QStringLiteral("the payload must be an object."));
+    if (hasLongText(payload, ConfigStore::MaxTextLength)) return fail(QStringLiteral("the payload has text longer than %1 characters.").arg(ConfigStore::MaxTextLength));
+    return true;
+}
+
+bool validateActionList(const QJsonValue &list, int limit, const QString &where, QSet<QString> *ids, QString *error)
+{
+    if (!list.isArray()) {
+        if (error) *error = where + QStringLiteral(": the actions must be a list.");
+        return false;
+    }
+    const auto actions = list.toArray();
+    if (actions.size() > limit) {
+        if (error) *error = where + QStringLiteral(": %1 actions, but at most %2 are allowed.").arg(actions.size()).arg(limit);
+        return false;
+    }
+    for (int i = 0; i < actions.size(); ++i)
+        if (!validateAction(actions.at(i), where + QStringLiteral(", action %1").arg(i + 1), ids, error)) return false;
+    return true;
+}
+
+// Appearance and behaviour values the UI offers only inside these bounds.
+struct NumberRange {
+    const char *section;
+    const char *key;
+    double low;
+    double high;
+};
+constexpr NumberRange kNumberRanges[] = {
+    {"appearance", "radius", 110, 240},        {"appearance", "scale", 0.75, 1.3},  {"appearance", "centerRadius", 36, 72},
+    {"appearance", "cardSize", 66, 110},       {"appearance", "gap", 4, 24},        {"appearance", "iconSize", 24, 42},
+    {"appearance", "opacity", 0.45, 1},        {"appearance", "dim", 0, 0.3},       {"appearance", "selectedScale", 1, 1.12},
+    {"appearance", "animationSpeed", 0.5, 1.5}, {"behaviour", "deadZone", 20, 180}, {"behaviour", "selectionSensitivity", 0.5, 2},
+    {"behaviour", "scrollCooldownMs", 0, 500}, {"trigger", "holdThresholdMs", 0, 1000},
+};
+
+// A value of the wrong type becomes the default; a number outside the
+// range the UI offers is brought into it.
+QJsonObject repairSection(const QString &section, const QJsonObject &defaults, QJsonObject actual)
+{
+    for (auto it = defaults.begin(); it != defaults.end(); ++it) {
+        const auto value = actual.value(it.key());
+        const auto fallback = it.value();
+        bool wrongType = false;
+        if (fallback.isBool()) wrongType = !value.isBool();
+        else if (fallback.isDouble()) wrongType = !value.isDouble();
+        else if (fallback.isString()) wrongType = !value.isString() || value.toString().size() > ConfigStore::MaxNameLength;
+        else if (fallback.isArray()) wrongType = !value.isArray();
+        if (wrongType) actual.insert(it.key(), fallback);
+    }
+    for (const auto &range : kNumberRanges) {
+        if (section != QLatin1String(range.section)) continue;
+        const auto value = actual.value(QLatin1String(range.key));
+        if (value.isDouble()) actual.insert(QLatin1String(range.key), std::clamp(value.toDouble(), range.low, range.high));
+    }
+    return actual;
 }
 
 bool isSensitiveField(QString key)
@@ -84,6 +216,13 @@ QJsonValue portableValue(const QJsonValue &value)
         return portable;
     }
     return value;
+}
+void limitActionText(QJsonObject &action)
+{
+    action.insert(QStringLiteral("name"), action.value(QStringLiteral("name")).toString().left(ConfigStore::MaxNameLength));
+    action.insert(QStringLiteral("icon"), action.value(QStringLiteral("icon")).toString().left(ConfigStore::MaxTextLength));
+    const auto payload = action.value(QStringLiteral("payload"));
+    action.insert(QStringLiteral("payload"), payload.isObject() ? cutText(payload, ConfigStore::MaxTextLength).toObject() : QJsonObject{});
 }
 } // namespace
 
@@ -231,7 +370,8 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
     const auto baseline = defaults();
     for (const auto &section : {"general", "link", "trigger", "appearance", "behaviour"}) {
         const auto key = QString::fromLatin1(section);
-        config.insert(key, mergeDefaults(baseline.value(key).toObject(), config.value(key).toObject()));
+        const auto base = baseline.value(key).toObject();
+        config.insert(key, repairSection(key, base, mergeDefaults(base, config.value(key).toObject())));
     }
     {
         auto general = config.value(QStringLiteral("general")).toObject();
@@ -250,12 +390,14 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
     QSet<QString> ids;
     for (const auto &deckValue : decks) {
         if (!deckValue.isObject()) continue;
+        if (normalizedDecks.size() == MaxDecks) break;
         QJsonObject deck = deckValue.toObject();
         QString deckId = deck.value(QStringLiteral("id")).toString();
         if (deckId.isEmpty() || ids.contains(deckId)) deckId = freshId();
         ids.insert(deckId);
         deck.insert(QStringLiteral("id"), deckId);
-        if (deck.value(QStringLiteral("name")).toString().isEmpty()) deck.insert(QStringLiteral("name"), QStringLiteral("Deck"));
+        const QString deckName = deck.value(QStringLiteral("name")).toString().left(MaxNameLength);
+        deck.insert(QStringLiteral("name"), deckName.isEmpty() ? QStringLiteral("Deck") : deckName);
         QJsonArray actions = deck.value(QStringLiteral("actions")).toArray();
         if (actions.isEmpty() && deck.value(QStringLiteral("items")).isArray())
             actions = deck.value(QStringLiteral("items")).toArray();
@@ -267,9 +409,9 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
             if (actionId.isEmpty() || ids.contains(actionId)) actionId = freshId();
             ids.insert(actionId);
             action.insert(QStringLiteral("id"), actionId);
-            if (!action.value(QStringLiteral("payload")).isObject()) action.insert(QStringLiteral("payload"), QJsonObject{});
+            limitActionText(action);
             normalizedActions.append(action);
-            if (normalizedActions.size() == 8) break;
+            if (normalizedActions.size() == MaxDeckActions) break;
         }
         while (normalizedActions.size() < 4) normalizedActions.append(emptyAction());
         deck.remove(QStringLiteral("items"));
@@ -293,9 +435,9 @@ QJsonObject ConfigStore::normalize(QJsonObject config, QString *error)
             if (id.isEmpty() || ids.contains(id)) id = freshId();
             ids.insert(id);
             action.insert("id", id);
-            if (!action.value("payload").isObject()) action.insert("payload", QJsonObject{});
+            limitActionText(action);
             actions.append(action);
-            if (actions.size() == 16) break;
+            if (actions.size() == MaxGestureActions) break;
         }
         group.insert("actions", actions);
         group.insert("enabled", group.value("enabled").toBool(false));
@@ -321,7 +463,7 @@ QJsonObject ConfigStore::load(const QVector<DiscoveredApplication> &applications
         return config;
     }
     QString readError;
-    const auto original = readJson(m_path, &readError);
+    const auto original = readJson(m_path, &readError, MaxSettingsBytes);
     if (original.isEmpty() && readError.isEmpty()) readError = QStringLiteral("Configuration is empty");
     auto config = original.isEmpty() ? QJsonObject{} : normalize(original, &readError);
     if (!config.isEmpty() && config != original) {
@@ -333,7 +475,9 @@ QJsonObject ConfigStore::load(const QVector<DiscoveredApplication> &applications
     }
     if (config.isEmpty()) {
         const auto backup = m_path + QStringLiteral(".invalid-") + freshId() + QStringLiteral(".json");
-        if (!QFile::copy(m_path, backup)) {
+        const bool copied = QFile::copy(m_path, backup);
+        if (copied) pruneCopies(m_path, QStringLiteral(".invalid-*.json"), backup);
+        if (!copied) {
             m_writeBlocked = true;
             if (error) *error = QStringLiteral("%1. The original configuration could not be backed up; changes will not be saved.").arg(readError);
             return defaults(applications);
@@ -397,8 +541,12 @@ bool ConfigStore::exportTo(const QJsonObject &config, const QString &path, QStri
 bool ConfigStore::importFrom(const QString &path, QJsonObject *config, QString *error) const
 {
     QString readError;
-    const auto raw = readJson(path, &readError);
+    const auto raw = readJson(path, &readError, MaxImportBytes);
     if (raw.isEmpty()) {
+        if (error) *error = readError.isEmpty() ? QStringLiteral("This is not a settings file: it is empty.") : readError;
+        return false;
+    }
+    if (!validateImport(raw, &readError)) {
         if (error) *error = readError;
         return false;
     }
@@ -411,6 +559,64 @@ bool ConfigStore::importFrom(const QString &path, QJsonObject *config, QString *
         return false;
     }
     *config = imported;
+    return true;
+}
+
+bool ConfigStore::validateImport(const QJsonObject &raw, QString *error)
+{
+    const auto fail = [&](const QString &why) {
+        if (error) *error = why;
+        return false;
+    };
+    static const QStringList known{QStringLiteral("schemaVersion"), QStringLiteral("general"),   QStringLiteral("link"),
+                                   QStringLiteral("trigger"),       QStringLiteral("appearance"), QStringLiteral("behaviour"),
+                                   QStringLiteral("decks"),         QStringLiteral("pages"),      QStringLiteral("centerGestures")};
+    if (std::none_of(known.begin(), known.end(), [&](const QString &key) { return raw.contains(key); }))
+        return fail(QStringLiteral("This is not an Arcade Wheel settings file: it has no settings or decks."));
+    if (raw.contains(QStringLiteral("schemaVersion"))) {
+        const auto version = raw.value(QStringLiteral("schemaVersion"));
+        const double number = version.toDouble(-1);
+        if (!version.isDouble() || number != std::floor(number) || number < 0)
+            return fail(QStringLiteral("The settings file's schema version must be a whole number."));
+        if (number > SchemaVersion) return fail(QStringLiteral("Unsupported configuration schema version %1").arg(static_cast<qint64>(number)));
+    }
+    for (const auto &section : {QStringLiteral("general"), QStringLiteral("link"), QStringLiteral("trigger"), QStringLiteral("appearance"),
+                                QStringLiteral("behaviour"), QStringLiteral("centerGestures")})
+        if (raw.contains(section) && !raw.value(section).isObject()) return fail(QStringLiteral("\"%1\" must be an object.").arg(section));
+    const QString deckKey = raw.contains(QStringLiteral("decks")) ? QStringLiteral("decks") : QStringLiteral("pages");
+    const auto list = raw.value(deckKey);
+    if (!list.isArray()) return fail(QStringLiteral("The settings file has no list of decks, so nothing was imported."));
+    const auto decks = list.toArray();
+    if (decks.isEmpty()) return fail(QStringLiteral("The settings file's list of decks is empty, so nothing was imported."));
+    if (decks.size() > MaxDecks) return fail(QStringLiteral("The settings file has %1 decks, but at most %2 are allowed.").arg(decks.size()).arg(MaxDecks));
+    QSet<QString> ids;
+    for (int i = 0; i < decks.size(); ++i) {
+        const QString where = QStringLiteral("Deck %1").arg(i + 1);
+        if (!decks.at(i).isObject()) return fail(where + QStringLiteral(": a deck must be an object."));
+        const auto deck = decks.at(i).toObject();
+        for (const auto &key : {QStringLiteral("id"), QStringLiteral("name")}) {
+            const auto field = deck.value(key);
+            if (field.isUndefined()) continue;
+            if (!field.isString()) return fail(where + QStringLiteral(": %1 must be text.").arg(key));
+            if (field.toString().size() > (key == QStringLiteral("name") ? MaxNameLength : MaxTextLength))
+                return fail(where + QStringLiteral(": %1 is too long (at most %2 characters).").arg(key).arg(key == QStringLiteral("name") ? MaxNameLength : MaxTextLength));
+        }
+        const QString id = deck.value(QStringLiteral("id")).toString();
+        if (!id.isEmpty()) {
+            if (ids.contains(id)) return fail(where + QStringLiteral(": this id is already used by another deck or action."));
+            ids.insert(id);
+        }
+        const auto actions = deck.contains(QStringLiteral("actions")) ? deck.value(QStringLiteral("actions")) : deck.value(QStringLiteral("items"));
+        if (actions.isUndefined()) continue;
+        if (!validateActionList(actions, MaxDeckActions, where, &ids, error)) return false;
+    }
+    const auto gestures = raw.value(QStringLiteral("centerGestures")).toObject();
+    for (const auto &key : {QStringLiteral("singleClick"), QStringLiteral("doubleClick"), QStringLiteral("tripleClick"), QStringLiteral("longPress")}) {
+        if (!gestures.contains(key)) continue;
+        if (!gestures.value(key).isObject()) return fail(QStringLiteral("Centre gesture \"%1\" must be an object.").arg(key));
+        const auto actions = gestures.value(key).toObject().value(QStringLiteral("actions"));
+        if (!actions.isUndefined() && !validateActionList(actions, MaxGestureActions, QStringLiteral("Centre gesture \"%1\"").arg(key), &ids, error)) return false;
+    }
     return true;
 }
 
@@ -490,6 +696,23 @@ bool ConfigStore::backupCurrent(QString *backupPath, QString *error) const
         if (error) *error = backup.errorString();
         return false;
     }
+    pruneCopies(m_path, QStringLiteral(".backup-*.json"), destination);
     if (backupPath) *backupPath = destination;
     return true;
+}
+
+void ConfigStore::pruneCopies(const QString &settingsPath, const QString &suffixPattern, const QString &keep)
+{
+    const QFileInfo info(settingsPath);
+    QDir dir(info.absolutePath());
+    const auto copies = dir.entryInfoList({info.fileName() + suffixPattern}, QDir::Files, QDir::Time);
+    int remaining = KeptBackups - 1; // the copy just written takes the other one
+    for (const auto &copy : copies) {
+        if (copy.absoluteFilePath() == QFileInfo(keep).absoluteFilePath()) continue;
+        if (remaining > 0) {
+            --remaining;
+            continue;
+        }
+        QFile::remove(copy.absoluteFilePath());
+    }
 }

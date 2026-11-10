@@ -791,6 +791,8 @@ bool WheelController::importConfig(const QString &urlOrPath)
         }
     }
     if (!commit(imported, true, Persist::Prepared)) return false;
+    // A later import that works must not leave the earlier failure in --status.
+    clearError();
     applyStartOnLogin();
     return true;
 }

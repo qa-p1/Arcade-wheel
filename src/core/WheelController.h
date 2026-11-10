@@ -207,6 +207,9 @@ private:
     QPointF m_origin;
     QPointF m_visualCenter;
     QPointF m_lastPointer;
+    // Where the pointer was when the wheel opened, and whether the wheel moved it.
+    QPointF m_pointerBefore;
+    bool m_pointerWarped = false;
     int m_deckIndex = 0;
     int m_iconGeneration = 0;
     int m_selectedIndex = -1;

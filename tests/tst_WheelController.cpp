@@ -133,7 +133,6 @@ private slots:
         if (how == "release") controller.releaseTrigger();
         else controller.cancelTrigger();
         QVERIFY(!controller.overlayVisible());
-        QEXPECT_FAIL("", "RD-WHEEL-3: the pointer stays at the centre of the screen", Abort);
         QCOMPARE(backend.moves.last(), QPointF(400, 300));
     }
     void anActionThatMovesThePointerIsNotUndone()

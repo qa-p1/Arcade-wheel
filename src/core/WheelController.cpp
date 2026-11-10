@@ -180,6 +180,7 @@ void WheelController::setOverlayView(QQuickView *view)
         m_openClock.restart();
         m_waitingForCenter = m_backend->movePointer(
             QPointF(m_overlay->screen()->geometry().topLeft()) + m_origin);
+        m_pointerWarped = m_waitingForCenter;
         m_lastPointer = m_origin;
         setSelectedIndex(-1);
         m_revealed = true;
@@ -358,6 +359,8 @@ void WheelController::openOverlay()
     if (m_visible || !m_overlay) return;
     m_dispatcher.arcade().refreshClipboard();
     const QPointF cursor = m_backend->cursorPosition();
+    m_pointerBefore = cursor;
+    m_pointerWarped = false;
     QScreen *screen = QGuiApplication::screenAt(cursor.toPoint());
     if (!screen) screen = QGuiApplication::primaryScreen();
     if (!screen) return;
@@ -404,6 +407,12 @@ void WheelController::hideOverlay()
     m_revealOnFrame = false;
     emit overlayRevealedChanged();
     m_waitingForCenter = false;
+    // Put the pointer back where the user had it. This runs before the chosen
+    // action does, so an action that moves the pointer on purpose still wins.
+    if (m_pointerWarped) {
+        m_pointerWarped = false;
+        m_backend->movePointer(m_pointerBefore);
+    }
     // A bounded fallback also closes the surface if the renderer is suspended.
     m_closeTimer.start(240);
     emit overlayVisibleChanged();

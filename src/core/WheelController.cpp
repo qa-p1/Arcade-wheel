@@ -361,8 +361,11 @@ void WheelController::openOverlay()
     const QPointF cursor = m_backend->cursorPosition();
     m_pointerBefore = cursor;
     m_pointerWarped = false;
-    QScreen *screen = QGuiApplication::screenAt(cursor.toPoint());
-    if (!screen) screen = QGuiApplication::primaryScreen();
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    QList<QRect> layout;
+    for (QScreen *candidate : screens) layout.append(candidate->geometry());
+    const int monitor = WheelLogic::screenIndexFor(layout, cursor);
+    QScreen *screen = monitor >= 0 ? screens.at(monitor) : QGuiApplication::primaryScreen();
     if (!screen) return;
     m_closeTimer.stop();
     m_overlay->setScreen(screen);

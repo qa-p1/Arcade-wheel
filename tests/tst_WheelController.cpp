@@ -232,7 +232,6 @@ private slots:
         settings.show();
         QVERIFY(QTest::qWaitForWindowActive(&settings));
         QTest::keyClick(&settings, Qt::Key_Escape);
-        QEXPECT_FAIL("", "WH-1: nothing handles Escape at the top of Settings", Abort);
         QTRY_VERIFY_WITH_TIMEOUT(!settings.isVisible(), 500);
     }
     void escapeInAPopupClosesOnlyThePopup()
@@ -255,7 +254,6 @@ private slots:
         QTRY_VERIFY(!dialog->property("visible").toBool());
         QVERIFY(settings.isVisible()); // the dialog took the key; Settings stays
         QTest::keyClick(&settings, Qt::Key_Escape);
-        QEXPECT_FAIL("", "WH-1: nothing handles Escape at the top of Settings", Abort);
         QTRY_VERIFY_WITH_TIMEOUT(!settings.isVisible(), 500); // now at the top view
     }
     void escapeCancelsADestructiveDialog()

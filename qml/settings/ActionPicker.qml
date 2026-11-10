@@ -383,7 +383,7 @@ T.Popup {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         spacing: Theme.space8
-                        SearchField { id: appSearch; Layout.fillWidth: true; placeholderText: "Search installed applications" }
+                        SearchField { id: appSearch; Layout.fillWidth: true; placeholderText: "Search installed applications"; onEscaped: picker.close() }
                         ListView {
                             id: appList
                             visible: picker.appRows.length > 0
@@ -497,7 +497,7 @@ T.Popup {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         spacing: Theme.space8
-                        SearchField { id: arcadeSearch; Layout.fillWidth: true; placeholderText: "Search Arcade actions" }
+                        SearchField { id: arcadeSearch; Layout.fillWidth: true; placeholderText: "Search Arcade actions"; onEscaped: picker.close() }
                         ListView {
                             id: arcadeList
                             visible: picker.arcadeRows.length > 0

@@ -240,11 +240,14 @@ int main(int argc, char **argv)
     if (!smokeTest && !headlessPlatform && !query) {
         const auto legacy = ArcadeLink::legacyDirs(ArcadeLink::Ids::Wheel);
         if (std::any_of(legacy.begin(), legacy.end(), [](const auto &dir) { return QFileInfo::exists(dir.path); })) {
-            // Before 0.5 the key came from Qt's "Arcade Wheel/Arcade Wheel" config folder.
+            // Before 0.5 the key came from Qt's "Arcade Wheel/Arcade Wheel" config folder,
+            // which the application names no longer resolve to.
+            QString oldConfig;
+            for (const auto &dir : legacy)
+                if (dir.kind == u"config") oldConfig = dir.path;
             QLocalSocket older;
-            older.connectToServer(serverNameFor(instanceKeyFor(
-                QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))));
-            if (older.waitForConnected(150)) {
+            older.connectToServer(serverNameFor(instanceKeyFor(oldConfig)));
+            if (!oldConfig.isEmpty() && older.waitForConnected(150)) {
                 older.write("--quit\n");
                 older.waitForBytesWritten(300);
                 older.waitForDisconnected(5000);

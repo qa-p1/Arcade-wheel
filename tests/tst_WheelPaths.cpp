@@ -54,6 +54,30 @@ private slots:
         QCOMPARE(WheelPaths::migrate(user, "linux"), QString());
         QCOMPARE(read(dirs.settingsFile()), QByteArray(R"({"schemaVersion":4})"));
     }
+    void anOldCacheThatConflictsWithTheNewOneIsRetired()
+    {
+        // The owner's machine: 0.5.0 left Qt's pipeline cache in both places.
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        const auto user = ArcadeLink::UserDirs::under(root.path());
+        const QString oldCache = root.filePath(".cache/Arcade Wheel/Arcade Wheel");
+        write(oldCache + "/qtpipelinecache-x86_64-little_endian-lp64/qqpc_opengl", "old");
+        write(root.filePath(".cache/arcade/wheel/qtpipelinecache-x86_64-little_endian-lp64/qqpc_opengl"), "new");
+        QCOMPARE(WheelPaths::migrate(user, "linux"), QString());
+        QVERIFY(!QFileInfo::exists(root.filePath(".cache/Arcade Wheel")));
+        QCOMPARE(read(root.filePath(".cache/arcade/wheel/qtpipelinecache-x86_64-little_endian-lp64/qqpc_opengl")), QByteArray("new"));
+    }
+    void anOldCacheHoldingLogsIsKeptWhenItConflicts()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        const auto user = ArcadeLink::UserDirs::under(root.path());
+        write(root.filePath(".cache/Arcade Wheel/Arcade Wheel/logs/arcade-wheel.log"), "old log");
+        write(root.filePath(".cache/arcade/wheel/logs/arcade-wheel.log"), "new log");
+        const QString note = WheelPaths::migrate(user, "linux");
+        QVERIFY2(!note.isEmpty(), "a conflict with real files is reported, not deleted");
+        QCOMPARE(read(root.filePath(".cache/Arcade Wheel/Arcade Wheel/logs/arcade-wheel.log")), QByteArray("old log"));
+    }
     void existingSettingsAreNeverOverwritten()
     {
         QTemporaryDir root;
@@ -112,7 +136,6 @@ private slots:
         WheelPaths::applyApplicationIdentity();
 
         const auto dirs = WheelPaths::dirs();
-        QEXPECT_FAIL("", "WH-2: the names are \"Arcade Wheel\"/\"Arcade Wheel\", so Qt uses a second folder", Abort);
         QCOMPARE(QStandardPaths::writableLocation(QStandardPaths::CacheLocation), dirs.cache);
         QCOMPARE(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation), dirs.config);
         QCOMPARE(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation), dirs.data);
@@ -144,8 +167,6 @@ private slots:
         WheelPaths::applyApplicationIdentity();
         const QString qtCache = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
         write(qtCache + "/qtpipelinecache-x86_64-little_endian-lp64/qqpc_opengl", "again");
-
-        QEXPECT_FAIL("", "WH-2: Qt recreates Arcade Wheel/Arcade Wheel after the move", Abort);
         QCOMPARE(QDir(root.filePath(".cache")).entryList(QDir::Dirs | QDir::NoDotAndDotDot), QStringList{"arcade"});
         QVERIFY(QFileInfo::exists(root.filePath(".cache/arcade/wheel/qtpipelinecache-x86_64-little_endian-lp64/qqpc_opengl")));
 

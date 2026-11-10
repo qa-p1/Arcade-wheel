@@ -164,6 +164,22 @@ int main(int argc, char **argv)
                                "Once running, hold the configured shortcut (F8 by default), move toward an action, then release.\n";
         return 0;
     }
+    // CLI-2: anything else is a mistake, not a request to start a resident.
+    static const QStringList commandsWithoutArguments{
+        QStringLiteral("--settings"), QStringLiteral("--background"), QStringLiteral("--show"),     QStringLiteral("--preview"),
+        QStringLiteral("--hide"),     QStringLiteral("--cancel"),     QStringLiteral("--toggle"),   QStringLiteral("--press"),
+        QStringLiteral("--release"),  QStringLiteral("--status"),     QStringLiteral("--restart"),  QStringLiteral("--restarting"),
+        QStringLiteral("--quit"),     QStringLiteral("--smoke-test"), QStringLiteral("--version"),  QStringLiteral("-V"),
+        QStringLiteral("--arcade-manifest")};
+    static const QStringList commandsWithOptions{QStringLiteral("--settings-export"), QStringLiteral("--settings-import"),
+                                                 QStringLiteral("--install"), QStringLiteral("--uninstall"), QStringLiteral("--repair"),
+                                                 QStringLiteral("--integration-status"), QStringLiteral("--menu")};
+    if (!cliArguments.isEmpty() && !commandsWithOptions.contains(command) &&
+        (!commandsWithoutArguments.contains(command) || cliArguments.size() > 1)) {
+        QTextStream(stderr) << "arcade-wheel: unknown argument " << (commandsWithoutArguments.contains(command) ? cliArguments.at(1) : command)
+                            << "\nTry arcade-wheel --help.\n";
+        return 2;
+    }
     if (command == QStringLiteral("--version") || command == QStringLiteral("-V")) {
         QTextStream(stdout) << "Arcade Wheel " << ARCADE_VERSION << '\n';
         return 0;
@@ -318,12 +334,12 @@ int main(int argc, char **argv)
         }
         if (command == QStringLiteral("--release") || command == QStringLiteral("--cancel") || command == QStringLiteral("--hide") || command == QStringLiteral("--quit")) return 0;
         if (command == QStringLiteral("--status")) {
-            // One line of JSON either way (STANDARD §10); exit status 1 when not running.
+            // One line of JSON either way (CLI-1); exit status 3 when not running.
             QTextStream(stdout) << QJsonDocument(QJsonObject{{QStringLiteral("running"), false},
                                                              {QStringLiteral("version"), QStringLiteral(ARCADE_VERSION)}})
                                        .toJson(QJsonDocument::Compact)
                                 << '\n';
-            return 1;
+            return 3; // the LSB status code for "not running" (CLI-1)
         }
     }
 

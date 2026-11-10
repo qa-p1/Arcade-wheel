@@ -15,6 +15,8 @@ in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everyt
 - 437e2e9 fix RD-WHEEL-3 (pointer restore). **not run** (controller test needs Qt 6.8).
 - b2160fd monitor placement function + test. **tested locally** (tst_WheelLogic, 42 pass).
 
+- CLI-1/CLI-2: unknown arguments exit 2 with usage, `--status` exits 3 when not running; `tests/cli-contract.py`. **not run** (needs a Qt 6.8 build; CI).
+
 Open: CLI-2 (unknown argument), --status exit code 3, crash reports, unpacked relaunch, WH1, desktop harness test, CI, notices, SECURITY, CHANGELOG, untangle.
 
 ## Step 0 - brief

@@ -17,6 +17,8 @@ in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everyt
 
 - CLI-1/CLI-2: unknown arguments exit 2 with usage, `--status` exits 3 when not running; `tests/cli-contract.py`. **not run** (needs a Qt 6.8 build; CI).
 
+- Step 3 repo files: SECURITY.md, THIRD_PARTY_NOTICES.md (Qt LGPL relinking), Dependabot, dev.arcade.Wheel icons and symbolic tray svg in packaging/linux, CHANGELOG Unreleased. Documents; not run. SECURITY.md cites `tests/crash-report.py` (to be written with crash reports).
+
 Open: CLI-2 (unknown argument), --status exit code 3, crash reports, unpacked relaunch, WH1, desktop harness test, CI, notices, SECURITY, CHANGELOG, untangle.
 
 ## Step 0 - brief

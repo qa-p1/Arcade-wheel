@@ -1,6 +1,7 @@
 #include "core/IconImageProvider.h"
 #include "core/IconTheme.h"
 #include "core/CommandReply.h"
+#include "core/CrashReport.h"
 #include "core/WheelController.h"
 #include "core/WheelPaths.h"
 #include "link/WheelLink.h"
@@ -358,6 +359,7 @@ int main(int argc, char **argv)
     // Started at login or by Tools, stderr often goes to /dev/null: keep
     // Qt's warnings in the log folder the manifest advertises instead.
     ArcadeLink::captureStderr(WheelPaths::logsDir(), QStringLiteral("arcade-wheel"));
+    CrashReport::install(WheelPaths::dirs().data + QStringLiteral("/crashes"), QStringLiteral(ARCADE_VERSION));
     if (!migrationNote.isEmpty()) qWarning("%s", qPrintable(migrationNote));
 
 #ifdef Q_OS_WIN

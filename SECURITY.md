@@ -15,7 +15,7 @@ promote path.
 | Link | Arcade Link's sockets are 0600 in a 0700 folder and now also check the peer's user id. | Link's vendored tests (`ReleasedLink*`) |
 | Actions | A command action runs the program you configured, with no shell; other Arcade apps' actions are shown with what they send out before you save them. | `tests/tst_ActionDispatcher.cpp` |
 | Install | Integration files are written from a receipt; foreign files are never overwritten or removed. | `tests/tst_AppInstaller.cpp` |
-| Crash reports | Written locally under `arcade/wheel/crashes`, never sent. | `tests/crash-report.py` |
+| Crash reports | Written locally under `arcade/wheel/crashes`, never sent. | `tests/tst_CrashReport.cpp` |
 
 ## Dependencies
 

@@ -25,6 +25,7 @@ add_library(arcade_core STATIC
     src/core/WheelLogic.h src/core/WheelLogic.cpp
     src/core/WheelController.h src/core/WheelController.cpp
     src/core/WheelPaths.h src/core/WheelPaths.cpp
+    src/core/CrashReport.h src/core/CrashReport.cpp
     src/core/IconImageProvider.h src/core/IconImageProvider.cpp
     src/core/IconTheme.h src/core/IconTheme.cpp
     src/actions/ActionDispatcher.h src/actions/ActionDispatcher.cpp
@@ -180,7 +181,7 @@ endif()
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
-    foreach(test_name IN ITEMS WheelLogic ConfigStore ActionDispatcher WheelController CommandReply WheelPaths)
+    foreach(test_name IN ITEMS WheelLogic ConfigStore ActionDispatcher WheelController CommandReply WheelPaths CrashReport)
         qt_add_executable(test_${test_name} tests/tst_${test_name}.cpp)
         target_link_libraries(test_${test_name} PRIVATE arcade_core Qt6::Test)
         add_test(NAME ${test_name} COMMAND test_${test_name})

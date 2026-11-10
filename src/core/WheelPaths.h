@@ -10,6 +10,11 @@
 // on macOS. Before 0.5 they were Qt's "Arcade Wheel/Arcade Wheel" folders.
 namespace WheelPaths {
 
+// The organisation and application names Qt builds its own folders from (the
+// scenegraph's pipeline cache, QSettings). They must resolve to the same
+// folders as dirs(), or Qt writes a second tree next to them (WH-2).
+void applyApplicationIdentity();
+
 ArcadeLink::AppDirs dirs();
 QString settingsFile();
 QString cacheDir();

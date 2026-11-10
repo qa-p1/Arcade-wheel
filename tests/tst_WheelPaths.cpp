@@ -91,6 +91,71 @@ private slots:
         QSKIP("Linux folder names");
 #endif
     }
+    // WH-2 / RD-WHEEL-1: Qt's own cache (the scenegraph pipeline cache) is
+    // written to CacheLocation, which comes from the organisation and
+    // application names. It must be the folder Wheel uses, so an upgrade
+    // leaves one cache tree and Qt does not recreate "Arcade Wheel/Arcade Wheel".
+    void qtWritesItsCacheIntoTheOneWheelFolder()
+    {
+#ifdef Q_OS_LINUX
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        const QByteArray savedCache = qgetenv("XDG_CACHE_HOME");
+        const QByteArray savedConfig = qgetenv("XDG_CONFIG_HOME");
+        const QByteArray savedData = qgetenv("XDG_DATA_HOME");
+        qputenv("XDG_CACHE_HOME", root.filePath(".cache").toUtf8());
+        qputenv("XDG_CONFIG_HOME", root.filePath(".config").toUtf8());
+        qputenv("XDG_DATA_HOME", root.filePath(".local/share").toUtf8());
+        const QString oldName = QCoreApplication::applicationName();
+        const QString oldOrg = QCoreApplication::organizationName();
+        const QString oldDomain = QCoreApplication::organizationDomain();
+        WheelPaths::applyApplicationIdentity();
+
+        const auto dirs = WheelPaths::dirs();
+        QEXPECT_FAIL("", "WH-2: the names are \"Arcade Wheel\"/\"Arcade Wheel\", so Qt uses a second folder", Abort);
+        QCOMPARE(QStandardPaths::writableLocation(QStandardPaths::CacheLocation), dirs.cache);
+        QCOMPARE(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation), dirs.config);
+        QCOMPARE(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation), dirs.data);
+
+        QCoreApplication::setApplicationName(oldName);
+        QCoreApplication::setOrganizationName(oldOrg);
+        QCoreApplication::setOrganizationDomain(oldDomain);
+        for (const auto &[name, value] : {std::pair{"XDG_CACHE_HOME", savedCache}, std::pair{"XDG_CONFIG_HOME", savedConfig}, std::pair{"XDG_DATA_HOME", savedData}})
+            value.isEmpty() ? qunsetenv(name) : qputenv(name, value);
+#else
+        QSKIP("Linux folder names");
+#endif
+    }
+    void anUpgradeLeavesOneCacheFolderEvenAfterQtHasWritten()
+    {
+#ifdef Q_OS_LINUX
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        const QByteArray savedCache = qgetenv("XDG_CACHE_HOME");
+        qputenv("XDG_CACHE_HOME", root.filePath(".cache").toUtf8());
+        const QString oldName = QCoreApplication::applicationName();
+        const QString oldOrg = QCoreApplication::organizationName();
+        // 0.5.0 left Qt's pipeline cache in the doubled folder.
+        write(root.filePath(".cache/Arcade Wheel/Arcade Wheel/qtpipelinecache-x86_64-little_endian-lp64/qqpc_opengl"), "cache");
+
+        const auto user = ArcadeLink::UserDirs::under(root.path());
+        QCOMPARE(WheelPaths::migrate(user, "linux"), QString());
+        // The next start: Qt draws a window and writes its pipeline cache.
+        WheelPaths::applyApplicationIdentity();
+        const QString qtCache = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+        write(qtCache + "/qtpipelinecache-x86_64-little_endian-lp64/qqpc_opengl", "again");
+
+        QEXPECT_FAIL("", "WH-2: Qt recreates Arcade Wheel/Arcade Wheel after the move", Abort);
+        QCOMPARE(QDir(root.filePath(".cache")).entryList(QDir::Dirs | QDir::NoDotAndDotDot), QStringList{"arcade"});
+        QVERIFY(QFileInfo::exists(root.filePath(".cache/arcade/wheel/qtpipelinecache-x86_64-little_endian-lp64/qqpc_opengl")));
+
+        QCoreApplication::setApplicationName(oldName);
+        QCoreApplication::setOrganizationName(oldOrg);
+        savedCache.isEmpty() ? qunsetenv("XDG_CACHE_HOME") : qputenv("XDG_CACHE_HOME", savedCache);
+#else
+        QSKIP("Linux folder names");
+#endif
+    }
 };
 
 QTEST_GUILESS_MAIN(WheelPathsTest)

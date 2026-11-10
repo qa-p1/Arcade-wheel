@@ -117,9 +117,7 @@ int main(int argc, char **argv)
     // lightest fallback for anything it does not cover.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QApplication app(argc, argv);
-    QCoreApplication::setOrganizationName(QStringLiteral("Arcade Wheel"));
-    QCoreApplication::setOrganizationDomain(QStringLiteral("arcadewheel.org"));
-    QCoreApplication::setApplicationName(QStringLiteral("Arcade Wheel"));
+    WheelPaths::applyApplicationIdentity();
     QCoreApplication::setApplicationVersion(QStringLiteral(ARCADE_VERSION));
     app.setQuitOnLastWindowClosed(false);
     // The OS identifier (STANDARD §10): Wayland app_id, the desktop file and

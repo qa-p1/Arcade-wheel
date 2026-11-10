@@ -2,6 +2,7 @@
 
 #include <ArcadeLink.h>
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QStringList>
@@ -9,6 +10,13 @@
 namespace WheelPaths {
 namespace {
 const QString kAppId = QStringLiteral("arcade.wheel");
+}
+
+void applyApplicationIdentity()
+{
+    QCoreApplication::setOrganizationName(QStringLiteral("Arcade Wheel"));
+    QCoreApplication::setOrganizationDomain(QStringLiteral("arcadewheel.org"));
+    QCoreApplication::setApplicationName(QStringLiteral("Arcade Wheel"));
 }
 
 ArcadeLink::AppDirs dirs() { return ArcadeLink::appDirs(kAppId); }

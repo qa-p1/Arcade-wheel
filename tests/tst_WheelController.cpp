@@ -30,7 +30,12 @@ public:
         return shortcut == "Volume Mute" ? QStringLiteral("Volume Mute is already used") : QString();
     }
     bool prepareOverlay(QQuickWindow *, QString *) override { return true; }
-    QPointF cursorPosition() const override { return {5, 5}; }
+    QPointF cursorPosition() const override { return cursor; }
+    bool movePointer(const QPointF &position) override
+    {
+        moves << position;
+        return true;
+    }
     QVector<DiscoveredApplication> applications() const override
     {
         return {{"test.desktop", "Test app", {}, {}, {}}, {"second.desktop", "Second", {}, {}, {}}, {"third.desktop", "Third", {}, {}, {}}, {"fourth.desktop", "Fourth", {}, {}, {}}, {"fifth.desktop", "Fifth", {}, {}, {}}};
@@ -45,6 +50,8 @@ public:
     bool performSystemAction(const QString &id, QString *) override
     {
         systemActions << id;
+        // An action that moves the pointer on purpose.
+        if (id == QStringLiteral("test:warp")) moves << QPointF(9, 9);
         return true;
     }
     bool setStartOnLogin(bool enabled, QString *error) override
@@ -59,6 +66,8 @@ public:
     bool startOnLogin() const override { return login; }
     void setShortcutRecording(bool enabled) override { recording = enabled; }
     bool recording = false;
+    QPointF cursor{5, 5};
+    QList<QPointF> moves;
     int launches = 0;
     QStringList launchedIds;
     int configures = 0;
@@ -86,6 +95,198 @@ class WheelControllerTest final : public QObject {
         controller.centerReleased(controller.visualCenterX(), controller.visualCenterY());
     }
 private slots:
+    // ---- Pointer (RD-WHEEL-3) -------------------------------------------------
+
+    void theWheelWarpsThePointerToItsCentreOnOpen()
+    {
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        backend.cursor = {400, 300};
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        QQuickView view;
+        controller.setOverlayView(&view);
+        controller.showWheel();
+        QTRY_VERIFY(!backend.moves.isEmpty());
+        QVERIFY(backend.moves.first() != QPointF(400, 300));
+    }
+    void closingTheWheelPutsThePointerBack_data()
+    {
+        QTest::addColumn<QString>("how");
+        QTest::newRow("cancel") << "cancel";
+        QTest::newRow("release in the middle") << "release";
+        QTest::newRow("hide command") << "hide";
+    }
+    void closingTheWheelPutsThePointerBack()
+    {
+        QFETCH(QString, how);
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        backend.cursor = {400, 300};
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        QQuickView view;
+        controller.setOverlayView(&view);
+        if (how == "release") controller.pressTrigger();
+        else controller.showWheel();
+        QTRY_VERIFY(!backend.moves.isEmpty());
+        if (how == "release") controller.releaseTrigger();
+        else controller.cancelTrigger();
+        QVERIFY(!controller.overlayVisible());
+        QEXPECT_FAIL("", "RD-WHEEL-3: the pointer stays at the centre of the screen", Abort);
+        QCOMPARE(backend.moves.last(), QPointF(400, 300));
+    }
+    void anActionThatMovesThePointerIsNotUndone()
+    {
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        backend.cursor = {400, 300};
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        const QString deck = controller.currentDeck().value("id").toString();
+        QVERIFY(controller.setAction(deck, 0, {{"type", "system"}, {"name", "Warp"}, {"payload", QVariantMap{{"id", "test:warp"}}}}));
+        QQuickView view;
+        controller.setOverlayView(&view);
+        controller.pressTrigger();
+        QTRY_VERIFY(!backend.moves.isEmpty());
+        controller.pointerMoved(controller.visualCenterX(), controller.visualCenterY() - 160);
+        QCOMPARE(controller.selectedIndex(), 0);
+        controller.releaseTrigger();
+        QTRY_COMPARE(backend.systemActions, QStringList{"test:warp"});
+        QCOMPARE(backend.moves.last(), QPointF(9, 9));
+    }
+    void aWheelThatNeverMovedThePointerRestoresNothing()
+    {
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        QQuickView view;
+        controller.setOverlayView(&view);
+        controller.cancelTrigger();
+        QVERIFY(backend.moves.isEmpty());
+    }
+
+    // ---- Import through the controller (WH-4, WH-6) ---------------------------
+
+    void aRefusedImportKeepsEveryDeck()
+    {
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        controller.createDeck();
+        QCOMPARE(controller.deckCount(), 2);
+        const auto before = controller.config().value("decks");
+        const QString bad = dir.filePath("bad.json");
+        QFile file(bad);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(R"({"schemaVersion":4,"decks":"nope"})");
+        file.close();
+        const bool accepted = controller.importConfig(bad);
+        QEXPECT_FAIL("", "WH-6: the user's decks are replaced by a default deck", Abort);
+        QVERIFY(!accepted);
+        QVERIFY(!controller.lastError().isEmpty());
+        QCOMPARE(controller.config().value("decks"), before);
+        QCOMPARE(controller.deckCount(), 2);
+    }
+    void aSuccessfulImportClearsTheLastError()
+    {
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        QVERIFY(!controller.importConfig(dir.filePath("missing.json")));
+        QVERIFY(!controller.lastError().isEmpty());
+        const QString good = dir.filePath("good.json");
+        QVERIFY(controller.exportConfig(good));
+        QVERIFY(controller.importConfig(good));
+        QEXPECT_FAIL("", "WH-4: --status keeps the error of an earlier failed import", Abort);
+        QVERIFY2(controller.lastError().isEmpty(), qPrintable(controller.lastError()));
+    }
+    void nonObjectJsonIsNotReportedAsNoError()
+    {
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        const QString path = dir.filePath("array.json");
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("[1,2,3]");
+        file.close();
+        QVERIFY(!controller.importConfig(path));
+        QEXPECT_FAIL("", "WH-4: \"Invalid JSON: no error occurred\"", Abort);
+        QVERIFY2(!controller.lastError().contains("no error occurred"), qPrintable(controller.lastError()));
+    }
+
+    // ---- Escape (WH-1, WH-5) ---------------------------------------------------
+
+    void escapeClosesSettingsAtTheTopView()
+    {
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        QQuickView settings;
+        settings.setInitialProperties({{"controller", QVariant::fromValue(&controller)}});
+        settings.loadFromModule("ArcadeWheel", "SettingsWindow");
+        QCOMPARE(settings.status(), QQuickView::Ready);
+        settings.show();
+        QVERIFY(QTest::qWaitForWindowActive(&settings));
+        QTest::keyClick(&settings, Qt::Key_Escape);
+        QEXPECT_FAIL("", "WH-1: nothing handles Escape at the top of Settings", Abort);
+        QTRY_VERIFY_WITH_TIMEOUT(!settings.isVisible(), 500);
+    }
+    void escapeInAPopupClosesOnlyThePopup()
+    {
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        QQuickView settings;
+        settings.setInitialProperties({{"controller", QVariant::fromValue(&controller)}});
+        settings.loadFromModule("ArcadeWheel", "SettingsWindow");
+        QCOMPARE(settings.status(), QQuickView::Ready);
+        settings.show();
+        QVERIFY(QTest::qWaitForWindowActive(&settings));
+        auto *dialog = settings.rootObject()->findChild<QObject *>("resetDialog");
+        QVERIFY(dialog);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QTest::keyClick(&settings, Qt::Key_Escape);
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QVERIFY(settings.isVisible()); // the dialog took the key; Settings stays
+        QTest::keyClick(&settings, Qt::Key_Escape);
+        QEXPECT_FAIL("", "WH-1: nothing handles Escape at the top of Settings", Abort);
+        QTRY_VERIFY_WITH_TIMEOUT(!settings.isVisible(), 500); // now at the top view
+    }
+    void escapeCancelsADestructiveDialog()
+    {
+        // WH-5: the kit's destructive dialogs ignored Escape (NoAutoClose).
+        QTemporaryDir dir;
+        ControllerBackend backend;
+        WheelController controller(&backend, nullptr, dir.filePath("config.json"));
+        controller.initialize();
+        controller.createDeck();
+        QQuickView settings;
+        settings.setInitialProperties({{"controller", QVariant::fromValue(&controller)}});
+        settings.loadFromModule("ArcadeWheel", "SettingsWindow");
+        QCOMPARE(settings.status(), QQuickView::Ready);
+        settings.show();
+        QVERIFY(QTest::qWaitForWindowActive(&settings));
+        auto *dialog = settings.rootObject()->findChild<QObject *>("resetDialog");
+        QVERIFY(dialog);
+        QVERIFY(dialog->property("destructive").toBool());
+        const int decks = controller.deckCount();
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QTRY_VERIFY(dialog->property("visible").toBool());
+        QTest::keyClick(&settings, Qt::Key_Escape);
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QCOMPARE(controller.deckCount(), decks); // cancelled, nothing was reset
+        QVERIFY(settings.isVisible());
+    }
+
     void doubleClickLaunchesWholeGroupOnce()
     {
         QTemporaryDir dir;

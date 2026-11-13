@@ -71,9 +71,9 @@ QJsonObject readJson(const QString &path, QString *error, qint64 maxBytes)
 
 const QStringList &actionTypes()
 {
-    static const QStringList types{QStringLiteral("none"),   QStringLiteral("application"), QStringLiteral("command"), QStringLiteral("url"),
-                                   QStringLiteral("file"),   QStringLiteral("system"),      QStringLiteral("media"),   QStringLiteral("desktop"),
-                                   QStringLiteral("arcade"), QStringLiteral("plugin"),      QStringLiteral("arcade_box")};
+    static const QStringList types{QStringLiteral("none"), QStringLiteral("application"), QStringLiteral("command"), QStringLiteral("url"),
+                                   QStringLiteral("file"), QStringLiteral("system"), QStringLiteral("media"), QStringLiteral("desktop"),
+                                   QStringLiteral("arcade"), QStringLiteral("plugin"), QStringLiteral("arcade_box")};
     return types;
 }
 
@@ -163,11 +163,20 @@ struct NumberRange {
     double high;
 };
 constexpr NumberRange kNumberRanges[] = {
-    {"appearance", "radius", 110, 240},        {"appearance", "scale", 0.75, 1.3},  {"appearance", "centerRadius", 36, 72},
-    {"appearance", "cardSize", 66, 110},       {"appearance", "gap", 4, 24},        {"appearance", "iconSize", 24, 42},
-    {"appearance", "opacity", 0.45, 1},        {"appearance", "dim", 0, 0.3},       {"appearance", "selectedScale", 1, 1.12},
-    {"appearance", "animationSpeed", 0.5, 1.5}, {"behaviour", "deadZone", 20, 180}, {"behaviour", "selectionSensitivity", 0.5, 2},
-    {"behaviour", "scrollCooldownMs", 0, 500}, {"trigger", "holdThresholdMs", 0, 1000},
+    {"appearance", "radius", 110, 240},
+    {"appearance", "scale", 0.75, 1.3},
+    {"appearance", "centerRadius", 36, 72},
+    {"appearance", "cardSize", 66, 110},
+    {"appearance", "gap", 4, 24},
+    {"appearance", "iconSize", 24, 42},
+    {"appearance", "opacity", 0.45, 1},
+    {"appearance", "dim", 0, 0.3},
+    {"appearance", "selectedScale", 1, 1.12},
+    {"appearance", "animationSpeed", 0.5, 1.5},
+    {"behaviour", "deadZone", 20, 180},
+    {"behaviour", "selectionSensitivity", 0.5, 2},
+    {"behaviour", "scrollCooldownMs", 0, 500},
+    {"trigger", "holdThresholdMs", 0, 1000},
 };
 
 // A value of the wrong type becomes the default; a number outside the
@@ -568,9 +577,9 @@ bool ConfigStore::validateImport(const QJsonObject &raw, QString *error)
         if (error) *error = why;
         return false;
     };
-    static const QStringList known{QStringLiteral("schemaVersion"), QStringLiteral("general"),   QStringLiteral("link"),
-                                   QStringLiteral("trigger"),       QStringLiteral("appearance"), QStringLiteral("behaviour"),
-                                   QStringLiteral("decks"),         QStringLiteral("pages"),      QStringLiteral("centerGestures")};
+    static const QStringList known{QStringLiteral("schemaVersion"), QStringLiteral("general"), QStringLiteral("link"),
+                                   QStringLiteral("trigger"), QStringLiteral("appearance"), QStringLiteral("behaviour"),
+                                   QStringLiteral("decks"), QStringLiteral("pages"), QStringLiteral("centerGestures")};
     if (std::none_of(known.begin(), known.end(), [&](const QString &key) { return raw.contains(key); }))
         return fail(QStringLiteral("This is not an Arcade Wheel settings file: it has no settings or decks."));
     if (raw.contains(QStringLiteral("schemaVersion"))) {

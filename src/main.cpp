@@ -168,10 +168,10 @@ int main(int argc, char **argv)
     }
     // CLI-2: anything else is a mistake, not a request to start a resident.
     static const QStringList commandsWithoutArguments{
-        QStringLiteral("--settings"), QStringLiteral("--background"), QStringLiteral("--show"),     QStringLiteral("--preview"),
-        QStringLiteral("--hide"),     QStringLiteral("--cancel"),     QStringLiteral("--toggle"),   QStringLiteral("--press"),
-        QStringLiteral("--release"),  QStringLiteral("--status"),     QStringLiteral("--restart"),  QStringLiteral("--restarting"),
-        QStringLiteral("--quit"),     QStringLiteral("--smoke-test"), QStringLiteral("--version"),  QStringLiteral("-V"),
+        QStringLiteral("--settings"), QStringLiteral("--background"), QStringLiteral("--show"), QStringLiteral("--preview"),
+        QStringLiteral("--hide"), QStringLiteral("--cancel"), QStringLiteral("--toggle"), QStringLiteral("--press"),
+        QStringLiteral("--release"), QStringLiteral("--status"), QStringLiteral("--restart"), QStringLiteral("--restarting"),
+        QStringLiteral("--quit"), QStringLiteral("--smoke-test"), QStringLiteral("--version"), QStringLiteral("-V"),
         QStringLiteral("--arcade-manifest")};
     static const QStringList commandsWithOptions{QStringLiteral("--settings-export"), QStringLiteral("--settings-import"),
                                                  QStringLiteral("--install"), QStringLiteral("--uninstall"), QStringLiteral("--repair"),

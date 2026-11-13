@@ -459,10 +459,10 @@ private slots:
     {
         QTemporaryDir dir;
         const QString path = writeBytes(dir, "long.json", settingsWith([](QJsonObject &config) {
-            auto deck = firstDeck(config);
-            deck.insert("name", QString(1000, QLatin1Char('B')));
-            setFirstDeck(config, deck);
-        }));
+                                            auto deck = firstDeck(config);
+                                            deck.insert("name", QString(1000, QLatin1Char('B')));
+                                            setFirstDeck(config, deck);
+                                        }));
         QJsonObject imported;
         QString error;
         const bool accepted = ConfigStore(dir.filePath("settings.json")).importFrom(path, &imported, &error);
@@ -475,15 +475,15 @@ private slots:
         // A settings.json written before the limits existed still loads, with names cut.
         QTemporaryDir dir;
         const QString path = writeBytes(dir, "settings.json", settingsWith([](QJsonObject &config) {
-            auto deck = firstDeck(config);
-            deck.insert("name", QString(300000, QLatin1Char('C')));
-            auto actions = deck.value("actions").toArray();
-            auto action = actions.first().toObject();
-            action.insert("name", QString(300000, QLatin1Char('D')));
-            actions[0] = action;
-            deck.insert("actions", actions);
-            setFirstDeck(config, deck);
-        }));
+                                            auto deck = firstDeck(config);
+                                            deck.insert("name", QString(300000, QLatin1Char('C')));
+                                            auto actions = deck.value("actions").toArray();
+                                            auto action = actions.first().toObject();
+                                            action.insert("name", QString(300000, QLatin1Char('D')));
+                                            actions[0] = action;
+                                            deck.insert("actions", actions);
+                                            setFirstDeck(config, deck);
+                                        }));
         QString error;
         const QJsonObject loaded = ConfigStore(path).load({}, &error);
         const QJsonObject deck = firstDeck(loaded);
@@ -550,10 +550,10 @@ private slots:
     {
         QTemporaryDir dir;
         const QString path = writeBytes(dir, "ok.json", settingsWith([](QJsonObject &config) {
-            auto deck = firstDeck(config);
-            deck.insert("name", QStringLiteral("Café ☕ 日本語"));
-            setFirstDeck(config, deck);
-        }));
+                                            auto deck = firstDeck(config);
+                                            deck.insert("name", QStringLiteral("Café ☕ 日本語"));
+                                            setFirstDeck(config, deck);
+                                        }));
         QJsonObject imported;
         QString error;
         QVERIFY2(ConfigStore(dir.filePath("settings.json")).importFrom(path, &imported, &error), qPrintable(error));

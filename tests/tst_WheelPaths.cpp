@@ -143,7 +143,8 @@ private slots:
         QCoreApplication::setApplicationName(oldName);
         QCoreApplication::setOrganizationName(oldOrg);
         QCoreApplication::setOrganizationDomain(oldDomain);
-        for (const auto &[name, value] : {std::pair{"XDG_CACHE_HOME", savedCache}, std::pair{"XDG_CONFIG_HOME", savedConfig}, std::pair{"XDG_DATA_HOME", savedData}})
+        for (const auto &[name, value] : {std::pair{"XDG_CACHE_HOME", savedCache}, std::pair{"XDG_CONFIG_HOME", savedConfig}, std::pair { "XDG_DATA_HOME",
+                                                                                                                                          savedData }})
             value.isEmpty() ? qunsetenv(name) : qputenv(name, value);
 #else
         QSKIP("Linux folder names");

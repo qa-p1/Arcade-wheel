@@ -50,13 +50,14 @@
 
 Q_IMPORT_QML_PLUGIN(ArcadePlugin)
 Q_IMPORT_QML_PLUGIN(ArcadeWheelPlugin)
-#ifdef __GLIBC__
-#include <malloc.h>
-#endif
+#include "link/qt/arcade_trim.h"
+
+// Freed heap and clean file pages back to the system (memory item W0):
+// after startup, after the wheel hides and after a released window.
 static void releaseFreedHeap()
 {
-#ifdef __GLIBC__
-    malloc_trim(0);
+#if defined(__GLIBC__)
+    arcade_trim();
 #endif
 }
 
@@ -432,6 +433,12 @@ int main(int argc, char **argv)
     if (appIcon.isNull()) appIcon = QIcon::fromTheme(QStringLiteral("applications-system"));
     app.setWindowIcon(appIcon);
 
+    // Trim once the wheel has been hidden for a moment (W0); a reopen in the
+    // meantime cancels it. Declared before the view, which reports itself
+    // hidden when destroyed at exit.
+    QTimer trimAfterHide;
+    trimAfterHide.setSingleShot(true);
+    trimAfterHide.setInterval(2000);
     QQuickView overlay;
     overlay.setColor(Qt::transparent);
     overlay.setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint |
@@ -442,6 +449,13 @@ int main(int argc, char **argv)
     overlay.loadFromModule("ArcadeWheel", "Overlay");
     if (overlay.status() == QQuickView::Error) return 1;
     controller.setOverlayView(&overlay);
+    QObject::connect(&trimAfterHide, &QTimer::timeout, &app, [&] {
+        if (!overlay.isVisible()) releaseFreedHeap();
+    });
+    QObject::connect(&overlay, &QWindow::visibleChanged, &app, [&](bool visible) {
+        if (visible) trimAfterHide.stop();
+        else trimAfterHide.start();
+    });
     // Inter at 13 px (the kit's body size) for every window, Qt Widgets menus
     // and dialogs included. The kit's Fonts singleton has already loaded it
     // from the resources.
@@ -657,6 +671,8 @@ int main(int argc, char **argv)
     // handler existed, and Qt does not announce it again: answer it once the
     // event loop runs.
     QTimer::singleShot(0, &app, acceptCommands);
+    // Startup touched far more pages than an idle resident keeps (W0).
+    trimAfterHide.start();
     if (smokeTest) {
         QTimer::singleShot(0, &app, showSettings);
         QTimer::singleShot(1500, &app, [&] {

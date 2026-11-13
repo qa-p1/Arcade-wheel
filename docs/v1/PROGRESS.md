@@ -21,6 +21,11 @@ in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everyt
 - WH1 (software renderer) is not switched: the spec allows it only if the open animation and frame time stay equal,
   and CI's llvmpipe can't show that for a real GPU. Needs a measured comparison on a real session first (D-entry).
 - Waiting on Link v1.0.7: re-vendor `qt/` and leave `LEGACY_PENDING` (fleet rule "One launcher per app").
+- First PR CI run (2725f33): Linux and Windows `scripts/check` failed on two things the authoring sandbox could not
+  run: clang-format 18 (ConfigStore.cpp, main.cpp, two tests) and the zero-warning qmllint gate
+  (`SettingsWindow.qml` read `cursorPosition` on a `QQuickItem`). Fixed in 2156d37 and 12f3869 (the Escape handler
+  now checks `instanceof TextInput || TextEdit`); format, qmllint gate, vendor, docs, shortcut and release checks and
+  all 21 tests pass locally (clang-format 18.1.8 from pip, Qt 6.12).
 
 ## Step 1-2 - behaviour lock and P0/P1 fixes
 - ab7f123 build: vendor Link v1.0.6 (carries WH-5). **tested locally**: `packaging/check-link-vendor.py --source`, `check-vendored-tools.py --source` pass.

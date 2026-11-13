@@ -6,6 +6,22 @@ Qt 6.8 is not installed in the authoring sandbox (Qt 6.4.2 only, no network inst
 the QML and the QtTest suite could not run there. Code that does not need Qt Quick was built and run against Qt 6.4
 in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everything else is **not run** until CI.
 
+## 2026-11-13 - local build and test pass, W0, CI1 (PR #17)
+
+- The whole branch now **builds and passes locally** against Qt 6.12 (owner's PC): `cmake -DBUILD_TESTING=ON
+  -DWHEEL_WARNINGS_AS_ERRORS=ON -DARCADE_REQUIRE_LAYERSHELLQT=OFF`, then `ctest` with `QT_QPA_PLATFORM=offscreen
+  QT_QUICK_BACKEND=software` in a clean environment (`env -i`, temporary HOME and runtime dir): 21 of 21 pass,
+  including the controller and QML tests that were "not run" above. Run inside a Hyprland session's environment,
+  five WheelController tests fail (the Hyprland variables leak into them); CI and a clean environment are unaffected,
+  noted as a test-isolation item for the untangle step.
+- [PR #17](https://github.com/qa-p1/Arcade-wheel/pull/17) opened for CI on Linux, Windows and macOS.
+- cf4109c ci: timeouts and retries on every network step (CI1; the Qt install cache was already on).
+- 4e08f1e perf: `arcade_trim()` (vendored Link C twin of `runtime::trim`) after startup and 2 s after each hide (W0).
+  The old `malloc_trim` call sites (Settings and Activity release) use it too.
+- WH1 (software renderer) is not switched: the spec allows it only if the open animation and frame time stay equal,
+  and CI's llvmpipe can't show that for a real GPU. Needs a measured comparison on a real session first (D-entry).
+- Waiting on Link v1.0.7: re-vendor `qt/` and leave `LEGACY_PENDING` (fleet rule "One launcher per app").
+
 ## Step 1-2 - behaviour lock and P0/P1 fixes
 - ab7f123 build: vendor Link v1.0.6 (carries WH-5). **tested locally**: `packaging/check-link-vendor.py --source`, `check-vendored-tools.py --source` pass.
 - 9890aff test: every P1 finding as QEXPECT_FAIL. ConfigStore/WheelPaths/WheelLogic tests **tested locally** in a Qt 6.4 harness (xfail confirmed against the old code). Controller/QML tests **not run** (need Qt 6.8).

@@ -65,7 +65,7 @@ Rectangle {
         const win = root.Window.window;
         const focused = win ? win.activeFocusItem : null;
         event.accepted = true;
-        if (focused && focused !== root && typeof focused.cursorPosition === "number") root.forceActiveFocus();
+        if (focused && focused !== root && (focused instanceof TextInput || focused instanceof TextEdit)) root.forceActiveFocus();
         else if (win) win.close();
     }
     Connections {

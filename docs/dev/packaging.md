@@ -32,7 +32,7 @@ python3 scripts/validate_shortcuts.py docs/user/shortcuts.json --manifest tests/
 python3 -m unittest discover -s tests -p 'test_release.py' -v
 ```
 
-No repository secrets are needed for unsigned builds. Build jobs have read-only repository permissions; only the publish job in `release.yml` and `tag.yml` get `contents: write`. The built-in `GITHUB_TOKEN` publishes releases and creates tags without triggering another run. GitHub Actions must be enabled. Actions and downloaded Linux packaging tools/dependency sources are pinned to revisions or checksums. Qt is fixed at 6.8.3; upgrade Qt and rebuild LayerShellQt together because the latter uses Qt's private API.
+Builds need no repository secrets. `promote.yml` and `nightly.yml` sign `manifest.json` with the `ARCADE_UPDATE_SIGNING_KEY` secret and publish nothing without it. Build jobs have read-only repository permissions; only the publish jobs and `tag.yml` get `contents: write`, and `tag.yml` also `actions: write` to start `release.yml` on the tag it made (a tag pushed with the built-in `GITHUB_TOKEN` triggers no run by itself). GitHub Actions must be enabled. Actions and downloaded Linux packaging tools/dependency sources are pinned to revisions or checksums. Qt is fixed at 6.8.3; upgrade Qt and rebuild LayerShellQt together because the latter uses Qt's private API.
 
 ## What is bundled
 

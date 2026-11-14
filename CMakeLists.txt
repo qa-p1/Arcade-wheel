@@ -21,6 +21,7 @@ add_subdirectory(src/link/qt)
 
 add_library(arcade_core STATIC
     src/platform/PlatformBackend.h
+    src/core/DiscoveredApplication.h
     src/config/ConfigStore.h src/config/ConfigStore.cpp
     src/core/WheelLogic.h src/core/WheelLogic.cpp
     src/core/WheelController.h src/core/WheelController.cpp

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "platform/PlatformBackend.h"
+#include "core/DiscoveredApplication.h"
 
 #include <QJsonObject>
 #include <QString>

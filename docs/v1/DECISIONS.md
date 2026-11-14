@@ -27,3 +27,11 @@ way, so it cannot show the GPU comparison. Left for a measured run on a real ses
 copied from the same tag and their `VENDORED` records and CI's `ARCADE_LINK_REVISION` updated. 1.0.7's Qt installer
 retires entries under `legacyDesktopIds` even when they run the same AppImage, and carries Start at login over; Wheel
 already lists `com.arcadewheel.ArcadeWheel` and `arcade-wheel` (fleet rule "One launcher per app").
+
+## Untangle (step 2): configuration no longer depends on the platform interface
+
+`ConfigStore.h` included `platform/PlatformBackend.h` (a `QObject` interface with every OS hook) for one value type,
+`DiscoveredApplication`, so the stored configuration format depended on the most volatile layer. The struct is now
+`core/DiscoveredApplication.h`; the backends, which produce it, and `ConfigStore` and `ActionDispatcher`, which read
+it, include that. Kept on purpose: the Linux and Windows backends use `AppInstaller` for start at login and desktop
+repair once Wheel is installed, because the login item is part of the install integration.

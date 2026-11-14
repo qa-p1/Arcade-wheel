@@ -6,15 +6,9 @@
 #include <QString>
 #include <QVector>
 
-class QQuickWindow;
+#include "core/DiscoveredApplication.h"
 
-struct DiscoveredApplication {
-    QString id;
-    QString name;
-    QString icon;
-    QString description;
-    QString launchTarget;
-};
+class QQuickWindow;
 
 // Only desktop integration lives behind this boundary. Configuration, selection,
 // action routing and QML are shared by every platform.

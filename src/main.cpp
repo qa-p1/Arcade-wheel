@@ -1,6 +1,7 @@
 #include "core/IconImageProvider.h"
 #include "core/IconTheme.h"
 #include "core/CommandReply.h"
+#include "core/CrashReport.h"
 #include "core/WheelController.h"
 #include "core/WheelPaths.h"
 #include "link/WheelLink.h"
@@ -49,13 +50,14 @@
 
 Q_IMPORT_QML_PLUGIN(ArcadePlugin)
 Q_IMPORT_QML_PLUGIN(ArcadeWheelPlugin)
-#ifdef __GLIBC__
-#include <malloc.h>
-#endif
+#include "link/qt/arcade_trim.h"
+
+// Freed heap and clean file pages back to the system (memory item W0):
+// after startup, after the wheel hides and after a released window.
 static void releaseFreedHeap()
 {
-#ifdef __GLIBC__
-    malloc_trim(0);
+#if defined(__GLIBC__)
+    arcade_trim();
 #endif
 }
 
@@ -117,9 +119,7 @@ int main(int argc, char **argv)
     // lightest fallback for anything it does not cover.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QApplication app(argc, argv);
-    QCoreApplication::setOrganizationName(QStringLiteral("Arcade Wheel"));
-    QCoreApplication::setOrganizationDomain(QStringLiteral("arcadewheel.org"));
-    QCoreApplication::setApplicationName(QStringLiteral("Arcade Wheel"));
+    WheelPaths::applyApplicationIdentity();
     QCoreApplication::setApplicationVersion(QStringLiteral(ARCADE_VERSION));
     app.setQuitOnLastWindowClosed(false);
     // The OS identifier (STANDARD §10): Wayland app_id, the desktop file and
@@ -165,6 +165,22 @@ int main(int argc, char **argv)
                                "                             Print the Arcade Link manifest (no side effects)\n\n"
                                "Once running, hold the configured shortcut (F8 by default), move toward an action, then release.\n";
         return 0;
+    }
+    // CLI-2: anything else is a mistake, not a request to start a resident.
+    static const QStringList commandsWithoutArguments{
+        QStringLiteral("--settings"), QStringLiteral("--background"), QStringLiteral("--show"), QStringLiteral("--preview"),
+        QStringLiteral("--hide"), QStringLiteral("--cancel"), QStringLiteral("--toggle"), QStringLiteral("--press"),
+        QStringLiteral("--release"), QStringLiteral("--status"), QStringLiteral("--restart"), QStringLiteral("--restarting"),
+        QStringLiteral("--quit"), QStringLiteral("--smoke-test"), QStringLiteral("--version"), QStringLiteral("-V"),
+        QStringLiteral("--arcade-manifest")};
+    static const QStringList commandsWithOptions{QStringLiteral("--settings-export"), QStringLiteral("--settings-import"),
+                                                 QStringLiteral("--install"), QStringLiteral("--uninstall"), QStringLiteral("--repair"),
+                                                 QStringLiteral("--integration-status"), QStringLiteral("--menu")};
+    if (!cliArguments.isEmpty() && !commandsWithOptions.contains(command) &&
+        (!commandsWithoutArguments.contains(command) || cliArguments.size() > 1)) {
+        QTextStream(stderr) << "arcade-wheel: unknown argument " << (commandsWithoutArguments.contains(command) ? cliArguments.at(1) : command)
+                            << "\nTry arcade-wheel --help.\n";
+        return 2;
     }
     if (command == QStringLiteral("--version") || command == QStringLiteral("-V")) {
         QTextStream(stdout) << "Arcade Wheel " << ARCADE_VERSION << '\n';
@@ -242,11 +258,14 @@ int main(int argc, char **argv)
     if (!smokeTest && !headlessPlatform && !query) {
         const auto legacy = ArcadeLink::legacyDirs(ArcadeLink::Ids::Wheel);
         if (std::any_of(legacy.begin(), legacy.end(), [](const auto &dir) { return QFileInfo::exists(dir.path); })) {
-            // Before 0.5 the key came from Qt's "Arcade Wheel/Arcade Wheel" config folder.
+            // Before 0.5 the key came from Qt's "Arcade Wheel/Arcade Wheel" config folder,
+            // which the application names no longer resolve to.
+            QString oldConfig;
+            for (const auto &dir : legacy)
+                if (dir.kind == u"config") oldConfig = dir.path;
             QLocalSocket older;
-            older.connectToServer(serverNameFor(instanceKeyFor(
-                QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))));
-            if (older.waitForConnected(150)) {
+            older.connectToServer(serverNameFor(instanceKeyFor(oldConfig)));
+            if (!oldConfig.isEmpty() && older.waitForConnected(150)) {
                 older.write("--quit\n");
                 older.waitForBytesWritten(300);
                 older.waitForDisconnected(5000);
@@ -317,12 +336,12 @@ int main(int argc, char **argv)
         }
         if (command == QStringLiteral("--release") || command == QStringLiteral("--cancel") || command == QStringLiteral("--hide") || command == QStringLiteral("--quit")) return 0;
         if (command == QStringLiteral("--status")) {
-            // One line of JSON either way (STANDARD §10); exit status 1 when not running.
+            // One line of JSON either way (CLI-1); exit status 3 when not running.
             QTextStream(stdout) << QJsonDocument(QJsonObject{{QStringLiteral("running"), false},
                                                              {QStringLiteral("version"), QStringLiteral(ARCADE_VERSION)}})
                                        .toJson(QJsonDocument::Compact)
                                 << '\n';
-            return 1;
+            return 3; // the LSB status code for "not running" (CLI-1)
         }
     }
 
@@ -341,6 +360,7 @@ int main(int argc, char **argv)
     // Started at login or by Tools, stderr often goes to /dev/null: keep
     // Qt's warnings in the log folder the manifest advertises instead.
     ArcadeLink::captureStderr(WheelPaths::logsDir(), QStringLiteral("arcade-wheel"));
+    CrashReport::install(WheelPaths::dirs().data + QStringLiteral("/crashes"), QStringLiteral(ARCADE_VERSION));
     if (!migrationNote.isEmpty()) qWarning("%s", qPrintable(migrationNote));
 
 #ifdef Q_OS_WIN
@@ -413,6 +433,12 @@ int main(int argc, char **argv)
     if (appIcon.isNull()) appIcon = QIcon::fromTheme(QStringLiteral("applications-system"));
     app.setWindowIcon(appIcon);
 
+    // Trim once the wheel has been hidden for a moment (W0); a reopen in the
+    // meantime cancels it. Declared before the view, which reports itself
+    // hidden when destroyed at exit.
+    QTimer trimAfterHide;
+    trimAfterHide.setSingleShot(true);
+    trimAfterHide.setInterval(2000);
     QQuickView overlay;
     overlay.setColor(Qt::transparent);
     overlay.setFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint |
@@ -423,6 +449,13 @@ int main(int argc, char **argv)
     overlay.loadFromModule("ArcadeWheel", "Overlay");
     if (overlay.status() == QQuickView::Error) return 1;
     controller.setOverlayView(&overlay);
+    QObject::connect(&trimAfterHide, &QTimer::timeout, &app, [&] {
+        if (!overlay.isVisible()) releaseFreedHeap();
+    });
+    QObject::connect(&overlay, &QWindow::visibleChanged, &app, [&](bool visible) {
+        if (visible) trimAfterHide.stop();
+        else trimAfterHide.start();
+    });
     // Inter at 13 px (the kit's body size) for every window, Qt Widgets menus
     // and dialogs included. The kit's Fonts singleton has already loaded it
     // from the resources.
@@ -638,6 +671,8 @@ int main(int argc, char **argv)
     // handler existed, and Qt does not announce it again: answer it once the
     // event loop runs.
     QTimer::singleShot(0, &app, acceptCommands);
+    // Startup touched far more pages than an idle resident keeps (W0).
+    trimAfterHide.start();
     if (smokeTest) {
         QTimer::singleShot(0, &app, showSettings);
         QTimer::singleShot(1500, &app, [&] {

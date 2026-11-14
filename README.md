@@ -202,7 +202,7 @@ src/actions/     ActionDispatcher: built-in action routing
 src/providers/   ActionProvider interface and asynchronous Arcade Link discovery/jobs
 src/platform/    Linux, Windows, and macOS desktop integration backends
 src/install/     Qt first-run dialog and installation CLI
-src/link/        Arcade Link v0.4.15: the Qt module and the Arcade design kit (vendored)
+src/link/        Arcade Link v1.0.7: the Qt module and the Arcade design kit (vendored)
 qml/             Wheel overlay, Settings window and install prompt on the kit
 tests/           Qt Test suites (run with ctest) and the Link e2e checks
 scripts/         dev, check, package and sync-design

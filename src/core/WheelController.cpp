@@ -180,6 +180,7 @@ void WheelController::setOverlayView(QQuickView *view)
         m_openClock.restart();
         m_waitingForCenter = m_backend->movePointer(
             QPointF(m_overlay->screen()->geometry().topLeft()) + m_origin);
+        m_pointerWarped = m_waitingForCenter;
         m_lastPointer = m_origin;
         setSelectedIndex(-1);
         m_revealed = true;
@@ -358,8 +359,13 @@ void WheelController::openOverlay()
     if (m_visible || !m_overlay) return;
     m_dispatcher.arcade().refreshClipboard();
     const QPointF cursor = m_backend->cursorPosition();
-    QScreen *screen = QGuiApplication::screenAt(cursor.toPoint());
-    if (!screen) screen = QGuiApplication::primaryScreen();
+    m_pointerBefore = cursor;
+    m_pointerWarped = false;
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    QList<QRect> layout;
+    for (QScreen *candidate : screens) layout.append(candidate->geometry());
+    const int monitor = WheelLogic::screenIndexFor(layout, cursor);
+    QScreen *screen = monitor >= 0 ? screens.at(monitor) : QGuiApplication::primaryScreen();
     if (!screen) return;
     m_closeTimer.stop();
     m_overlay->setScreen(screen);
@@ -404,6 +410,12 @@ void WheelController::hideOverlay()
     m_revealOnFrame = false;
     emit overlayRevealedChanged();
     m_waitingForCenter = false;
+    // Put the pointer back where the user had it. This runs before the chosen
+    // action does, so an action that moves the pointer on purpose still wins.
+    if (m_pointerWarped) {
+        m_pointerWarped = false;
+        m_backend->movePointer(m_pointerBefore);
+    }
     // A bounded fallback also closes the surface if the renderer is suspended.
     m_closeTimer.start(240);
     emit overlayVisibleChanged();
@@ -791,6 +803,8 @@ bool WheelController::importConfig(const QString &urlOrPath)
         }
     }
     if (!commit(imported, true, Persist::Prepared)) return false;
+    // A later import that works must not leave the earlier failure in --status.
+    clearError();
     applyStartOnLogin();
     return true;
 }

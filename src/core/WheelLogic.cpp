@@ -24,3 +24,29 @@ int WheelLogic::scrollIndex(int current, int count, int steps, bool wrap, bool r
     if (wrap) return (target % count + count) % count;
     return std::clamp(target, 0, count - 1);
 }
+
+int WheelLogic::screenIndexFor(const QList<QRect> &screens, QPointF pointer)
+{
+    int nearest = -1;
+    qreal nearestDistance = 0;
+    for (int i = 0; i < screens.size(); ++i) {
+        const QRect &screen = screens.at(i);
+        // A monitor owns its left and top edges, like QRect::contains for pixels.
+        if (pointer.x() >= screen.left() && pointer.x() < screen.left() + screen.width() &&
+            pointer.y() >= screen.top() && pointer.y() < screen.top() + screen.height())
+            return i;
+        const qreal dx = std::max<qreal>({screen.left() - pointer.x(), 0, pointer.x() - (screen.left() + screen.width())});
+        const qreal dy = std::max<qreal>({screen.top() - pointer.y(), 0, pointer.y() - (screen.top() + screen.height())});
+        const qreal distance = std::hypot(dx, dy);
+        if (nearest < 0 || distance < nearestDistance) {
+            nearest = i;
+            nearestDistance = distance;
+        }
+    }
+    return nearest;
+}
+
+QPointF WheelLogic::centreOf(const QRect &screen)
+{
+    return QPointF(screen.left() + screen.width() / 2.0, screen.top() + screen.height() / 2.0);
+}

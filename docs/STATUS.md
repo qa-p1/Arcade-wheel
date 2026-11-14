@@ -2,7 +2,7 @@
 
 ## 2026-11-01: 0.5.0 (WHEEL.md overhaul)
 
-- Kit: Arcade Link v0.4.15's QML kit as a static module (`arcade_kit`), Inter, Wheel's amber.
+- Kit: Arcade Link v1.0.7's QML kit as a static module (`arcade_kit`), Inter, Wheel's amber.
   `WheelController` is a typed QML type; the `qmllint_gate` target runs at 0 warnings. The overlay
   keeps its geometry, motion and gestures; only colours, type, the label pill and the selected
   slot's 2 px accent changed.

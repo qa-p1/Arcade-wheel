@@ -7,6 +7,41 @@ class WheelLogicTest final : public QObject {
     Q_OBJECT
 
 private slots:
+    // Multi-monitor placement: the wheel opens on the monitor with the pointer
+    // and is centred on it, whatever the layout.
+    void monitorPlacement_data()
+    {
+        QTest::addColumn<QList<QRect>>("screens");
+        QTest::addColumn<QPointF>("pointer");
+        QTest::addColumn<int>("expected");
+        QTest::addColumn<QPointF>("centre");
+        const QList<QRect> sideBySide{{0, 0, 2560, 1440}, {2560, 0, 1920, 1080}};
+        QTest::newRow("left of two") << sideBySide << QPointF(10, 10) << 0 << QPointF(1280, 720);
+        QTest::newRow("right of two") << sideBySide << QPointF(3000, 500) << 1 << QPointF(3520, 540);
+        QTest::newRow("the shared edge belongs to the right monitor") << sideBySide << QPointF(2560, 100) << 1 << QPointF(3520, 540);
+        QTest::newRow("just left of the shared edge") << sideBySide << QPointF(2559.5, 100) << 0 << QPointF(1280, 720);
+        const QList<QRect> stacked{{0, -1080, 1920, 1080}, {0, 0, 1920, 1080}};
+        QTest::newRow("above") << stacked << QPointF(900, -5) << 0 << QPointF(960, -540);
+        QTest::newRow("below") << stacked << QPointF(900, 5) << 1 << QPointF(960, 540);
+        const QList<QRect> negative{{-1920, 0, 1920, 1080}, {0, 0, 1920, 1080}};
+        QTest::newRow("negative origin") << negative << QPointF(-1, 40) << 0 << QPointF(-960, 540);
+        const QList<QRect> gap{{0, 0, 1000, 800}, {1200, 0, 1000, 800}};
+        QTest::newRow("in a gap, nearer the left") << gap << QPointF(1050, 400) << 0 << QPointF(500, 400);
+        QTest::newRow("in a gap, nearer the right") << gap << QPointF(1150, 400) << 1 << QPointF(1700, 400);
+        QTest::newRow("beyond every monitor") << gap << QPointF(9000, 9000) << 1 << QPointF(1700, 400);
+        QTest::newRow("one monitor") << QList<QRect>{{0, 0, 1280, 720}} << QPointF(-50, -50) << 0 << QPointF(640, 360);
+        QTest::newRow("no monitors") << QList<QRect>{} << QPointF(1, 1) << -1 << QPointF();
+    }
+    void monitorPlacement()
+    {
+        QFETCH(QList<QRect>, screens);
+        QFETCH(QPointF, pointer);
+        QFETCH(int, expected);
+        QFETCH(QPointF, centre);
+        const int index = WheelLogic::screenIndexFor(screens, pointer);
+        QCOMPARE(index, expected);
+        if (index >= 0) QCOMPARE(WheelLogic::centreOf(screens.at(index)), centre);
+    }
     void angularSelection_data()
     {
         QTest::addColumn<int>("count");

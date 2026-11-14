@@ -5,7 +5,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QTemporaryDir>
+#include <QDir>
+#include <QElapsedTimer>
 #include <QtTest>
+#include <functional>
 
 class ConfigStoreTest final : public QObject {
     Q_OBJECT
@@ -404,6 +407,203 @@ private slots:
         QVERIFY(!ConfigStore(invalidPath).importFrom(invalidPath, &imported, &error));
         QVERIFY(!error.isEmpty());
         QVERIFY(imported.isEmpty());
+    }
+
+    // ---- Import validation (WH-3, WH-4, WH-6) --------------------------------
+
+private:
+    static QString writeBytes(const QTemporaryDir &dir, const QString &name, const QByteArray &bytes)
+    {
+        const QString path = dir.filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size()) return {};
+        return path;
+    }
+    static QByteArray settingsWith(const std::function<void(QJsonObject &)> &edit)
+    {
+        QJsonObject config = ConfigStore::defaults();
+        edit(config);
+        return QJsonDocument(config).toJson(QJsonDocument::Compact);
+    }
+    static QJsonObject firstDeck(const QJsonObject &config) { return config.value("decks").toArray().first().toObject(); }
+    static void setFirstDeck(QJsonObject &config, const QJsonObject &deck)
+    {
+        auto decks = config.value("decks").toArray();
+        decks[0] = deck;
+        config.insert("decks", decks);
+    }
+
+private slots:
+    void aMultiMegabyteNameIsRefusedQuickly()
+    {
+        // WH-3: a 5 MB deck name froze the resident for minutes.
+        QTemporaryDir dir;
+        const QByteArray huge = settingsWith([](QJsonObject &config) {
+            auto deck = firstDeck(config);
+            deck.insert("name", QString(5 * 1024 * 1024, QLatin1Char('A')));
+            setFirstDeck(config, deck);
+        });
+        const QString path = writeBytes(dir, "huge.json", huge);
+        QVERIFY(!path.isEmpty());
+        QJsonObject imported;
+        QString error;
+        QElapsedTimer timer;
+        timer.start();
+        const bool accepted = ConfigStore(dir.filePath("settings.json")).importFrom(path, &imported, &error);
+        QVERIFY2(timer.elapsed() < 2000, "the import must not take long");
+        QVERIFY(!accepted);
+        QVERIFY(!error.isEmpty());
+    }
+
+    void aLongNameInASmallFileIsRefused()
+    {
+        QTemporaryDir dir;
+        const QString path = writeBytes(dir, "long.json", settingsWith([](QJsonObject &config) {
+                                            auto deck = firstDeck(config);
+                                            deck.insert("name", QString(1000, QLatin1Char('B')));
+                                            setFirstDeck(config, deck);
+                                        }));
+        QJsonObject imported;
+        QString error;
+        const bool accepted = ConfigStore(dir.filePath("settings.json")).importFrom(path, &imported, &error);
+        QVERIFY(!accepted);
+        QVERIFY(error.contains("long"));
+    }
+
+    void loadCutsOversizedNamesInAnExistingFile()
+    {
+        // A settings.json written before the limits existed still loads, with names cut.
+        QTemporaryDir dir;
+        const QString path = writeBytes(dir, "settings.json", settingsWith([](QJsonObject &config) {
+                                            auto deck = firstDeck(config);
+                                            deck.insert("name", QString(300000, QLatin1Char('C')));
+                                            auto actions = deck.value("actions").toArray();
+                                            auto action = actions.first().toObject();
+                                            action.insert("name", QString(300000, QLatin1Char('D')));
+                                            actions[0] = action;
+                                            deck.insert("actions", actions);
+                                            setFirstDeck(config, deck);
+                                        }));
+        QString error;
+        const QJsonObject loaded = ConfigStore(path).load({}, &error);
+        const QJsonObject deck = firstDeck(loaded);
+        QVERIFY(deck.value("name").toString().size() <= 120);
+        QVERIFY(deck.value("actions").toArray().first().toObject().value("name").toString().size() <= 120);
+        QCOMPARE(loaded.value("decks").toArray().size(), 1);
+    }
+
+    void wrongShapesAreRefusedWithAMessage_data()
+    {
+        QTest::addColumn<QByteArray>("file");
+        const auto row = [](const char *tag, const QByteArray &bytes) { QTest::newRow(tag) << bytes; };
+        row("array", "[1,2,3]");
+        row("empty object", "{}");
+        row("null", "null");
+        row("number", "42");
+        row("string", "\"settings\"");
+        row("unrelated object", R"({"hello":"world"})");
+        row("decks is a string", settingsWith([](QJsonObject &c) { c.insert("decks", "nope"); }));
+        row("decks is empty", settingsWith([](QJsonObject &c) { c.insert("decks", QJsonArray{}); }));
+        row("decks is numbers", settingsWith([](QJsonObject &c) { c.insert("decks", QJsonArray{1, 2}); }));
+        row("schema is a string", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", "two"); }));
+        row("schema is negative", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", -1); }));
+        row("schema is fractional", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", 1.5); }));
+        row("schema is newer", settingsWith([](QJsonObject &c) { c.insert("schemaVersion", 99); }));
+        row("unknown action type", settingsWith([](QJsonObject &c) {
+                auto deck = firstDeck(c);
+                auto actions = deck.value("actions").toArray();
+                auto action = actions.first().toObject();
+                action.insert("type", "frobnicate");
+                actions[0] = action;
+                deck.insert("actions", actions);
+                setFirstDeck(c, deck);
+            }));
+        row("duplicate deck ids", settingsWith([](QJsonObject &c) {
+                QJsonArray decks;
+                for (int i = 0; i < 3; ++i) decks.append(QJsonObject{{"id", "same"}, {"name", "Copy"}, {"actions", QJsonArray{}}});
+                c.insert("decks", decks);
+            }));
+        row("too many actions", settingsWith([](QJsonObject &c) {
+                auto deck = firstDeck(c);
+                QJsonArray actions;
+                for (int i = 0; i < 500; ++i) actions.append(QJsonObject{{"type", "none"}});
+                deck.insert("actions", actions);
+                setFirstDeck(c, deck);
+            }));
+        row("appearance is a list", settingsWith([](QJsonObject &c) { c.insert("appearance", QJsonArray{1}); }));
+        row("not json", "{ nope");
+    }
+    void wrongShapesAreRefusedWithAMessage()
+    {
+        QFETCH(QByteArray, file);
+        QTemporaryDir dir;
+        const QString path = writeBytes(dir, "in.json", file);
+        QJsonObject imported;
+        QString error;
+        const bool accepted = ConfigStore(dir.filePath("settings.json")).importFrom(path, &imported, &error);
+        QVERIFY2(!accepted, "an invalid import must be refused whole");
+        QVERIFY(imported.isEmpty());
+        QVERIFY2(!error.isEmpty() && !error.contains("no error occurred"), qPrintable(error));
+    }
+
+    void aValidImportWithAUnicodeNameStillWorks()
+    {
+        QTemporaryDir dir;
+        const QString path = writeBytes(dir, "ok.json", settingsWith([](QJsonObject &config) {
+                                            auto deck = firstDeck(config);
+                                            deck.insert("name", QStringLiteral("Café ☕ 日本語"));
+                                            setFirstDeck(config, deck);
+                                        }));
+        QJsonObject imported;
+        QString error;
+        QVERIFY2(ConfigStore(dir.filePath("settings.json")).importFrom(path, &imported, &error), qPrintable(error));
+        QCOMPARE(firstDeck(imported).value("name").toString(), QStringLiteral("Café ☕ 日本語"));
+    }
+
+    void outOfRangeNumbersAreBroughtIntoRange()
+    {
+        QJsonObject config = ConfigStore::defaults();
+        auto appearance = config.value("appearance").toObject();
+        appearance.insert("radius", -5);
+        appearance.insert("opacity", 99);
+        appearance.insert("iconSize", 1e9);
+        appearance.insert("labels", "yes");
+        config.insert("appearance", appearance);
+        const QJsonObject normalized = ConfigStore::normalize(config);
+        const QJsonObject result = normalized.value("appearance").toObject();
+        QVERIFY(result.value("radius").toDouble() >= 110);
+        QVERIFY(result.value("opacity").toDouble() <= 1);
+        QVERIFY(result.value("iconSize").toDouble() <= 42);
+        QVERIFY(result.value("labels").isBool());
+    }
+
+    void importBackupsArePruned()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("settings.json");
+        ConfigStore store(path);
+        QVERIFY(store.save(ConfigStore::defaults()));
+        for (int i = 0; i < 12; ++i) {
+            QString backup;
+            QVERIFY(store.backupCurrent(&backup));
+            QTest::qWait(3);
+        }
+        const int kept = QDir(dir.path()).entryList({"settings.json.backup-*.json"}, QDir::Files).size();
+        QVERIFY2(kept <= 5, qPrintable(QString::number(kept)));
+        QVERIFY(kept >= 1);
+    }
+
+    void aKnownGoodImportKeepsTheNewestBackup()
+    {
+        QTemporaryDir dir;
+        ConfigStore store(dir.filePath("settings.json"));
+        QVERIFY(store.save(ConfigStore::defaults()));
+        QString last;
+        for (int i = 0; i < 8; ++i) {
+            QVERIFY(store.backupCurrent(&last));
+            QTest::qWait(3);
+        }
+        QVERIFY(QFileInfo::exists(last));
     }
 };
 

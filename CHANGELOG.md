@@ -1,6 +1,25 @@
 # Changelog
 
-All notable changes to Arcade Wheel are documented here.
+All notable changes to Arcade Wheel are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and the project follows [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+### Fixed
+
+- Importing settings with a huge deck name froze the wheel for minutes. Imports over 2 MiB are refused unread, and text length, ids, action types and counts are checked first; a refused import changes nothing and says why.
+- A settings file that is valid JSON but not an object no longer reports "no error occurred", and a good import clears an earlier error from `--status`.
+- Only the newest five settings backups are kept.
+- Qt no longer recreates `~/.cache/Arcade Wheel/Arcade Wheel`; everything is under `~/.cache/arcade/wheel`. The old folder is retired once.
+- Escape closes Settings at its top view, and cancels the "Delete this deck?" and "Reset everything?" dialogs.
+- The pointer goes back to where it was when the wheel closes.
+- The wheel opens on the monitor nearest the pointer when the pointer is in a gap between monitors.
+- An unknown command-line argument prints usage and exits 2; `--status` exits 3 when Wheel is not running.
+
+### Changed
+
+- Arcade Link v1.0.6 (Qt module, design kit, release tools).
+
 
 ## 0.5.0 — 2026-11-01
 

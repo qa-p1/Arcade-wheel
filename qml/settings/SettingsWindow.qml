@@ -57,6 +57,17 @@ Rectangle {
     }
     Component.onCompleted: { root.showPage(root.wheelPage); root.syncLinkDraft(); }
     Shortcut { sequences: [StandardKey.Close]; onActivated: root.Window.window.close() }
+    // Escape goes back one step. An open dialog, menu or the action editor takes
+    // the key for itself (closePolicy); a text field gives its focus back first;
+    // at the top of Settings it closes the window.
+    focus: true
+    Keys.onEscapePressed: function (event) {
+        const win = root.Window.window;
+        const focused = win ? win.activeFocusItem : null;
+        event.accepted = true;
+        if (focused && focused !== root && (focused instanceof TextInput || focused instanceof TextEdit)) root.forceActiveFocus();
+        else if (win) win.close();
+    }
     Connections {
         target: root.controller
         function onCurrentDeckChanged() { if (root.selectedSlot >= root.activeActions.length) root.selectedSlot = -1; }

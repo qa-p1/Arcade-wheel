@@ -20,8 +20,8 @@ concurrency:
 
 env:
   QT_VERSION: '6.8.3'
-  # Arcade Link v0.4.15, the tag src/link and the design kit are vendored from.
-  ARCADE_LINK_REVISION: '56798545d263c104ded54877239750f9645c32a3'
+  # Arcade Link v1.0.7, the tag src/link and the design kit are vendored from.
+  ARCADE_LINK_REVISION: '40ec0279095f7a5082b0fbe2912d1a869b98f55d'
   CARGO_BUILD_JOBS: '2'
   CMAKE_BUILD_PARALLEL_LEVEL: '2'
   PYTHONUTF8: '1'
@@ -66,13 +66,17 @@ jobs:
         with:
           persist-credentials: false
 
+      # Network steps time out and retry (CI1).
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build libglib2.0-dev dbus libwayland-dev wayland-protocols libxkbcommon-dev libgl1-mesa-dev libegl1-mesa-dev libfuse2 desktop-file-utils xvfb xdotool
+          apt_opts="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
+          sudo apt-get $apt_opts update
+          sudo apt-get $apt_opts install -y ninja-build libglib2.0-dev dbus libwayland-dev wayland-protocols libxkbcommon-dev libgl1-mesa-dev libegl1-mesa-dev libfuse2 desktop-file-utils xvfb xdotool
 
       - name: Install Qt
+        timeout-minutes: 15
         uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -85,6 +89,7 @@ jobs:
 
       - name: Build matching LayerShellQt
         if: runner.os == 'Linux'
+        timeout-minutes: 15
         run: bash packaging/linux/build-dependencies.sh "$RUNNER_TEMP/deps" "$RUNNER_TEMP/deps-build"
 
       - name: Configure Linux
@@ -118,15 +123,18 @@ jobs:
 
       - name: Build the released Link CLI for interop and isolated lifecycle checks
         if: runner.os == 'Linux'
+        timeout-minutes: 15
         env:
           RUSTUP_TOOLCHAIN: '1.88.0'
         run: |
           rustup toolchain install 1.88.0 --profile minimal
+          for attempt in 1 2 3; do cargo fetch --manifest-path .arcade-link-upstream/Cargo.toml --locked && break; sleep $((attempt * 10)); done
           cargo build --manifest-path .arcade-link-upstream/Cargo.toml -p arcade-link-cli --locked
 
       - name: Install clang-format 18
         if: runner.os == 'Linux'
-        run: python3 -m pip install --user clang-format==18.1.8
+        timeout-minutes: 5
+        run: python3 -m pip install --user --retries 3 --timeout 30 clang-format==18.1.8
 
       # Build (warnings as errors), format, qmllint, vendored files, shortcut
       # data, doc links, release tools and every test: what a contributor runs.

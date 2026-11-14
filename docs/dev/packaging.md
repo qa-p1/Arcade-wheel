@@ -5,18 +5,18 @@ The [workflow](../../.github/workflows/ci.yml) builds a Release configuration, r
 ## Triggers and downloads
 
 - [`ci.yml`](../../.github/workflows/ci.yml) runs on pushes to `main`, on pull requests and on demand. It builds, checks and packages all three systems and uploads the packages as run artifacts for 30 days. It never publishes anything. Superseded PR runs are cancelled.
-- [`release.yml`](../../.github/workflows/release.yml) is started by hand with a `channel`:
-  - `beta` on `main` calls `ci.yml`, then publishes `v<version>-beta.<run>` as a **draft prerelease**. It is the rehearsal: nobody sees it and Tools ignores it.
-  - `stable` on the `v<version>` tag calls `ci.yml` on that tag, then publishes `v<version>` as **Latest**.
-- [`tag.yml`](../../.github/workflows/tag.yml) creates the `v<version>` tag from `CMakeLists.txt` on a commit of `main`. Tags are never pushed by hand.
+- [`tag.yml`](../../.github/workflows/tag.yml) creates a `v<version>-rc.<n>` tag from `CMakeLists.txt` on a commit of `main` and starts `release.yml` on it. Tags are never pushed by hand, and stable is never tagged here.
+- [`release.yml`](../../.github/workflows/release.yml) calls `ci.yml` on the rc tag, verifies the five packages and publishes them through Link's `app-publish` as a hidden prerelease on the `test` channel, which Tools never offers. Every exit gate runs against those published files.
+- [`promote.yml`](../../.github/workflows/promote.yml) republishes a verified rc's files as `v<version>` with a signed `manifest.json` (Link's `app-promote`): the same bytes, no rebuild, every hash checked again after upload.
+- [`nightly.yml`](../../.github/workflows/nightly.yml) republishes main CI's packages daily as a signed `v<version>-nightly.*` prerelease when `main` changed and its CI is green.
 - The version comes only from `CMakeLists.txt`; installer filenames, the installed app and the tag all use it. The CI run number appears in the release notes as the build number.
 - Failed or cancelled runs never publish. A rerun preserves an already published release. Interrupted uploads leave a draft that a rerun resumes. A slower run of an older commit cannot replace a newer release as **Latest**.
 
-Release order: merge to `main`, run `release.yml` with `beta` on `main`, check the draft, run `tag.yml`, then `release.yml` with `stable` on the new tag.
+Release order: merge to `main`, run `tag.yml` with `v<version>-rc.<n>`, run the exit gates against the published rc, then `promote.yml` with the rc tag.
 
 Use [Releases](https://github.com/qa-p1/Arcade-wheel/releases) for direct installer downloads. Release notes link to the exact tested commit and run and include GitHub-generated change notes. All five packages are checksum-verified before upload, and the complete upload is checked before the draft is published. Alternatively, choose an Actions run and download its platform **Artifacts**; GitHub wraps these in ZIPs.
 
-Each platform artifact includes its own checksum list and manifest. The release job downloads these into separate directories, verifies every original package, then combines the five packages and regenerates one manifest and checksum list. Corrupt, missing or duplicate packages stop publication. The manifest version is the plain `X.Y.Z`; stable releases use the `stable` channel and beta drafts `nightly`. It marks the Windows ZIP as `portable` and records `--install --silent` for AppImage and DMG assets. Windows installer entries use Inno's `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER` flags.
+Each platform artifact includes its own checksum list and manifest. The release job downloads these into separate directories, verifies every original package, then combines the five packages; Link's publish writes one manifest and checksum list for the set. Corrupt, missing or duplicate packages stop publication. The manifest version is the plain `X.Y.Z`; an rc uses the `test` channel and its promotion `stable`. It marks the Windows ZIP as `portable` and records `--install --silent` for AppImage and DMG assets. Windows installer entries use Inno's `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER` flags.
 
 The Qt bundle, conformance vectors, embedded install strings, release generator,
 shortcut validator and Windows Inno/NSIS integration are all vendored from

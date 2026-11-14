@@ -1,16 +1,11 @@
-# Builds, tests and publishes a release through ci.yml. Beta is a private
-# draft prerelease on main (the rehearsal); stable must run on its v<version>
-# tag, created by tag.yml, and becomes the latest release. Tools installs
-# stable releases through arcade-release.json and SHA256SUMS.txt.
+# Builds every platform once from a release-candidate tag and publishes the five packages as a hidden prerelease on
+# the test channel (Link's reusable publish: arcade-release.json with the Inno installer's switches, and an unsigned
+# manifest.json). "Tag a release" starts it; it can also be run by hand on an rc tag. Every exit gate runs against
+# the published files; "Promote" then republishes the same bytes as stable with a signed manifest. Nothing here
+# publishes stable (PLAN.md rule zero); nightlies come from nightly.yml.
 name: Release
 on:
   workflow_dispatch:
-    inputs:
-      channel:
-        description: Release channel
-        type: choice
-        options: [beta, stable]
-        default: beta
 permissions:
   contents: read
 concurrency:
@@ -19,30 +14,31 @@ concurrency:
 jobs:
   prepare:
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Validate the channel and version before building
-        env:
-          CHANNEL: ${{ inputs.channel }}
+      - name: The tag is this version's release candidate
+        id: plan
         run: |
           version=$(sed -nE 's/^project\(ArcadeWheel VERSION ([^ ]+).*/\1/p' CMakeLists.txt)
-          if [ "$CHANNEL" = stable ]; then
-            [ "$GITHUB_REF" = "refs/tags/v$version" ] || { echo "Stable releases must run on v$version"; exit 1; }
-          else
-            [ "$GITHUB_REF" = refs/heads/main ] || { echo "Beta releases run on main"; exit 1; }
-          fi
+          tag="${GITHUB_REF#refs/tags/}"
+          [[ "$GITHUB_REF" == refs/tags/* && "$tag" =~ ^v${version//./\\.}-rc\.[1-9][0-9]*$ ]] \
+            || { echo "::error::run Release on a tag v$version-rc.N (got $GITHUB_REF)"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
   ci:
     needs: prepare
     uses: ./.github/workflows/ci.yml
-  publish:
-    name: Publish
-    needs: ci
+  stage:
+    name: Verify the five packages
+    needs: [prepare, ci]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: write
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -52,13 +48,33 @@ jobs:
           pattern: ArcadeWheel-*
           path: artifacts
           merge-multiple: false
-      - name: Publish packages
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          CHANNEL: ${{ inputs.channel }}
+      - name: Each CI bundle against its own checksums and manifest, then all five packages together
         run: |
-          python3 packaging/publish-release.py --bundles artifacts --artifacts dist \
-            --channel "$CHANNEL" --commit "$GITHUB_SHA" --ref "$GITHUB_REF" \
-            --run-number "$GITHUB_RUN_NUMBER" \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location("publish_release", "packaging/publish-release.py")
+          release = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(release)
+          version = release.project_version(Path("CMakeLists.txt"))
+          release.collect_assets(Path("artifacts"), Path("release"), version)
+          print(sorted(p.name for p in Path("release").iterdir()))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-wheel
+          path: release/*
+          if-no-files-found: error
+  publish:
+    needs: [prepare, stage]
+    permissions:
+      contents: write
+    uses: qa-p1/Arcade-Link/.github/workflows/app-publish.yml@v1.0.8
+    with:
+      app: arcade.wheel
+      version: ${{ needs.prepare.outputs.version }}
+      tag: ${{ needs.prepare.outputs.tag }}
+      channel: test
+      artifacts: release-wheel
+      windows-installer: inno
+      link-ref: v1.0.8

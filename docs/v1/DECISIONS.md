@@ -28,7 +28,7 @@ copied from the same tag and their `VENDORED` records and CI's `ARCADE_LINK_REVI
 retires entries under `legacyDesktopIds` even when they run the same AppImage, and carries Start at login over; Wheel
 already lists `com.arcadewheel.ArcadeWheel` and `arcade-wheel` (fleet rule "One launcher per app").
 
-## Untangle (step 2): configuration no longer depends on the platform interface
+## D4. Untangle (step 2): configuration no longer depends on the platform interface
 
 `ConfigStore.h` included `platform/PlatformBackend.h` (a `QObject` interface with every OS hook) for one value type,
 `DiscoveredApplication`, so the stored configuration format depended on the most volatile layer. The struct is now

@@ -6,6 +6,16 @@ Qt 6.8 is not installed in the authoring sandbox (Qt 6.4.2 only, no network inst
 the QML and the QtTest suite could not run there. Code that does not need Qt Quick was built and run against Qt 6.4
 in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everything else is **not run** until CI.
 
+## 2026-11-14 - steps 2 and 6 (cloud session, branch `claude/sharp-cori-29w5eg`)
+
+- Step 6 (ba1b238): rc-only releases through Link `app-publish` (Inno), `promote.yml`, `nightly.yml`; the stage job
+  collects assets with `publish-release.collect_assets`.
+- Step 2 (0b1b126, D4): an `#include` graph of `src/` (the vendored `link/qt` excluded) showed configuration including
+  the platform interface for one value type; `DiscoveredApplication` has its own header now.
+- Tested locally with Qt 6.8.3 (aqt): CMake build with `-DWHEEL_WARNINGS_AS_ERRORS=ON` and
+  `-DARCADE_REQUIRE_LAYERSHELLQT=OFF` (no LayerShellQt here; CI builds it), 21/21 ctest (offscreen),
+  clang-format 18 on the changed headers. Windows and macOS compile only in CI.
+
 ## 2026-11-14 - Link v1.0.7
 
 - PR #17 CI green on 12f3869 (Linux AppImage, Windows setup, macOS arm64 and Intel), after the format and qmllint fixes.

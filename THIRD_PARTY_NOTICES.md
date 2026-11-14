@@ -29,7 +29,7 @@ The Arcade design kit's typeface, `src/link/design/fonts/InterVariable.ttf`, lic
 
 ## Arcade Link (MIT OR Apache-2.0)
 
-The Qt module and design kit vendored in `src/link`, from Arcade Link v1.0.6 (see `src/link/VENDORED.json`).
+The Qt module and design kit vendored in `src/link`, from Arcade Link v1.0.7 (see `src/link/VENDORED.json`).
 
 ## Libraries pulled in by the Linux AppImage
 

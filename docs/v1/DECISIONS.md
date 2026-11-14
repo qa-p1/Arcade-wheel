@@ -21,3 +21,9 @@ page-cache faults; the audit measured no UX change. The software renderer (WH1, 
 the wheel draws; the spec requires equal open animation and frame time, measured. CI renders with llvmpipe either
 way, so it cannot show the GPU comparison. Left for a measured run on a real session (owner's desktop harness), with
 "release the scene graph on hide" as the fallback if the software renderer is slower.
+
+## D3. Link moves to the tag v1.0.7
+`scripts/sync-design v1.0.7` re-vendored `src/link` (commit `40ec0279`); the shared tools and Windows includes were
+copied from the same tag and their `VENDORED` records and CI's `ARCADE_LINK_REVISION` updated. 1.0.7's Qt installer
+retires entries under `legacyDesktopIds` even when they run the same AppImage, and carries Start at login over; Wheel
+already lists `com.arcadewheel.ArcadeWheel` and `arcade-wheel` (fleet rule "One launcher per app").

@@ -6,6 +6,12 @@ Qt 6.8 is not installed in the authoring sandbox (Qt 6.4.2 only, no network inst
 the QML and the QtTest suite could not run there. Code that does not need Qt Quick was built and run against Qt 6.4
 in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everything else is **not run** until CI.
 
+## 2026-11-14 - Link v1.0.7
+
+- PR #17 CI green on 12f3869 (Linux AppImage, Windows setup, macOS arm64 and Intel), after the format and qmllint fixes.
+- Re-vendored Arcade Link v1.0.7 (D3). Build, qmllint gate, vendor checks, docs, release tests and 21/21 ctest pass
+  locally on Qt 6.12. Removing `arcade.wheel` from Link's `LEGACY_PENDING` is Link's change, once this is on main.
+
 ## 2026-11-13 - local build and test pass, W0, CI1 (PR #17)
 
 - The whole branch now **builds and passes locally** against Qt 6.12 (owner's PC): `cmake -DBUILD_TESTING=ON

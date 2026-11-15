@@ -715,11 +715,6 @@ void WheelController::refreshApplications()
     emit applicationsChanged();
 }
 
-void WheelController::refreshProviders()
-{
-    m_dispatcher.arcade().refresh();
-}
-
 void WheelController::setPeerEnabled(const QString &app, bool enabled)
 {
     if (!AppMetadata::apps().contains(app) && app != ArcadeLink::Ids::Tools) return;

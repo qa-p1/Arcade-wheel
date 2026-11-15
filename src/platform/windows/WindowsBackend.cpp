@@ -854,7 +854,6 @@ QVector<DiscoveredApplication> WindowsBackend::applications() const
                                   ? QFileInfo(shortcut.target).fileName()
                                   : shortcut.description;
             app.icon = shellIconCacheFile(path);
-            app.launchTarget = path;
             result.append(std::move(app));
         }
     }

@@ -129,7 +129,6 @@ private slots:
             applications.append({QStringLiteral("org.example.app%1.desktop").arg(i),
                                  QStringLiteral("Application %1").arg(i),
                                  QStringLiteral("app-icon-%1").arg(i),
-                                 {},
                                  {}});
         }
 
@@ -152,7 +151,7 @@ private slots:
     void defaultsFillRemainingSlotsWithPlaceholders()
     {
         const QVector<DiscoveredApplication> applications{
-            {QStringLiteral("org.example.only.desktop"), QStringLiteral("Only app"), {}, {}, {}}};
+            {QStringLiteral("org.example.only.desktop"), QStringLiteral("Only app"), {}, {}}};
         const QJsonArray actions = ConfigStore::defaults(applications)
                                        .value(QStringLiteral("decks"))
                                        .toArray()

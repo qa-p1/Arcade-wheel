@@ -36,7 +36,6 @@ public:
     void stop();
     void setTrayState(const QString &state);
     bool listening() const;
-    QString lastError() const { return m_lastError; }
     const ArcadeLink::Locations &locations() const { return m_locations; }
 
 signals:
@@ -56,5 +55,4 @@ private:
     std::atomic_bool m_busy{false};
     QTimer m_addCancelTimer;
     void respond(const ArcadeLink::Responder &r, std::function<void(const ArcadeLink::Responder &)> reply);
-    QString m_lastError;
 };

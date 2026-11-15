@@ -9,5 +9,4 @@ struct DiscoveredApplication {
     QString name;
     QString icon;
     QString description;
-    QString launchTarget;
 };

@@ -1083,7 +1083,6 @@ LinuxBackend::DesktopEntry LinuxBackend::readDesktopEntry(const QString &path, c
     entry.workingDirectory = values.value(QStringLiteral("Path"));
     entry.startupWmClass = values.value(QStringLiteral("StartupWMClass"));
     entry.icon = values.value(QStringLiteral("Icon"));
-    entry.terminal = parseDesktopBoolean(values, QStringLiteral("Terminal"));
     entry.dbusActivatable = parseDesktopBoolean(values, QStringLiteral("DBusActivatable"));
     if (entry.exec.isEmpty() && !entry.dbusActivatable) return {};
 
@@ -1102,7 +1101,6 @@ LinuxBackend::DesktopEntry LinuxBackend::readDesktopEntry(const QString &path, c
     if (entry.application.name.isEmpty()) entry.application.name = QFileInfo(path).completeBaseName();
     entry.application.icon = entry.icon;
     entry.application.description = localizedValue(values, QStringLiteral("Comment"));
-    entry.application.launchTarget = path;
     return entry;
 }
 

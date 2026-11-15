@@ -30,10 +30,9 @@ public:
     QPointF cursorPosition() const override { return {5, 5}; }
     QVector<DiscoveredApplication> applications() const override
     {
-        return {{"org.gnome.Nautilus.desktop", "Files", "org.gnome.Nautilus", {}, {}},
+        return {{"org.gnome.Nautilus.desktop", "Files", "org.gnome.Nautilus", {}},
                 {"org.example.with-a-really-long-identifier-that-should-elide.desktop",
                  "An application with a deliberately long display name",
-                 {},
                  {},
                  {}}};
     }

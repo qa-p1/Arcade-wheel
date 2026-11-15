@@ -18,6 +18,7 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- On Linux, the AppImage now starts Wheel from a copy of itself in `~/.local/share/arcade/runtime/`, made once per version, instead of from the AppImage's own mount. The helper process the mount needs no longer stays in memory. The copy takes about 145 MB of disk, Restart keeps using it, and uninstalling Wheel removes it. Commands such as `--status` and `--version` run as before.
 - Arcade Link v1.0.10 (Qt module, design kit, release tools).
 
 

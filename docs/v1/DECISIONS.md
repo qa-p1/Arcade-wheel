@@ -82,3 +82,60 @@ Kept although it looks unused:
 - `docs/dev/history/release-notes-template.md` is unreferenced but is history, kept as such. `tests/cli-contract.py` and
   `tests/verify-wheel.py` are not run by CI (only `PROGRESS.md` and `docs/dev/link.md` mention them) and stay as
   documented manual checks.
+
+## D6. Step 5: memory, unpacked runtime (U1)
+
+Done: Link moves to v1.0.10 (the same D3 steps, see below), and Wheel runs from the unpacked copy of its AppImage
+(U1, `AUDIT/memory.md`). `main()` calls `arcade_relaunch_unpacked("arcade.wheel", ARCADE_VERSION, 0, argv)` from
+Link's `qt/arcade_unpacked.h` first, before `ArcadeLink::onStartup()` and the application object, and exits with the
+code it returns when that is not -1. The launcher then exits 0 at once and the same command line runs from
+`<XDG_DATA_HOME>/arcade/runtime/wheel-<version>-<16 hex digits>/`, with `$APPIMAGE` unchanged, so Install, the login
+entry and Restart still name the installed file. The copy is made once per version and image.
+
+Which starts relaunch (`ResidentStart::keepsResident`, unit-tested): no arguments, `--settings`, `--background` and
+`--restarting`, the starts that become Wheel's resident. Not relaunched, as Box does for its one-shots:
+- Commands that never keep a process: `--status`, `--version`, `--help`, `--menu`, `--arcade-manifest`,
+  `--settings-export`, `--install`, `--uninstall`, `--repair`, `--integration-status`, and anything unknown (exit 2).
+  A relaunch without wait would also drop their exit codes (`--status` exits 3 when Wheel is not running).
+- `--smoke-test`: one-shot whose exit code is the result (`packaging/smoke-test.py`).
+- Commands that drive a running Wheel: `--show`, `--preview`, `--hide`, `--cancel`, `--toggle`, `--press`, `--release`,
+  `--restart`, `--quit`, `--settings-import`. The code cannot tell before the application object exists whether a
+  resident is running; with one they only send a line and exit, and the trigger commands run on every hotkey press,
+  where a relaunch is a second process for nothing. With none running they still start one, from the mount as before
+  (no regression); `--background` at login and Settings are how Wheel normally starts. `--preview` is such a command
+  (it asks the running Wheel to draw a preview), not a start of its own.
+
+Restart: the copy has `ARCADE_UNPACKED` set so that it does not unpack itself again, and the successor inherited it
+and started from the mount (checked: the restarted resident ran from the AppImage's mount). The restart now removes the
+variable from the successor's environment when this process runs from one of Wheel's copies
+(`ResidentStart::runsFromUnpackedCopy`). A process that has the variable from a harness (Link's isolated session sets
+it so an AppImage start stays the process the test started) is left alone.
+
+Uninstall: nothing added. On Linux `AppInstaller::command --uninstall` ends in `engine.uninstall(Ids::Wheel, ...)`,
+Link's `ArcadeInstall::uninstall`, which since 1.0.10 also removes `<data>/arcade/runtime/wheel-*` (finished copies and
+`.wheel-*` copies in progress) and leaves other apps' copies. `quitResident` runs before it, so the copy in use has
+exited. `tst_AppInstaller` and the packaged lifecycle check assert it (Wheel's copy goes, another app's stays).
+
+Link 1.0.8 to 1.0.10, what touches Wheel: 1.0.10 adds `arcade_unpacked.h` and the uninstall above (this step);
+1.0.9 makes Link's isolated session start AppImages with `ARCADE_UNPACKED=1` (the packaged check removes it from
+its own environment because it wants the real relaunch), the rest is app gates and the Dart kit; 1.0.8's key chip and
+`HintBar` changes are in the kit, and Wheel uses neither component (D5). The shared tools and Windows includes did not
+change between 1.0.7 and 1.0.10, so only their `VENDORED` records and `ARCADE_LINK_REVISION` moved. The tag `v1.0.10`
+did not exist yet, so `tools/vendor_qt.py` and the icon and glyph copies of `scripts/sync-design` ran against a
+local clone at the release commit `2748ebf4` with a scratch tag; the files are what the tag will give.
+
+Cost: the copy is about 145 MB on disk per version (the audit measured 144 MB). Wheel does not remove an older
+version's copy itself; uninstall removes all of them, and Tools' `runtime_gc` recognises the folder names.
+
+Not done, and why:
+- WH1 (software renderer) stays as D-W0 says: it needs a measured run on a real session.
+- W1, W3b and OPEN1 are WebKit items (a WebView's renderer and network process, the page-out of its heap, and the
+  trimmer in WebKit's helpers); Wheel has no WebKit.
+- W0 was already done (D-W0).
+- Not measured here: the memory effect of U1 for Wheel. The audit's numbers come from its lab; the change is checked
+  for behaviour (the resident runs from the copy, also after Restart), not for megabytes.
+
+Found, in Link, not changed here: with `ARCADE_HOME` set, `ArcadeInstall::Environment::discover` takes the data
+folder from under it and ignores `XDG_DATA_HOME`, while `arcade_unpacked.h` and `runtime::unpacked_root` follow
+`XDG_DATA_HOME`. They agree without `ARCADE_HOME` (every real install), so uninstall finds the copies; only isolated
+test sessions differ, and the packaged check points `XDG_DATA_HOME` where Link looks.

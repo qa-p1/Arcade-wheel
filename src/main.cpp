@@ -576,15 +576,9 @@ int main(int argc, char **argv)
         // The successor runs from a new mount; it mustn't keep this one alive.
         QProcess successor;
         successor.setProgram(executable);
-        // This process may be an unpacked copy (U1), which has ARCADE_UNPACKED
-        // set so that it does not unpack itself again. The successor starts
-        // from the AppImage and has to unpack its own copy.
-        if (qEnvironmentVariableIsSet("ARCADE_UNPACKED") &&
-            ResidentStart::runsFromUnpackedCopy(QCoreApplication::applicationFilePath(), QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation))) {
-            auto environment = QProcessEnvironment::systemEnvironment();
-            environment.remove(QStringLiteral("ARCADE_UNPACKED"));
-            successor.setProcessEnvironment(environment);
-        }
+        // From an unpacked copy (U1) the successor inherits ARCADE_UNPACKED naming
+        // this copy's folder; Link (1.0.11) drops it there because the AppImage
+        // is not inside that folder, so the successor unpacks its own copy.
         successor.setArguments({QStringLiteral("--restarting")});
         ArcadeLink::detachFromImage(successor);
         if (!successor.startDetached()) {

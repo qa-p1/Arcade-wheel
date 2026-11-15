@@ -105,11 +105,12 @@ Which starts relaunch (`ResidentStart::keepsResident`, unit-tested): no argument
   (no regression); `--background` at login and Settings are how Wheel normally starts. `--preview` is such a command
   (it asks the running Wheel to draw a preview), not a start of its own.
 
-Restart: the copy has `ARCADE_UNPACKED` set so that it does not unpack itself again, and the successor inherited it
-and started from the mount (checked: the restarted resident ran from the AppImage's mount). The restart now removes the
-variable from the successor's environment when this process runs from one of Wheel's copies
-(`ResidentStart::runsFromUnpackedCopy`). A process that has the variable from a harness (Link's isolated session sets
-it so an AppImage start stays the process the test started) is left alone.
+Restart: with Link 1.0.10 the copy had `ARCADE_UNPACKED=1`, the successor inherited it and started from the mount
+(checked: the restarted resident ran from the AppImage's mount). The same happened in Clipboard, so it was fixed once
+in Link 1.0.11: the copy's marker names its own folder, and `arcade_relaunch_unpacked` drops a marker that does not
+contain the running executable, so the successor started from `$APPIMAGE` unpacks again. Wheel's own workaround
+(`ResidentStart::runsFromUnpackedCopy`) was removed; the packaged lifecycle check still asserts the restarted resident
+runs from the copy. `ARCADE_UNPACKED=1` (Link's isolated session) still means "never relaunch".
 
 Uninstall: nothing added. On Linux `AppInstaller::command --uninstall` ends in `engine.uninstall(Ids::Wheel, ...)`,
 Link's `ArcadeInstall::uninstall`, which since 1.0.10 also removes `<data>/arcade/runtime/wheel-*` (finished copies and

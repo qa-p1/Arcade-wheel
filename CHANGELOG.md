@@ -18,7 +18,7 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Arcade Link v1.0.6 (Qt module, design kit, release tools).
+- Arcade Link v1.0.10 (Qt module, design kit, release tools).
 
 
 ## 0.5.0 — 2026-11-01

@@ -62,12 +62,15 @@ Removed (one commit each):
 - `DiscoveredApplication::launchTarget`: set by the Linux and Windows backends, never read.
 - `assets/arcade/tokens.json`: compiled into the executable as a resource, opened by nothing, not vendored, not
   refreshed by `scripts/sync-design`; the kit's `Theme.qml` carries the accents.
+- `packaging/linux/dev.arcade.Wheel.png` and `packaging/linux/arcade-wheel-symbolic.svg`: no CMake, packaging
+  script or CI step names them; the AppImage takes its icon from `assets/arcade-wheel.svg` (`packaging/linux/package.sh`).
 
 Kept although it looks unused:
 
 - `WheelController::shortcutPeerConflict` (a `Q_PROPERTY`) is read only by `tst_WheelController`, and
-  `WheelLink::locations()` only by `tst_WheelLink`. Both are small test-visible state of live features (peer shortcut
-  conflicts, the Link registry location), so they stay until the owner decides on the UI that was meant to show them.
+  `WheelLink::locations()` only by `tst_WheelLink`. Both expose state the app uses (the controller sets
+  `m_shortcutPeerConflict` when a peer owns the shortcut; `WheelLink` serves from `m_locations`), so they stay as
+  the tests' view of it.
 - `shortcutFromKey` and `arcadeActionInfo` are `Q_INVOKABLE` but only called from C++ inside the controller; they are
   used, the attribute is just wider than needed.
 - Windows, macOS and `ARCADE_HAVE_LAYERSHELLQT` code: not compiled on this Linux build, so only read by hand (every
@@ -76,7 +79,6 @@ Kept although it looks unused:
   scripts and the Windows includes is vendored (D2, D3). Reported, not edited: a `retired` variable set and never read
   (`-Wunused-but-set-variable`, `ArcadeInstall.cpp:1012`), and the kit components `HintBar`, `NumberField`, `OverlayRow`
   and `Skeleton`, which neither Wheel nor other kit files use.
-- Unreferenced by CI, CMake, other scripts or docs, left for review: `packaging/linux/dev.arcade.Wheel.png`,
-  `packaging/linux/arcade-wheel-symbolic.svg`, `docs/dev/history/release-notes-template.md`. `tests/cli-contract.py` and
+- `docs/dev/history/release-notes-template.md` is unreferenced but is history, kept as such. `tests/cli-contract.py` and
   `tests/verify-wheel.py` are not run by CI (only `PROGRESS.md` and `docs/dev/link.md` mention them) and stay as
   documented manual checks.

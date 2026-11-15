@@ -20,7 +20,8 @@ in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everyt
 - Tested locally with Qt 6.8.3: clean CMake build with `-DWHEEL_WARNINGS_AS_ERRORS=ON`
   `-DARCADE_REQUIRE_LAYERSHELLQT=OFF`, 21/21 ctest (offscreen; baseline before the changes was also 21/21), clang-format 18
   on every non-vendored C++ file, `qmllint_gate`, `packaging/check-docs.py`, `packaging/check-link-vendor.py`. The Windows
-  and macOS code compiles only in CI; the one line removed there (`app.launchTarget = path;`) leaves `path` in use.
+  and macOS code compiles only in CI. On Windows, removing `app.launchTarget = path;` leaves `path` in use. On macOS the
+  first push missed the field's slot in the app list initializer, and the DMG builds failed until it was removed.
 
 ## 2026-11-14 - steps 2 and 6 (cloud session, branch `claude/sharp-cori-29w5eg`)
 

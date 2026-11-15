@@ -198,7 +198,7 @@ QVector<DiscoveredApplication> MacOSBackend::applications() const
                 NSString *icon = [bundle objectForInfoDictionaryKey:@"CFBundleIconFile"];
                 if (icon && [[icon pathExtension] length] == 0) icon = [icon stringByAppendingPathExtension:@"icns"];
                 NSString *iconPath = icon ? [[bundle resourcePath] stringByAppendingPathComponent:icon] : nil;
-                result.append({id, QString::fromNSString(title), QString::fromNSString(iconPath), {}, QString::fromNSString([url path])});
+                result.append({id, QString::fromNSString(title), QString::fromNSString(iconPath), {}});
             }
         }
     }

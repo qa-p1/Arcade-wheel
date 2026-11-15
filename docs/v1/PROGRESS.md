@@ -6,12 +6,12 @@ Qt 6.8 is not installed in the authoring sandbox (Qt 6.4.2 only, no network inst
 the QML and the QtTest suite could not run there. Code that does not need Qt Quick was built and run against Qt 6.4
 in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everything else is **not run** until CI.
 
-## 2026-11-15 (cloud session)
+## 2026-11-15 - step 4 (cloud session, branch `claude/sharp-cori-29w5eg`)
 
-- Step 4, dead code (D5): seven removals, one commit each (a402dfc, 1009cd3, 815e65c, 7dba3a6, 36b88f1, c48678a,
-  3b92c29): `WheelController::refreshProviders`, `WheelLogic::centreOf` (and its test column), `AppMetadata::Shelf` and
+- Step 4, dead code (D5): eight removals, one commit each (a402dfc, 1009cd3, 815e65c, 7dba3a6, 36b88f1, c48678a,
+  3b92c29, 86707f6): `WheelController::refreshProviders`, `WheelLogic::centreOf` (and its test column), `AppMetadata::Shelf` and
   `Find`, `WheelLink::lastError`, `DesktopEntry::terminal`, `DiscoveredApplication::launchTarget`, the unread
-  `assets/arcade/tokens.json`. Evidence per item is in D5. Vendored files untouched; findings in them are only reported.
+  `assets/arcade/tokens.json`, two unreferenced Linux packaging icons. Evidence per item is in D5. Vendored files untouched; findings in them are only reported.
 - Checks run: clang 18 `-Wunused*` (incl. member-function, private-field, macros, template) on every Wheel and test
   translation unit, g++ 13 `-Wunused*` on `ArcadeLinkProvider.cpp` (clang 18 cannot parse it), clang-tidy
   `misc-unused-using-decls`/`misc-unused-alias-decls`: no warning in Wheel's code. Name search of every non-vendored

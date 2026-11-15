@@ -45,8 +45,3 @@ int WheelLogic::screenIndexFor(const QList<QRect> &screens, QPointF pointer)
     }
     return nearest;
 }
-
-QPointF WheelLogic::centreOf(const QRect &screen)
-{
-    return QPointF(screen.left() + screen.width() / 2.0, screen.top() + screen.height() / 2.0);
-}

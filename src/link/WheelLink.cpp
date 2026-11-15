@@ -389,7 +389,7 @@ void WheelLink::apply(const QJsonObject &next)
         } else if (!enabled) state->server.reset();
         else if (changed) state->server->notifyChanged();
         const bool live = state->server && state->server->listening();
-        QMetaObject::invokeMethod(this, [this, live, startError] { m_listening.store(live); m_lastError = startError; emit diagnosticsChanged(live ? QStringLiteral("Listening") : QStringLiteral("Not listening"), startError); });
+        QMetaObject::invokeMethod(this, [this, live, startError] { m_listening.store(live); emit diagnosticsChanged(live ? QStringLiteral("Listening") : QStringLiteral("Not listening"), startError); });
     });
     if (!next.value("link").toObject().value("enabled").toBool(true) && m_controller)
         m_controller->finishLinkAction(false);

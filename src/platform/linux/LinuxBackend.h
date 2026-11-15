@@ -103,7 +103,6 @@ private:
         QString workingDirectory;
         QString startupWmClass;
         QString icon;
-        bool terminal = false;
         bool dbusActivatable = false;
     };
 

@@ -1083,7 +1083,6 @@ LinuxBackend::DesktopEntry LinuxBackend::readDesktopEntry(const QString &path, c
     entry.workingDirectory = values.value(QStringLiteral("Path"));
     entry.startupWmClass = values.value(QStringLiteral("StartupWMClass"));
     entry.icon = values.value(QStringLiteral("Icon"));
-    entry.terminal = parseDesktopBoolean(values, QStringLiteral("Terminal"));
     entry.dbusActivatable = parseDesktopBoolean(values, QStringLiteral("DBusActivatable"));
     if (entry.exec.isEmpty() && !entry.dbusActivatable) return {};
 

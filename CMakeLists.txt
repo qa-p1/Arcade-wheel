@@ -143,7 +143,6 @@ set(ARCADE_ASSET_FILES
     assets/arcade/arcade.shelf.svg
     assets/arcade/arcade.find.svg
     assets/arcade/arcade.tools.svg
-    assets/arcade/tokens.json
     assets/arcade-wheel.svg
     assets/arcade-wheel.png
 )

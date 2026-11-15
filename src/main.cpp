@@ -1,5 +1,6 @@
 #include "core/IconImageProvider.h"
 #include "core/IconTheme.h"
+#include "core/ResidentStart.h"
 #include "core/CommandReply.h"
 #include "core/CrashReport.h"
 #include "core/WheelController.h"
@@ -51,6 +52,7 @@
 Q_IMPORT_QML_PLUGIN(ArcadePlugin)
 Q_IMPORT_QML_PLUGIN(ArcadeWheelPlugin)
 #include "link/qt/arcade_trim.h"
+#include "link/qt/arcade_unpacked.h"
 
 // Freed heap and clean file pages back to the system (memory item W0):
 // after startup, after the wheel hides and after a released window.
@@ -114,6 +116,20 @@ static bool readSettingsForExport(QJsonObject *config, QString *error)
 
 int main(int argc, char **argv)
 {
+    // U1: a start that keeps Wheel resident runs from an unpacked copy of the
+    // AppImage, so no FUSE helper stays resident and the pages come from the
+    // real disk. The launcher exits 0 at once and the copy carries on with the
+    // same arguments; -1 means nothing was done (not an AppImage, already the
+    // copy, copying failed) and this process continues. One-shot commands never
+    // relaunch: they would only pay for the copy, and a relaunch without wait
+    // drops their exit code.
+    QStringList startArguments;
+    for (int i = 1; i < argc; ++i) startArguments << QString::fromLocal8Bit(argv[i]);
+    if (ResidentStart::keepsResident(startArguments)) {
+        const QByteArray appId = ArcadeLink::Ids::Wheel.toUtf8();
+        const int relaunched = arcade_relaunch_unpacked(appId.constData(), ARCADE_VERSION, 0, argv);
+        if (relaunched >= 0) return relaunched;
+    }
     ArcadeLink::onStartup();
     // The kit draws every control itself on Qt Quick Templates; Basic is the
     // lightest fallback for anything it does not cover.
@@ -560,6 +576,15 @@ int main(int argc, char **argv)
         // The successor runs from a new mount; it mustn't keep this one alive.
         QProcess successor;
         successor.setProgram(executable);
+        // This process may be an unpacked copy (U1), which has ARCADE_UNPACKED
+        // set so that it does not unpack itself again. The successor starts
+        // from the AppImage and has to unpack its own copy.
+        if (qEnvironmentVariableIsSet("ARCADE_UNPACKED") &&
+            ResidentStart::runsFromUnpackedCopy(QCoreApplication::applicationFilePath(), QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation))) {
+            auto environment = QProcessEnvironment::systemEnvironment();
+            environment.remove(QStringLiteral("ARCADE_UNPACKED"));
+            successor.setProcessEnvironment(environment);
+        }
         successor.setArguments({QStringLiteral("--restarting")});
         ArcadeLink::detachFromImage(successor);
         if (!successor.startDetached()) {

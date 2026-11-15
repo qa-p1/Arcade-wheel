@@ -128,7 +128,6 @@ public:
     Q_INVOKABLE void moveAction(const QString &deckId, int from, int to);
     Q_INVOKABLE QString actionUnavailableReason(const QVariantMap &action) const;
     Q_INVOKABLE void refreshApplications();
-    Q_INVOKABLE void refreshProviders();
     Q_INVOKABLE void setPeerEnabled(const QString &app, bool enabled);
     Q_INVOKABLE void getArcadeApp(const QString &app);
     Q_INVOKABLE void cancelLinkJob(const QString &job);

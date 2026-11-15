@@ -35,3 +35,48 @@ already lists `com.arcadewheel.ArcadeWheel` and `arcade-wheel` (fleet rule "One 
 `core/DiscoveredApplication.h`; the backends, which produce it, and `ConfigStore` and `ActionDispatcher`, which read
 it, include that. Kept on purpose: the Linux and Windows backends use `AppInstaller` for start at login and desktop
 repair once Wheel is installed, because the login item is part of the install integration.
+
+## D5. Dead code (step 4)
+
+Rule: remove with the language's own tools, keep only what is provably used, including by CI, packaging, Link entry
+points and other apps; vendored files are never edited.
+
+Evidence gathered: clang 18 with `-Wunused -Wunused-function -Wunused-member-function -Wunused-private-field
+-Wunused-macros -Wunused-template` over every Wheel and test translation unit that builds on Linux (clang 18 cannot
+parse `QPair` class-template deduction in `ArcadeLinkProvider.cpp`; g++ 13 with `-Wunused -Wunused-function
+-Wunused-macros -Wunused-but-set-variable -Wunused-local-typedefs -Wunused-const-variable=2` covered that file), no
+warning in Wheel's code; clang-tidy `misc-unused-using-decls`, `misc-unused-alias-decls`,
+`readability-redundant-declaration`, no finding. The compilers do not see members of public classes, so every
+function, slot, signal, `Q_PROPERTY`, `Q_INVOKABLE`, struct field and constant declared in the non-vendored headers was
+searched by name across `src/`, `qml/`, `tests/`, `scripts/`, `packaging/`, `.github/` and `docs/`, and each file under
+`qml/`, `assets/`, `scripts/`, `packaging/` and `tests/` was checked for a reference.
+
+Removed (one commit each):
+
+- `WheelController::refreshProviders()`: a `Q_INVOKABLE` that no QML, C++, test, script or CI step names.
+- `WheelLogic::centreOf()`: only its own test called it; the controller centres from the overlay window's size. The
+  test's centre column and assertion went with it, the `screenIndexFor` rows are unchanged.
+- `AppMetadata::Shelf` and `AppMetadata::Find`: namespace constants nothing refers to.
+- `WheelLink::lastError()` and `m_lastError`: no caller; the same value already goes to `diagnosticsChanged`.
+- `LinuxBackend::DesktopEntry::terminal`: parsed from every `.desktop` file, never read (GIO handles `Terminal=`).
+- `DiscoveredApplication::launchTarget`: set by the Linux and Windows backends, never read.
+- `assets/arcade/tokens.json`: compiled into the executable as a resource, opened by nothing, not vendored, not
+  refreshed by `scripts/sync-design`; the kit's `Theme.qml` carries the accents.
+
+Kept although it looks unused:
+
+- `WheelController::shortcutPeerConflict` (a `Q_PROPERTY`) is read only by `tst_WheelController`, and
+  `WheelLink::locations()` only by `tst_WheelLink`. Both are small test-visible state of live features (peer shortcut
+  conflicts, the Link registry location), so they stay until the owner decides on the UI that was meant to show them.
+- `shortcutFromKey` and `arcadeActionInfo` are `Q_INVOKABLE` but only called from C++ inside the controller; they are
+  used, the attribute is just wider than needed.
+- Windows, macOS and `ARCADE_HAVE_LAYERSHELLQT` code: not compiled on this Linux build, so only read by hand (every
+  helper has a second reference); nothing was removed there except the `launchTarget` assignment.
+- Everything under `src/link/qt`, `src/link/design`, `src/link/spec`, `src/link/fixtures`, `src/link/tools`, the shared
+  scripts and the Windows includes is vendored (D2, D3). Reported, not edited: a `retired` variable set and never read
+  (`-Wunused-but-set-variable`, `ArcadeInstall.cpp:1012`), and the kit components `HintBar`, `NumberField`, `OverlayRow`
+  and `Skeleton`, which neither Wheel nor other kit files use.
+- Unreferenced by CI, CMake, other scripts or docs, left for review: `packaging/linux/dev.arcade.Wheel.png`,
+  `packaging/linux/arcade-wheel-symbolic.svg`, `docs/dev/history/release-notes-template.md`. `tests/cli-contract.py` and
+  `tests/verify-wheel.py` are not run by CI (only `PROGRESS.md` and `docs/dev/link.md` mention them) and stay as
+  documented manual checks.

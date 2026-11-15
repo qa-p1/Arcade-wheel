@@ -6,6 +6,22 @@ Qt 6.8 is not installed in the authoring sandbox (Qt 6.4.2 only, no network inst
 the QML and the QtTest suite could not run there. Code that does not need Qt Quick was built and run against Qt 6.4
 in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everything else is **not run** until CI.
 
+## 2026-11-15 (cloud session)
+
+- Step 4, dead code (D5): seven removals, one commit each (a402dfc, 1009cd3, 815e65c, 7dba3a6, 36b88f1, c48678a,
+  3b92c29): `WheelController::refreshProviders`, `WheelLogic::centreOf` (and its test column), `AppMetadata::Shelf` and
+  `Find`, `WheelLink::lastError`, `DesktopEntry::terminal`, `DiscoveredApplication::launchTarget`, the unread
+  `assets/arcade/tokens.json`. Evidence per item is in D5. Vendored files untouched; findings in them are only reported.
+- Checks run: clang 18 `-Wunused*` (incl. member-function, private-field, macros, template) on every Wheel and test
+  translation unit, g++ 13 `-Wunused*` on `ArcadeLinkProvider.cpp` (clang 18 cannot parse it), clang-tidy
+  `misc-unused-using-decls`/`misc-unused-alias-decls`: no warning in Wheel's code. Name search of every non-vendored
+  header symbol across `src/ qml/ tests/ scripts/ packaging/ .github/ docs/`, and a reference check of every QML, asset,
+  script, packaging and fixture file.
+- Tested locally with Qt 6.8.3: clean CMake build with `-DWHEEL_WARNINGS_AS_ERRORS=ON`
+  `-DARCADE_REQUIRE_LAYERSHELLQT=OFF`, 21/21 ctest (offscreen; baseline before the changes was also 21/21), clang-format 18
+  on every non-vendored C++ file, `qmllint_gate`, `packaging/check-docs.py`, `packaging/check-link-vendor.py`. The Windows
+  and macOS code compiles only in CI; the one line removed there (`app.launchTarget = path;`) leaves `path` in use.
+
 ## 2026-11-14 - steps 2 and 6 (cloud session, branch `claude/sharp-cori-29w5eg`)
 
 - Step 6 (ba1b238): rc-only releases through Link `app-publish` (Inno), `promote.yml`, `nightly.yml`; the stage job

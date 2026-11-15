@@ -8,6 +8,9 @@ Short records of choices that are not obvious from the code. Newest first.
   every push to `main`. It now only checks and packages. Releases use the shared manual
   flow: `release.yml` with `beta` on `main` (a private draft prerelease), then `tag.yml`,
   then `release.yml` with `stable` on `v<version>`. See [packaging.md](packaging.md).
+  Since 2026-11-14 (fleet step 6, rule zero): stable is never built. `tag.yml` makes only
+  `v<version>-rc.<n>`, `release.yml` publishes it on Link's hidden `test` channel, and
+  `promote.yml` republishes a verified rc's bytes as stable with a signed manifest.
 - **Build number:** WHEEL.md asks for it in `arcade-release.json`, but the generator,
   `scripts/arcade-release.py`, is vendored byte-for-byte from Link and its manifest has no
   build field. The run number goes in the release notes instead; the manifest stays what

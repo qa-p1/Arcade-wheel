@@ -38,7 +38,7 @@ public:
     }
     QVector<DiscoveredApplication> applications() const override
     {
-        return {{"test.desktop", "Test app", {}, {}, {}}, {"second.desktop", "Second", {}, {}, {}}, {"third.desktop", "Third", {}, {}, {}}, {"fourth.desktop", "Fourth", {}, {}, {}}, {"fifth.desktop", "Fifth", {}, {}, {}}};
+        return {{"test.desktop", "Test app", {}, {}}, {"second.desktop", "Second", {}, {}}, {"third.desktop", "Third", {}, {}}, {"fourth.desktop", "Fourth", {}, {}}, {"fifth.desktop", "Fifth", {}, {}}};
     }
     bool launchApplication(const QString &id, bool, QString *error) override
     {

@@ -1101,7 +1101,6 @@ LinuxBackend::DesktopEntry LinuxBackend::readDesktopEntry(const QString &path, c
     if (entry.application.name.isEmpty()) entry.application.name = QFileInfo(path).completeBaseName();
     entry.application.icon = entry.icon;
     entry.application.description = localizedValue(values, QStringLiteral("Comment"));
-    entry.application.launchTarget = path;
     return entry;
 }
 

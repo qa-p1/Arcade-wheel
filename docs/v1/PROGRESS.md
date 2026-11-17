@@ -6,6 +6,19 @@ Qt 6.8 is not installed in the authoring sandbox (Qt 6.4.2 only, no network inst
 the QML and the QtTest suite could not run there. Code that does not need Qt Quick was built and run against Qt 6.4
 in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everything else is **not run** until CI.
 
+## 2026-11-17 - steps 6 to 8: 1.0.0, conformance, desktop suites, gates (cloud session, PR #24)
+
+- D7. Link v1.0.13, conformance 24/24 (ID-3 symbolic icon, REPO-2 dependency review), Tier 1 and Tier 2 desktop suites
+  in CI and in `gates.yml`, gates on the published rc (Linux lifecycle and upgrade from 0.5.0, Windows installer,
+  macOS DMG), version 1.0.0 and its changelog section.
+- CI on `ade3b02`: every job green, including Tier 1 (Hyprland) and Tier 2 (sway, KWin, Mutter, X11).
+- Tested locally: `dbus-run-session -- xvfb-run -a python3 scripts/verify-upgrade.py <published 0.5.0 AppImage>
+  <CI 1.0.0 AppImage from ade3b02>`: "PASS: 0.5.0 -> 1.0.0 keeps the user's wheel and settings and the integration"
+  (3 decks, 13 slots and 12 settings kept, one launcher, one login entry). Start at login switched off on 0.5.0 stays
+  off after the update (D7).
+- Not run: `gate-installer.ps1` and `gate-dmg.sh` need the hosted Windows and macOS runners and a published rc; they
+  first run in the rc.1 gates.
+
 ## 2026-11-15 - step 5: memory, unpacked runtime (cloud session, branch `local/wheel-step5`)
 
 - Link v1.0.10 (`2748ebf4`), U1 (`ResidentStart`, `main()`), the Restart successor fix, tests and D6 are in the

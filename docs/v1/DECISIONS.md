@@ -140,3 +140,42 @@ Found, in Link, not changed here: with `ARCADE_HOME` set, `ArcadeInstall::Enviro
 folder from under it and ignores `XDG_DATA_HOME`, while `arcade_unpacked.h` and `runtime::unpacked_root` follow
 `XDG_DATA_HOME`. They agree without `ARCADE_HOME` (every real install), so uninstall finds the copies; only isolated
 test sessions differ, and the packaged check points `XDG_DATA_HOME` where Link looks.
+
+## D7. 1.0.0: Link v1.0.13, conformance, desktop suites, release gates (steps 6 to 8)
+
+Link moves to v1.0.13 (`a24146f`) with `scripts/sync-design v1.0.13`, the same D3 steps: `scripts/VENDORED`,
+`packaging/windows/VENDORED`, `ARCADE_LINK_REVISION` in `ci.yml` and `docs/dev/vendored.md` name it, the reusable
+workflows (nightly, promote, release) are `@v1.0.13`, and the vendor checks pass (114 bundled files, 5 assets). What
+v1.0.11 to v1.0.13 change for Wheel: the inherited `ARCADE_UNPACKED` fix (D6), and the unpacked copy no longer
+inheriting the launcher's mount environment (Look's Restart hang; Wheel's copy runs the same `AppRun`).
+
+Conformance (`arcade-link conformance .`, Link 1.0.13 CLI): 24 checks, 0 failed after two fixes:
+- **ID-3:** `packaging/linux/dev.arcade.Wheel-symbolic.svg` (Link's `arcade.wheel.svg` glyph, unchanged), installed to
+  `share/icons/hicolor/symbolic/apps`; `scripts/sync-design` copies both desktop-id icons.
+- **REPO-2:** a `dependency review` job on pull requests (the audit half; Dependabot was already in place).
+
+Desktop suites in CI (`desktop`, `desktop-tier2`), on the CI AppImage, and in `gates.yml` on the published one:
+- Tier 1 (`tests/desktop/wheel_desktop.py`, headless Hyprland): a plain start opens Settings with Wheel's desktop id;
+  `--status`; `--show` maps the wheel as the `arcade-wheel` layer surface on the overlay layer, covering its monitor, and
+  adds no window; `--hide`, `--toggle` twice; Ctrl+W closes Settings and Wheel stays running; `--quit` leaves nothing.
+- Tier 2 (Link's `smoke.py` on sway, KWin, Mutter, X11) with the default `--background` start.
+
+Release gates (`gates.yml`, Link `app-gates.yml@v1.0.13`, previous release v0.5.0):
+- Linux: `tests/appimage-lifecycle.py` on the published AppImage in Link's isolated session, and
+  `scripts/verify-upgrade.py` from 0.5.0. 0.5.0 was built on Ubuntu 22.04, so it starts in the gates' 22.04 Linux job
+  (Shelf and Box need a separate 24.04 job for theirs).
+- Windows: `packaging/windows/gate-installer.ps1`: silent per-user install of the published Setup.exe, the installed
+  app's smoke test and native install checks, uninstall, nothing left.
+- macOS: `packaging/macos/gate-dmg.sh` on the Apple Silicon DMG (the hosted runner's architecture): copied out of the
+  image as a user drags it, smoke test, native install checks.
+
+The upgrade test fills 0.5.0's profile through `--settings-import` on the running 0.5.0 (3 decks, 13 slots, 12
+non-default settings), so nothing is written in ConfigStore's shape by hand, then installs the new file over it with
+`--install --silent` while 0.5.0 runs. It checks the settings file is untouched, that the new copy replaced the old in
+place, and that there is one launcher and at most one login entry, both starting the installed file.
+
+Start at login across an update: a fresh install starts at login (as every Arcade app); an existing install keeps the
+state of its entry (`loginEnabled` in `AppInstaller.cpp`). Checked by hand on 0.5.0 to the CI 1.0.0 without
+`ARCADE_HOME`: install adds the entry, switching start at login off removes it, the update keeps it off. With
+`ARCADE_HOME` set (isolated test sessions only) the installer's autostart folder is under it while the app reads
+`XDG_CONFIG_HOME`, the same split as in D6, so that case cannot be checked there.

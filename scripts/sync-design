@@ -17,6 +17,9 @@ cp "$icons/png/512.png" assets/arcade-wheel.png
 cp "$icons/wheel.ico" packaging/icons/arcade-wheel.ico
 cp "$icons/macos/icon.icns" packaging/icons/arcade-wheel.icns
 cp "$work"/link/assets/glyphs/arcade.*.svg assets/arcade/
+# The desktop-id copies Linux installs (conformance ID-3).
+cp "$icons/icon.svg" packaging/linux/dev.arcade.Wheel.svg
+cp assets/arcade/arcade.wheel.svg packaging/linux/dev.arcade.Wheel-symbolic.svg
 python3 packaging/check-link-vendor.py --source "$work/link"
 python3 packaging/check-vendored-tools.py --source "$work/link"
 echo "Vendored Arcade Link $tag ($(git -C "$work/link" rev-parse HEAD))."

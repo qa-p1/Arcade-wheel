@@ -176,6 +176,8 @@ install(DIRECTORY docs/user/ DESTINATION share/doc/arcade-wheel/docs/user)
 if(UNIX AND NOT APPLE)
     install(FILES packaging/linux/dev.arcade.Wheel.desktop DESTINATION share/applications)
     install(FILES assets/arcade-wheel.svg DESTINATION share/icons/hicolor/scalable/apps RENAME dev.arcade.Wheel.svg)
+    # The monochrome glyph the tray draws, for desktops that look up a symbolic icon by the desktop id.
+    install(FILES packaging/linux/dev.arcade.Wheel-symbolic.svg DESTINATION share/icons/hicolor/symbolic/apps)
 endif()
 
 include(CTest)

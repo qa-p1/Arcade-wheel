@@ -318,3 +318,21 @@ jobs:
           path: build/Testing/Temporary/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Tier 1: Settings and the wheel's layer surface on headless Hyprland (Link's desktop harness), from the AppImage
+  # built above; Tier 2: start, --status, tray and quit on sway, KWin, Mutter and X11.
+  desktop:
+    needs: build
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-e2e.yml@v1.0.13
+    with:
+      name: wheel
+      test: tests/desktop/wheel_desktop.py
+      args: '"$APP"'
+      artifact: ArcadeWheel-Linux-x86_64
+      link-ref: v1.0.13
+  desktop-tier2:
+    needs: build
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-tier2.yml@v1.0.13
+    with:
+      artifact: ArcadeWheel-Linux-x86_64
+      link-ref: v1.0.13

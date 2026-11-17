@@ -28,10 +28,14 @@ jobs:
       name: wheel
       previous: ${{ inputs.previous }}
       link-ref: v1.0.13
-      # What Qt's xcb platform plugin loads from the system, and xauth for xvfb-run.
+      # Every library the AppImage takes from the system (what a desktop always has: GL/EGL, X11, Wayland, fonts;
+      # `readelf -d` over the published image minus what it bundles), what Qt's xcb platform plugin loads, Mesa's
+      # software renderer for the headless checks, and xauth for xvfb-run. The hosted runner image is not a desktop:
+      # rc.1's gates found no libEGL.so.1 there.
       linux-packages: >-
-        xauth libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-render-util0 libxcb-image0 libxcb-xinerama0
-        libxcb-xkb1 libxkbcommon-x11-0
+        xauth libgl1-mesa-dri libegl1 libgl1 libglx0 libglvnd0 libx11-6 libx11-xcb1 libxcb1 libfontconfig1
+        libfreetype6 libwayland-client0 zlib1g libcom-err2 libgpg-error0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1
+        libxcb-render-util0 libxcb-image0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
       # The packaged install, resident and uninstall lifecycle, and the upgrade with a user's wheel and settings.
       linux-checks: |
         python3 ../Arcade-Link/tools/e2e.py run -- python3 tests/appimage-lifecycle.py "$RC"

@@ -47,11 +47,22 @@ private slots:
         QSignalSpy ready(&watcher, &ArcadeTrayHost::startupReady);
         QStringList states;
         connect(&watcher, &ArcadeTrayHost::stateChanged, this, [&](const QString &state) { QCOMPARE(QThread::currentThread(), thread()); states.append(state); });
+        QElapsedTimer startup;
+        startup.start();
         watcher.start();
         QTRY_VERIFY(watcher.ready());
         QCOMPARE(ready.count(), 1);
-        QCOMPARE(watcher.state(), QStringLiteral("hosted"));
-        QVERIFY(!states.contains("own"));
+        if (watcher.state() == QStringLiteral("own")) {
+            // Tools answered after the startup cap (a loaded CI runner: rc.2's macOS release build took this path).
+            // Wheel then shows its own icon, never earlier than the cap, and still moves to Tools when the answer
+            // comes.
+            QVERIFY2(startup.elapsed() >= TrayStartupCapMs - 10, qPrintable(QString::number(startup.elapsed())));
+            QTRY_COMPARE(watcher.state(), QStringLiteral("hosted"));
+        } else {
+            // Tools answered in time: the hosted icon is the first state, with no own icon flashing first.
+            QCOMPARE(watcher.state(), QStringLiteral("hosted"));
+            QVERIFY(!states.contains("own"));
+        }
         subscriber->write(notificationLine("tray.host", {{"hosted", false}}));
         QTRY_COMPARE(watcher.state(), QStringLiteral("own"));
         subscriber->write(notificationLine("tray.host", {{"hosted", true}}));

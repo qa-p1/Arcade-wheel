@@ -20,8 +20,8 @@ concurrency:
 
 env:
   QT_VERSION: '6.8.3'
-  # Arcade Link v1.0.10, the tag src/link and the design kit are vendored from.
-  ARCADE_LINK_REVISION: '2748ebf49eba78b131a1d41a40f92997d9141ffb'
+  # Arcade Link v1.0.13, the tag src/link and the design kit are vendored from.
+  ARCADE_LINK_REVISION: 'a24146fd87ff77ed362f518a414eaf266512f839'
   CARGO_BUILD_JOBS: '2'
   CMAKE_BUILD_PARALLEL_LEVEL: '2'
   PYTHONUTF8: '1'

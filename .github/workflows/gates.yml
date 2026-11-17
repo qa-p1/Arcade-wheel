@@ -1,0 +1,58 @@
+name: Gates
+
+# PLAN "Release" step 2: every exit gate against the published files of a release candidate, never a local build.
+# Run it on the rc tag ("Use workflow from: v1.0.0-rc.N") once "Release" has published it; "Promote" only after a
+# green run on the rc it promotes. The shared gates (published files and manifest, conformance, N-1, budgets, the
+# delta through Tools' updater, Windows and macOS smoke) are Link's app-gates.yml; Wheel adds its own Linux checks on
+# the published AppImage (the packaged lifecycle and the upgrade from the previous release) and both desktop suites.
+# 0.5.0 was built on Ubuntu 22.04, so the upgrade runs in the gates' Linux job.
+on:
+  workflow_dispatch:
+    inputs:
+      previous:
+        description: The previous stable release (upgrade test, and the delta "from the previous release")
+        default: v0.5.0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wheel-gates-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gates:
+    uses: qa-p1/Arcade-Link/.github/workflows/app-gates.yml@v1.0.13
+    with:
+      app: arcade.wheel
+      name: wheel
+      previous: ${{ inputs.previous }}
+      link-ref: v1.0.13
+      # What Qt's xcb platform plugin loads from the system, and xauth for xvfb-run.
+      linux-packages: >-
+        xauth libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-render-util0 libxcb-image0 libxcb-xinerama0
+        libxcb-xkb1 libxkbcommon-x11-0
+      # The packaged install, resident and uninstall lifecycle, and the upgrade with a user's wheel and settings.
+      linux-checks: |
+        python3 ../Arcade-Link/tools/e2e.py run -- python3 tests/appimage-lifecycle.py "$RC"
+        dbus-run-session -- xvfb-run -a python3 scripts/verify-upgrade.py "$PREVIOUS" "$RC"
+      windows-check: pwsh -NoProfile -File packaging/windows/gate-installer.ps1 -Setup "$(ls rc/*-Setup.exe)"
+      # The hosted macOS runner is Apple Silicon; the Intel DMG is the same build for the other architecture.
+      macos-check: bash packaging/macos/gate-dmg.sh rc/*-macOS-arm64.dmg
+
+  # Tier 1 (headless Hyprland) blocks on any failure; Tier 2 (sway, KWin, Mutter, X11) on a crash or data loss.
+  desktop:
+    needs: gates
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-e2e.yml@v1.0.13
+    with:
+      name: wheel
+      test: tests/desktop/wheel_desktop.py
+      args: '"$APP"'
+      artifact: gate-appimage
+      link-ref: v1.0.13
+  desktop-tier2:
+    needs: gates
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-tier2.yml@v1.0.13
+    with:
+      artifact: gate-appimage
+      link-ref: v1.0.13

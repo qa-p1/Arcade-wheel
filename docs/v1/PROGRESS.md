@@ -6,6 +6,47 @@ Qt 6.8 is not installed in the authoring sandbox (Qt 6.4.2 only, no network inst
 the QML and the QtTest suite could not run there. Code that does not need Qt Quick was built and run against Qt 6.4
 in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everything else is **not run** until CI.
 
+## 2026-11-17 - steps 6 to 8: 1.0.0, conformance, desktop suites, gates (cloud session, PR #24)
+
+- D7. Link v1.0.13, conformance 24/24 (ID-3 symbolic icon, REPO-2 dependency review), Tier 1 and Tier 2 desktop suites
+  in CI and in `gates.yml`, gates on the published rc (Linux lifecycle and upgrade from 0.5.0, Windows installer,
+  macOS DMG), version 1.0.0 and its changelog section.
+- CI on `ade3b02`: every job green, including Tier 1 (Hyprland) and Tier 2 (sway, KWin, Mutter, X11).
+- Tested locally: `dbus-run-session -- xvfb-run -a python3 scripts/verify-upgrade.py <published 0.5.0 AppImage>
+  <CI 1.0.0 AppImage from ade3b02>`: "PASS: 0.5.0 -> 1.0.0 keeps the user's wheel and settings and the integration"
+  (3 decks, 13 slots and 12 settings kept, one launcher, one login entry). Start at login switched off on 0.5.0 stays
+  off after the update (D7).
+- Not run: `gate-installer.ps1` and `gate-dmg.sh` need the hosted Windows and macOS runners and a published rc; they
+  first run in the rc.1 gates.
+
+## 2026-11-15 - step 5: memory, unpacked runtime (cloud session, branch `local/wheel-step5`)
+
+- Link v1.0.10 (`2748ebf4`), U1 (`ResidentStart`, `main()`), the Restart successor fix, tests and D6 are in the
+  commits on top of `origin/main`; `git log origin/main..HEAD` lists them. WH1 stays as D-W0 says; W1, W3b and OPEN1 are
+  WebKit only.
+- Tested locally with Qt 6.8.3 (aqt), Linux x86_64, no real desktop session:
+  - `cmake -S . -B build-ls -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DWHEEL_WARNINGS_AS_ERRORS=ON
+    -DARCADE_REQUIRE_LAYERSHELLQT=ON` (LayerShellQt 6.4.6 and ECM 6.14.0 built from KDE's git tags, as
+    `packaging/linux/build-dependencies.sh` does from tarballs, which this sandbox cannot download, so their checksums
+    were not checked), then `scripts/check.py --build build-ls --config Release --link-source <Link at 2748ebf4>`:
+    build with warnings as errors, clang-format 18.1.3, qmllint gate, `check-link-vendor.py` and
+    `check-vendored-tools.py` against Link, shortcut data, doc links, release tests and 23/23 ctest (offscreen, software
+    renderer): pass. The same run on the build without LayerShellQt also passes.
+  - New tests fail without the change: `ResidentStart` with `keepsResident` returning false fails its four
+    resident rows; the packaged check with the relaunch disabled in `main()` times out waiting for the launcher to exit
+    (it stays the resident); without the Restart fix the successor's `/proc/<pid>/exe` is the AppImage mount, not the copy.
+  - `scripts/package` (`packaging/linux/package.sh build-ls dist`): AppImage built, bundle check and `--smoke-test` pass.
+    `tests/appimage-lifecycle.py` on that AppImage inside Link's `tools/e2e.py run --` (Link CLI built from the same
+    commit): passes, covering the unpacked resident, Restart, `--quit` and uninstall. The SVG engine files are in the image.
+  - `tests/hub-lifecycle.py` on `build/arcade-wheel` in `e2e.py run --`, and `tests/cli-contract.py`: pass (they run the
+    binary directly, not an AppImage, so they see no relaunch).
+- Not run: Windows and macOS (compile only in CI; the header is a no-op there and `main()` calls it on every
+  platform); `tests/verify-wheel.py` (needs the other apps' builds under fixed paths); the WH1 comparison and any
+  memory measurement (RSS and PSS were not measured, only where the resident runs from); the real AppImage
+  runtime with FUSE (the sandbox runs AppImages with `APPIMAGE_EXTRACT_AND_RUN=1`, as CI does).
+- The tag `v1.0.10` did not exist yet: the vendoring ran from the commit (D6). Re-running `scripts/sync-design v1.0.10`
+  once the tag exists should change nothing.
+
 ## 2026-11-15 - step 4 (cloud session, branch `claude/sharp-cori-29w5eg`)
 
 - Step 4, dead code (D5): eight removals, one commit each (a402dfc, 1009cd3, 815e65c, 7dba3a6, 36b88f1, c48678a,

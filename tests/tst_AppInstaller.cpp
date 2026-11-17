@@ -144,8 +144,20 @@ private slots:
             QCOMPARE(QFileInfo::exists(integration.value("autostart").toString()), enabled);
             QCOMPARE(changed.value("integration").toObject().value("autostart").isString(), enabled);
         }
+        // Wheel's unpacked copies (U1) go with it through the same call, and another app's stay.
+        const QString unpackedRoot = env.data + "/arcade/runtime";
+        const QStringList wheelCopies{unpackedRoot + "/wheel-0.3.0-0123456789abcdef", unpackedRoot + "/wheel-0.2.0-fedcba9876543210",
+                                      unpackedRoot + "/.wheel-0.3.0-0123456789abcdef.tmp-4242"};
+        const QString shelfCopy = unpackedRoot + "/shelf-0.3.0-0123456789abcdef";
+        for (const QString &copy : wheelCopies + QStringList{shelfCopy}) {
+            QVERIFY(QDir().mkpath(copy + "/usr/bin"));
+            QFile marker(copy + "/usr/bin/arcade-app");
+            QVERIFY(marker.open(QIODevice::WriteOnly));
+        }
         AppInstaller::Engine::UninstallOptions uninstall;
         QVERIFY2(engine.uninstall(Ids::Wheel, uninstall, nullptr, &error), qPrintable(error));
+        for (const QString &copy : wheelCopies) QVERIFY2(!QFileInfo::exists(copy), qPrintable(copy));
+        QVERIFY(QFileInfo::exists(shelfCopy + "/usr/bin/arcade-app"));
         QVERIFY(!QFileInfo::exists(receipt.value("path").toString()));
         QVERIFY(!QFileInfo::exists(integration.value("autostart").toString()));
         QVERIFY(QFileInfo::exists(source));

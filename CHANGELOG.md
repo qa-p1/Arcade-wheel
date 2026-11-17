@@ -5,6 +5,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-17
+
 ### Fixed
 
 - Importing settings with a huge deck name froze the wheel for minutes. Imports over 2 MiB are refused unread, and text length, ids, action types and counts are checked first; a refused import changes nothing and says why.
@@ -18,7 +20,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Arcade Link v1.0.6 (Qt module, design kit, release tools).
+- On Linux, the AppImage now starts Wheel from a copy of itself in `~/.local/share/arcade/runtime/`, made once per version, instead of from the AppImage's own mount. The helper process the mount needs no longer stays in memory. The copy takes about 145 MB of disk, Restart keeps using it, and uninstalling Wheel removes it. Commands such as `--status` and `--version` run as before.
+- The monochrome tray icon is also installed under Wheel's desktop id (`dev.arcade.Wheel-symbolic`).
+- Arcade Link v1.0.13 (Qt module, design kit, release tools).
 
 
 ## 0.5.0 — 2026-11-01

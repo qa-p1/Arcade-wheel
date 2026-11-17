@@ -20,13 +20,23 @@ concurrency:
 
 env:
   QT_VERSION: '6.8.3'
-  # Arcade Link v1.0.7, the tag src/link and the design kit are vendored from.
-  ARCADE_LINK_REVISION: '40ec0279095f7a5082b0fbe2912d1a869b98f55d'
+  # Arcade Link v1.0.13, the tag src/link and the design kit are vendored from.
+  ARCADE_LINK_REVISION: 'a24146fd87ff77ed362f518a414eaf266512f839'
   CARGO_BUILD_JOBS: '2'
   CMAKE_BUILD_PARALLEL_LEVEL: '2'
   PYTHONUTF8: '1'
 
 jobs:
+  # Wheel's only package-manager dependencies are GitHub Actions (Qt is pinned above and Link is vendored, see
+  # SECURITY.md); a pull request that adds or bumps one with a known advisory fails here. Dependabot keeps them current.
+  dependency-review:
+    name: dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/dependency-review-action@v4
   build:
     name: ${{ matrix.name }}
     timeout-minutes: 45
@@ -308,3 +318,21 @@ jobs:
           path: build/Testing/Temporary/
           if-no-files-found: ignore
           retention-days: 7
+
+  # Tier 1: Settings and the wheel's layer surface on headless Hyprland (Link's desktop harness), from the AppImage
+  # built above; Tier 2: start, --status, tray and quit on sway, KWin, Mutter and X11.
+  desktop:
+    needs: build
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-e2e.yml@v1.0.13
+    with:
+      name: wheel
+      test: tests/desktop/wheel_desktop.py
+      args: '"$APP"'
+      artifact: ArcadeWheel-Linux-x86_64
+      link-ref: v1.0.13
+  desktop-tier2:
+    needs: build
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-tier2.yml@v1.0.13
+    with:
+      artifact: ArcadeWheel-Linux-x86_64
+      link-ref: v1.0.13

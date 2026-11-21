@@ -6,6 +6,28 @@ Qt 6.8 is not installed in the authoring sandbox (Qt 6.4.2 only, no network inst
 the QML and the QtTest suite could not run there. Code that does not need Qt Quick was built and run against Qt 6.4
 in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everything else is **not run** until CI.
 
+## 2026-11-18 - 1.0.0 promoted (cloud session)
+
+`v1.0.0-rc.4` (5481c63, Link 1.0.13, Tier 2 from Link 1.0.14) passed
+[Gates](https://github.com/qa-p1/Arcade-wheel/actions/runs/44226061986) 12/12 on its published files: published files,
+delta from v0.5.0, memory and performance budgets, Linux conformance with the lifecycle and upgrade checks, Windows and
+macOS installer smoke, N-1, and both desktop suites (Tier 1 Hyprland; Tier 2 sway, KWin, Mutter, X11).
+[Promote](https://github.com/qa-p1/Arcade-wheel/actions/runs/44228311950) made it
+[1.0.0](https://github.com/qa-p1/Arcade-wheel/releases/tag/v1.0.0), now the latest release. The AppImage, both dmgs,
+the setup.exe, the Windows zip and SHA256SUMS.txt have the same SHA-256 digests as rc.4; `manifest.json` and
+`arcade-release.json` differ only in the channel (`test` to `stable`), the tag and the notes link, and
+`manifest.json.sig` is new.
+
+What stopped the earlier rcs, each fixed before the next:
+- rc.1 (9ae74f4): Gates' Linux job lacked libraries the AppImage takes from the desktop (`libEGL.so.1`), so CLI-1 to
+  CLI-4 exited 127. #25 installs the full list.
+- rc.2 (a29a65c): its own Release failed on macOS arm64: `tst_WheelTrayHost` expected "hosted" first, but on a loaded
+  runner the test's fake Tools answered after the 300 ms startup cap, so Wheel rightly showed its own icon first. #26
+  checks the contract either way: in time, "hosted" with no own icon before it; late, "own" no earlier than the cap,
+  then "hosted".
+- rc.3 (60c58a1): its own Release failed in Tier 2 (sway, X11): the desktop packages timed out on a slow Ubuntu
+  mirror. #27 moves Tier 2 to Link 1.0.14 (package cache, parallel prefetch, mirror fallback). Nothing was published.
+
 ## 2026-11-17 - steps 6 to 8: 1.0.0, conformance, desktop suites, gates (cloud session, PR #24)
 
 - D7. Link v1.0.13, conformance 24/24 (ID-3 symbolic icon, REPO-2 dependency review), Tier 1 and Tier 2 desktop suites

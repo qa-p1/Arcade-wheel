@@ -63,7 +63,10 @@ def main():
     if not (build / "CMakeCache.txt").exists():
         run("cmake", "-S", ROOT, "-B", build, "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release",
             "-DBUILD_TESTING=ON", "-DWHEEL_WARNINGS_AS_ERRORS=ON")
-    run("cmake", "--build", build, "--config", args.config, "--parallel")
+    # A bare --parallel is `make -j` with no limit (and makes CMake ignore CMAKE_BUILD_PARALLEL_LEVEL): every QML
+    # cache file compiled at once swapped the 7 GB macOS arm64 runner for over half an hour. Always name a count.
+    jobs = os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL") or str(os.cpu_count() or 2)
+    run("cmake", "--build", build, "--config", args.config, "--parallel", jobs)
     linux = sys.platform.startswith("linux")
     if linux:
         check_format()

@@ -76,6 +76,15 @@ When Arcade Tools is running, its tray icon hosts Wheel's menu, including **Open
 
 See [how the Arcade apps connect](docs/user/with-other-apps.md) and [Arcade Link actions and platform support](docs/dev/link.md).
 
+## Use it from anywhere
+
+With [Arcade Tools](https://github.com/qa-p1/Arcade-tools) 1.1 or later installed, its Arcade helper puts **Add to
+Wheel** in your file manager's right-click menu for files and folders (Files, Dolphin, Caja, Nemo, Thunar and "Open
+With" on Linux, File Explorer on Windows, Finder's Quick Actions on macOS), below what the file is for, so a file or
+folder becomes a wheel slot without opening Wheel. The Arcade browser extension will offer it on links and pages when
+it ships, and **Show the Wheel** is in searchable Arcade lists. See Tools'
+[Everywhere guide](https://github.com/qa-p1/Arcade-tools/blob/main/docs/user/everywhere.md) for pinning and defaults.
+
 ## Usage
 
 Closing Settings leaves the wheel running. When the desktop has a system tray, the tray icon opens Settings on click. Its menu offers **Open wheel**, **Settings**, **Restart Arcade Wheel** and **Quit Arcade Wheel**. The default shortcut is **F8**, and the desktop may ask you to approve it the first time.

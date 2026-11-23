@@ -1,5 +1,19 @@
 # Arcade Wheel: status
 
+## 2026-11-23: 1.1.0 released
+
+Current release: [1.1.0](https://github.com/qa-p1/Arcade-wheel/releases/tag/v1.1.0), promoted from `v1.1.0-rc.1` after
+Gates passed 12/12 on its published files (delta from 1.0.0, memory and performance budgets, Linux conformance, the
+Windows and macOS installer smokes, N-1, and both desktop suites: Hyprland; sway, KWin, Mutter and X11). Before it,
+1.0.0 (2026-11-17).
+
+1.1.0 moved Wheel onto Arcade Link 1.1.1: "Add to Wheel" takes an action from any Arcade app (newer apps included),
+Wheel's list of other apps' actions follows the catalog's rules and the user's hidden actions, and "Add to Wheel" is
+offered in file and folder menus, on browser links and pages, and in the palette.
+
+Not verified yet: the wheel and its menu entry on a real Windows or macOS desktop (CI covers the installers and the
+Linux desktops above), and the browser surfaces, which wait for the Arcade browser extension.
+
 ## 2026-11-01: 0.5.0 (WHEEL.md overhaul)
 
 - Kit: Arcade Link v1.0.13's QML kit as a static module (`arcade_kit`), Inter, Wheel's amber.

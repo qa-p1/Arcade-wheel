@@ -22,12 +22,12 @@ concurrency:
 
 jobs:
   gates:
-    uses: qa-p1/Arcade-Link/.github/workflows/app-gates.yml@v1.1.0
+    uses: qa-p1/Arcade-Link/.github/workflows/app-gates.yml@v1.1.1
     with:
       app: arcade.wheel
       name: wheel
       previous: ${{ inputs.previous }}
-      link-ref: v1.1.0
+      link-ref: v1.1.1
       # Every library the AppImage takes from the system (what a desktop always has: GL/EGL, X11, Wayland, fonts;
       # `readelf -d` over the published image minus what it bundles), what Qt's xcb platform plugin loads, Mesa's
       # software renderer for the headless checks, and xauth for xvfb-run. The hosted runner image is not a desktop:
@@ -47,16 +47,16 @@ jobs:
   # Tier 1 (headless Hyprland) blocks on any failure; Tier 2 (sway, KWin, Mutter, X11) on a crash or data loss.
   desktop:
     needs: gates
-    uses: qa-p1/Arcade-Link/.github/workflows/desktop-e2e.yml@v1.1.0
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-e2e.yml@v1.1.1
     with:
       name: wheel
       test: tests/desktop/wheel_desktop.py
       args: '"$APP"'
       artifact: gate-appimage
-      link-ref: v1.1.0
+      link-ref: v1.1.1
   desktop-tier2:
     needs: gates
-    uses: qa-p1/Arcade-Link/.github/workflows/desktop-tier2.yml@v1.1.0
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-tier2.yml@v1.1.1
     with:
       artifact: gate-appimage
-      link-ref: v1.1.0
+      link-ref: v1.1.1

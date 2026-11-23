@@ -5,6 +5,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-23
+
 ### Added
 
 - "Add to Wheel" takes an action from any Arcade app, including apps newer than this Wheel, as the browser extension, the file manager menus and other apps offer it. An app Wheel has no glyph for gets the Arcade glyph.

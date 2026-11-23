@@ -6,6 +6,26 @@ Qt 6.8 is not installed in the authoring sandbox (Qt 6.4.2 only, no network inst
 the QML and the QtTest suite could not run there. Code that does not need Qt Quick was built and run against Qt 6.4
 in a throw-away harness (ConfigStore, WheelPaths and the Link path code); everything else is **not run** until CI.
 
+## 2026-11-23 - 1.1.0 promoted (cloud session)
+
+`v1.1.0-rc.1` (5e4f055, PR #29: Link 1.1.1, the shared action rules, any app's action) passed
+[Gates](https://github.com/qa-p1/Arcade-wheel/actions/runs/45174864217) 12/12 on its published files: published files,
+delta from v1.0.0, memory and performance budgets, Linux conformance, Windows and macOS installer smoke, N-1, and both
+desktop suites (Tier 1 Hyprland; Tier 2 sway, KWin, Mutter, X11).
+[Promote](https://github.com/qa-p1/Arcade-wheel/actions/runs/45176537134) made it
+[1.1.0](https://github.com/qa-p1/Arcade-wheel/releases/tag/v1.1.0), now the latest release. The AppImage, both dmgs,
+the setup.exe, the Windows zip and SHA256SUMS.txt have the same SHA-256 digests as rc.1; `manifest.json` and
+`arcade-release.json` differ only in the channel (`test` to `stable`), the tag and the notes link, and
+`manifest.json.sig` is new.
+
+PR #29's CI found three things, each fixed before the merge:
+- ARM Linux `scripts/check` hit the 45-minute limit: `cmake --build --parallel` with no number runs an unbounded
+  `make -j` and ignores `CMAKE_BUILD_PARALLEL_LEVEL`, which swapped the 7 GB runner. `check.py` now passes the job count.
+- One `hub-lifecycle.py` run timed out on a status wait after `app.restart` and could not be reproduced (13 local runs,
+  restart takes 0.1-0.2 s). The timeout now prints the exit code, output and Wheel's logs.
+- macOS: `hdiutil attach` can fail with "Resource temporarily unavailable" right after `hdiutil create`.
+  `packaging/macos/attach.sh` tries again up to five times, for that error only.
+
 ## 2026-11-18 - 1.0.0 promoted (cloud session)
 
 `v1.0.0-rc.4` (5481c63, Link 1.0.13, Tier 2 from Link 1.0.14) passed

@@ -5,6 +5,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- CI: install-qt-action 4.5.0, upload-artifact 7.0.2 (the release workflow moves from 4) and download-artifact 8.0.2,
+  each pinned to its commit.
+
 ## [1.1.0] - 2026-11-23
 
 ### Added

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(dirname -- "${BASH_SOURCE[0]}")/attach.sh"
 
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 build=$(cd "${1:-$repo/build}" && pwd)
@@ -36,7 +37,7 @@ hdiutil create -volname 'Arcade Wheel' -srcfolder "$stage" -ov -format UDZO "$ou
 # directory. Native install/move/receipt helpers are exercised by CTest.
 mount="$stage/dmg-mounted"
 mkdir -p "$mount"
-hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$output/$filename"
+attach_dmg "$mount" "$output/$filename"
 trap 'hdiutil detach "$mount" >/dev/null 2>&1 || true; rm -rf -- "$stage"' EXIT
 ditto "$mount/Arcade Wheel.app" "$stage/dmg-copy/Arcade Wheel.app"
 hdiutil detach "$mount"

@@ -3,6 +3,7 @@
 
 #include <QBuffer>
 #include <QClipboard>
+#include <QDir>
 #include <QFile>
 #include <QGuiApplication>
 #include <QJsonDocument>
@@ -111,6 +112,61 @@ private slots:
         QVERIFY(findListed);
         for (const auto &row : provider.connectedApps()) QCOMPARE(row.toMap().value("state").toString(), QStringLiteral("Not installed"));
         QVERIFY(provider.shortcutOwner("F8").isEmpty());
+    }
+    void pickerFollowsSurfacesCatalogRulesAndHiddenChoices()
+    {
+        if (QStandardPaths::findExecutable("arcade-link").isEmpty()) QSKIP("arcade-link mock is not on PATH");
+        const auto any = QJsonArray{"text/plain"};
+        const QJsonObject json{{"actions", QJsonArray{QJsonObject{{"id", "look.renamed"}, {"title", "Old title"}, {"accepts", any}},
+                                                      QJsonObject{{"id", "look.kept"}, {"title", "Kept"}, {"accepts", any}},
+                                                      QJsonObject{{"id", "look.hidden_by_catalog"}, {"title", "Catalog hides it"}, {"accepts", any}},
+                                                      QJsonObject{{"id", "look.hidden_by_user"}, {"title", "User hid it"}, {"accepts", any}},
+                                                      QJsonObject{{"id", "look.internal"}, {"title", "For callers"}, {"accepts", any}, {"surfaces", QJsonArray{"internal"}}},
+                                                      QJsonObject{{"id", "look.menus_only"}, {"title", "Menus only"}, {"accepts", any}, {"surfaces", QJsonArray{"file-menu"}}}}}};
+        const auto locations = Locations::discover();
+        QDir().mkpath(QFileInfo(locations.catalogPath()).absolutePath());
+        QFile catalog(locations.catalogPath());
+        QVERIFY(catalog.open(QIODevice::WriteOnly));
+        catalog.write(QJsonDocument(QJsonObject{{"apps", QJsonArray{QJsonObject{{"id", "arcade.look"}, {"name", "Arcade Look"}}}},
+                                                {"rules", QJsonObject{{"hide", QJsonArray{"arcade.look/look.hidden_by_catalog"}},
+                                                                      {"rename", QJsonObject{{"arcade.look/look.renamed", "New title"}}}}}})
+                          .toJson());
+        catalog.close();
+        QVERIFY(saveOfferPrefs(locations, {{"hidden", QJsonArray{"arcade.look/look.hidden_by_user"}}}));
+        MockPeer look;
+        QVERIFY(look.start(Ids::Look, writeFixture(*root, json)));
+        ArcadeLinkProvider provider;
+        provider.apply({{"enabled", true}});
+        QTRY_VERIFY_WITH_TIMEOUT(!provider.tools().isEmpty(), 5000);
+        QStringList titles;
+        for (const auto &row : provider.tools()) titles << row.toMap().value("title").toString();
+        titles.sort();
+        QCOMPARE(titles, (QStringList{"Kept", "New title"}));
+    }
+    void aNewCatalogAppIsListedWithTheArcadeGlyph()
+    {
+        const auto locations = Locations::discover();
+        QDir().mkpath(QFileInfo(locations.catalogPath()).absolutePath());
+        QFile catalog(locations.catalogPath());
+        QVERIFY(catalog.open(QIODevice::WriteOnly));
+        catalog.write(QJsonDocument(QJsonObject{{"apps", QJsonArray{QJsonObject{{"id", "arcade.look"}, {"name", "Arcade Look"}},
+                                                                    QJsonObject{{"id", "arcade.newapp"}, {"name", "Arcade New"}, {"tagline", "Does new things"}}}}})
+                          .toJson());
+        catalog.close();
+        ArcadeLinkProvider provider;
+        QSignalSpy changed(&provider, &ArcadeLinkProvider::changed);
+        provider.apply({{"enabled", true}});
+        QTRY_VERIFY(changed.count() >= 2);
+        QVariantMap added;
+        QStringList ids;
+        for (const auto &row : provider.connectedApps()) {
+            ids << row.toMap().value("id").toString();
+            if (row.toMap().value("id") == "arcade.newapp") added = row.toMap();
+        }
+        QCOMPARE(ids, (QStringList{"arcade.look", "arcade.newapp", Ids::Tools}));
+        QCOMPARE(added.value("name").toString(), QStringLiteral("Arcade New"));
+        QCOMPARE(added.value("pitch").toString(), QStringLiteral("Does new things"));
+        QCOMPARE(added.value("glyph").toString(), QStringLiteral("qrc:/assets/arcade/arcade.tools.svg"));
     }
     void mockDiscoveryBeforeAndAfterWheel()
     {

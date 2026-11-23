@@ -5,6 +5,18 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- "Add to Wheel" takes an action from any Arcade app, including apps newer than this Wheel, as the browser extension, the file manager menus and other apps offer it. An app Wheel has no glyph for gets the Arcade glyph.
+- Settings › Connected apps lists the apps in Arcade Tools' shared app list, with their names and descriptions from it, so a new Arcade app appears without a Wheel update.
+
+### Changed
+
+- Wheel's list of other apps' actions follows the same rules as every Arcade menu (Arcade Link 1.1): actions the catalog hides or renames are hidden or renamed, actions you hid elsewhere are hidden, and actions an app offers only to other programs are left out.
+- "Add to Wheel" appears in the file manager menus and on links and pages in the browser, below what the file or page is for; "Show the Wheel" only in searchable lists.
+- Arcade Box 1.0 lists each saved pipeline as its own action; Wheel keeps listing pipelines once, as before, and saved pipeline slots keep working.
+- Arcade Link 1.1.1 (Qt module, design kit, release tools).
+
 ## [1.0.0] - 2026-11-17
 
 ### Fixed

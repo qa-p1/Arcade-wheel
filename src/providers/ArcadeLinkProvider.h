@@ -20,6 +20,9 @@ struct WheelClipboard {
 
 // Registry and IPC workers publish immutable snapshots. Menus, slot state and
 // shortcut recording use only that cache, with no disk access or IPC.
+// The glyph Wheel shows for an Arcade app.
+QString glyphFor(const QString &app);
+
 class ArcadeLinkProvider final : public QObject, public ActionProvider {
     Q_OBJECT
 public:

@@ -264,6 +264,44 @@ private slots:
         QVERIFY(WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", data}}, &error).isEmpty());
     }
 
+    void anyArcadeAppsOfferCanBeAdded()
+    {
+        QString error;
+        // An offer from Link's shared list names no version, and may come from an app this build doesn't know.
+        const QJsonObject offer{{"app", "arcade.newapp"}, {"action", "newapp.do"}, {"title", "Do the new thing"}};
+        auto draft = WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", offer}}, &error);
+        QVERIFY2(!draft.isEmpty(), qPrintable(error));
+        const auto payload = QJsonObject::fromVariantMap(draft.value("payload").toMap());
+        QCOMPARE(payload.value("app").toString(), QStringLiteral("arcade.newapp"));
+        QCOMPARE(payload.value("version").toInt(), 1);
+        QCOMPARE(payload.value("input").toString(), QStringLiteral("none"));
+        QCOMPARE(draft.value("icon").toString(), QStringLiteral("qrc:/assets/arcade/arcade.tools.svg"));
+        // Not Arcade ids, Wheel itself, or an explicit version below 1.
+        for (const auto &app : {QStringLiteral("evil"), QStringLiteral("arcade."), QStringLiteral("arcade.Bad id"), Ids::Wheel}) {
+            auto invalid = offer;
+            invalid.insert("app", app);
+            QVERIFY2(WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", invalid}}, &error).isEmpty(), qPrintable(app));
+        }
+        auto old = offer;
+        old.insert("version", 0);
+        QVERIFY(WheelLink::draftFor({{"type", "structured/arcade-action"}, {"data", old}}, &error).isEmpty());
+    }
+
+    void cardSaysWhereEachActionIsOffered()
+    {
+        QJsonObject add, show;
+        for (const auto &value : WheelLink::actions()) {
+            const auto action = value.toObject();
+            if (action.value("id") == "wheel.add_action") add = action;
+            if (action.value("id") == "wheel.show") show = action;
+        }
+        const auto addSurfaces = actionSurfaces(add);
+        QVERIFY(addSurfaces.contains("file-menu") && addSurfaces.contains("browser-link") && addSurfaces.contains("palette"));
+        QVERIFY2(!addSurfaces.contains("browser-image") && !addSurfaces.contains("browser-video"), "not on every picture or video");
+        QVERIFY(actionRankFor(add, "file/image") < 20);
+        QCOMPARE(actionSurfaces(show), QStringList{"palette"});
+    }
+
     void findShowAcceptsClipboardAndFileSelection()
     {
         QString error;

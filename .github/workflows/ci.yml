@@ -20,8 +20,8 @@ concurrency:
 
 env:
   QT_VERSION: '6.8.3'
-  # Arcade Link v1.0.13, the tag src/link and the design kit are vendored from.
-  ARCADE_LINK_REVISION: 'a24146fd87ff77ed362f518a414eaf266512f839'
+  # Arcade Link v1.1.1, the tag src/link and the design kit are vendored from.
+  ARCADE_LINK_REVISION: 'd04f3ca33c01e31727a829afb54f2fbc1bb03e74'
   CARGO_BUILD_JOBS: '2'
   CMAKE_BUILD_PARALLEL_LEVEL: '2'
   PYTHONUTF8: '1'
@@ -323,16 +323,16 @@ jobs:
   # built above; Tier 2: start, --status, tray and quit on sway, KWin, Mutter and X11.
   desktop:
     needs: build
-    uses: qa-p1/Arcade-Link/.github/workflows/desktop-e2e.yml@v1.0.13
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-e2e.yml@v1.1.1
     with:
       name: wheel
       test: tests/desktop/wheel_desktop.py
       args: '"$APP"'
       artifact: ArcadeWheel-Linux-x86_64
-      link-ref: v1.0.13
+      link-ref: v1.1.1
   desktop-tier2:
     needs: build
-    uses: qa-p1/Arcade-Link/.github/workflows/desktop-tier2.yml@v1.0.14
+    uses: qa-p1/Arcade-Link/.github/workflows/desktop-tier2.yml@v1.1.1
     with:
       artifact: ArcadeWheel-Linux-x86_64
-      link-ref: v1.0.14
+      link-ref: v1.1.1

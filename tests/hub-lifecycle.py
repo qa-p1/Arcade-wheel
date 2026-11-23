@@ -35,9 +35,19 @@ def run(executable, *args, environment=None, check=True):
         raise AssertionError(f"{args}: {result.returncode}\n{result.stdout}\n{result.stderr}")
     return result
 
+last_status = None
+
 def status(executable):
-    result = run(executable, "--status", check=False)
+    global last_status
+    result = last_status = run(executable, "--status", check=False)
     return json.loads(result.stdout) if result.returncode == 0 else {}
+
+def logs():
+    # What Wheel itself said (its stdout/stderr here, its own log folder): a status timeout alone can't tell a
+    # successor that never started from one that refused to or didn't answer.
+    folders = {root, *(Path(env[name]) for name in ("XDG_CACHE_HOME", "XDG_STATE_HOME", "ARCADE_HOME") if env.get(name))}
+    files = [root / "wheel-hub.log", *sorted({f for d in folders if d.is_dir() for f in d.rglob("arcade-wheel*.log")})]
+    return "".join(f"\n--- {f} (end)\n{f.read_text(errors='replace')[-4000:]}" for f in files if f.is_file())
 
 def wait_for(executable, predicate, timeout=10):
     deadline = time.monotonic() + timeout
@@ -46,7 +56,8 @@ def wait_for(executable, predicate, timeout=10):
         last = status(executable)
         if predicate(last):
             return last
-    raise AssertionError(f"status timeout: {last}")
+    detail = f" (exit {last_status.returncode}: {last_status.stdout.strip()} {last_status.stderr.strip()})" if last_status else ""
+    raise AssertionError(f"status timeout: {last}{detail}{logs()}")
 
 def describe(timeout=10):
     # The tray state arrives over Wheel's own socket; its Link endpoint can

@@ -21,12 +21,12 @@ jobs:
         run: echo "version=$(sed -nE 's/^project\(ArcadeWheel VERSION ([^ ]+).*/\1/p' CMakeLists.txt)" >> "$GITHUB_OUTPUT"
   nightly:
     needs: version
-    uses: qa-p1/Arcade-Link/.github/workflows/app-nightly.yml@v1.0.13
+    uses: qa-p1/Arcade-Link/.github/workflows/app-nightly.yml@v1.1.1
     with:
       app: arcade.wheel
       version: ${{ needs.version.outputs.version }}
       artifacts: ArcadeWheel-*
       windows-installer: inno
-      link-ref: v1.0.13
+      link-ref: v1.1.1
     secrets:
       ARCADE_UPDATE_SIGNING_KEY: ${{ secrets.ARCADE_UPDATE_SIGNING_KEY }}

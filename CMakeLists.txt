@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(ArcadeWheel VERSION 1.0.0 LANGUAGES CXX)
+project(ArcadeWheel VERSION 1.1.0 LANGUAGES CXX)
 
 if(APPLE)
     enable_language(OBJCXX)

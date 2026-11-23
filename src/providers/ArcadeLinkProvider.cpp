@@ -6,9 +6,11 @@
 #include <QClipboard>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QJsonDocument>
 #include <QMimeData>
+#include <QSet>
 #include <QTimer>
 #include <QUuid>
 
@@ -570,17 +572,39 @@ QStringList ArcadeLinkProvider::inputModes(const QJsonObject &action) const
     return modes;
 }
 
+// The app's glyph (Wheel ships one for each app the Link module knows), or the Arcade glyph for a newer app.
+QString glyphFor(const QString &app)
+{
+    const bool own = Ids::apps().contains(app) || app == Ids::Tools;
+    return QStringLiteral("qrc:/assets/arcade/%1.svg").arg(own ? app : QStringLiteral("arcade.tools"));
+}
+
 QVariantList ArcadeLinkProvider::tools() const
 {
     QVariantList rows;
     if (!m_enabled) return rows;
+    // The same corrections every Arcade menu applies (Link SPEC §5.5): the catalog's hidden and renamed actions
+    // and the ones the user hid.
+    const auto rules = Catalog::load(m_locations).rules;
+    QSet<QString> hidden;
+    for (const auto &ref : rules.value("hide").toArray()) hidden.insert(ref.toString());
+    for (const auto &ref : loadOfferPrefs(m_locations).value("hidden").toArray()) hidden.insert(ref.toString());
+    const auto renamed = rules.value("rename").toObject();
     for (const auto &value : m_manifests) {
         const auto manifest = value.toObject();
         const auto id = manifest.value("id").toString();
         if (id == Ids::Wheel || id == Ids::Tools || m_disabledPeers.contains(id)) continue;
         for (const auto &entry : manifest.value("actions").toArray()) {
             auto action = entry.toObject();
-            if (id == Ids::Box && (action.value("id").toString() == "box.pipeline.run" || action.value("id").toString() == "box.pipelines")) continue;
+            const auto actionId = action.value("id").toString();
+            // Box's generic pipeline actions (listed below, one row per pipeline) on cards before 1.0; from 1.0 Box
+            // offers them nowhere and lists each pipeline as its own action, which the rows below already cover.
+            if (id == Ids::Box && (actionId == "box.pipeline.run" || actionId == "box.pipelines" || actionId.startsWith("box.pipeline:"))) continue;
+            // Only what the app offers in searchable lists (an action of its own for callers, like a helper's, isn't).
+            if (!actionSurfaces(action).contains("palette")) continue;
+            const auto ref = id + "/" + actionId;
+            if (hidden.contains(ref)) continue;
+            if (renamed.value(ref).isString()) action.insert("title", renamed.value(ref).toString());
             if (!actionUsable(manifest, action)) continue;
             const auto modes = inputModes(action);
             if (modes.isEmpty()) continue;
@@ -590,7 +614,7 @@ QVariantList ArcadeLinkProvider::tools() const
             action.insert("inputModes", QJsonArray::fromStringList(modes));
             action.insert("input", modes.first());
             action.insert("outbound", outbound(action));
-            action.insert("glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(id));
+            action.insert("glyph", glyphFor(id));
             rows.append(action.toVariantMap());
         }
         if (id == Ids::Box)
@@ -608,7 +632,7 @@ QVariantList ArcadeLinkProvider::tools() const
                 action.insert("inputModes", QJsonArray::fromStringList(modes));
                 action.insert("input", modes.first());
                 action.insert("outbound", outbound(action));
-                action.insert("glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(id));
+                action.insert("glyph", glyphFor(id));
                 rows.append(action.toVariantMap());
             }
     }
@@ -713,8 +737,8 @@ QVariantList ArcadeLinkProvider::connectedApps() const
         const bool installed = !manifest.isEmpty();
         if (id == Ids::Tools && installed) continue; // Its row only offers Get Arcade Tools.
         const auto state = m_states.value(id).toString();
-        rows.append(QVariantMap{{"id", id}, {"name", AppMetadata::appName(id)}, {"pitch", AppMetadata::appPitch(id)}, {"glyph", QStringLiteral("qrc:/assets/arcade/%1.svg").arg(id)}, {"state", state == "Running" ? "Running · v" + manifest.value("version").toString() : installed ? "Installed"
-                                                                                                                                                                                                                                                                                      : "Not installed"},
+        rows.append(QVariantMap{{"id", id}, {"name", AppMetadata::appName(id)}, {"pitch", AppMetadata::appPitch(id)}, {"glyph", glyphFor(id)}, {"state", state == "Running" ? "Running · v" + manifest.value("version").toString() : installed ? "Installed"
+                                                                                                                                                                                                                                               : "Not installed"},
                                 {"installed", installed},
                                 {"enabled", !m_disabledPeers.contains(id)},
                                 {"endpoint", state == "Running" ? "Connected" : "No live endpoint"},

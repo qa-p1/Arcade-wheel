@@ -1,5 +1,6 @@
 #include "link/AppMetadata.h"
 #include "link/WheelLink.h"
+#include "providers/ArcadeLinkProvider.h"
 #include "core/WheelPaths.h"
 
 #include "core/WheelController.h"
@@ -13,6 +14,7 @@
 #include <QThread>
 #include <QJsonArray>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QUrl>
 
 using namespace ArcadeLink;
@@ -73,8 +75,13 @@ QJsonArray WheelLink::actions()
 {
     const QJsonArray all{QStringLiteral("linux"), QStringLiteral("windows"), QStringLiteral("macos")};
     return {
-        QJsonObject{{QStringLiteral("id"), QStringLiteral("wheel.add_action")}, {QStringLiteral("version"), 1}, {QStringLiteral("title"), QStringLiteral("Add to Wheel")}, {QStringLiteral("verb"), QStringLiteral("add")}, {QStringLiteral("accepts"), QJsonArray{QStringLiteral("text/url"), QStringLiteral("text/plain;hint=command"), QStringLiteral("file/*"), QStringLiteral("folder/reference"), QStringLiteral("structured/arcade-action")}}, {QStringLiteral("produces"), QJsonArray{}}, {QStringLiteral("effects"), QJsonArray{QStringLiteral("persists"), QStringLiteral("opens-ui")}}, {QStringLiteral("interactive"), true}, {QStringLiteral("privacy"), QStringLiteral("local")}, {QStringLiteral("platforms"), all}, {QStringLiteral("available"), true}},
-        QJsonObject{{QStringLiteral("id"), QStringLiteral("wheel.show")}, {QStringLiteral("version"), 1}, {QStringLiteral("title"), QStringLiteral("Show the Wheel")}, {QStringLiteral("verb"), QStringLiteral("show")}, {QStringLiteral("accepts"), QJsonArray{}}, {QStringLiteral("produces"), QJsonArray{}}, {QStringLiteral("effects"), QJsonArray{QStringLiteral("opens-ui")}}, {QStringLiteral("interactive"), true}, {QStringLiteral("privacy"), QStringLiteral("local")}, {QStringLiteral("platforms"), all}, {QStringLiteral("available"), true}},
+        QJsonObject{{QStringLiteral("id"), QStringLiteral("wheel.add_action")}, {QStringLiteral("version"), 1}, {QStringLiteral("title"), QStringLiteral("Add to Wheel")}, {QStringLiteral("verb"), QStringLiteral("add")}, {QStringLiteral("accepts"), QJsonArray{QStringLiteral("text/url"), QStringLiteral("text/plain;hint=command"), QStringLiteral("file/*"), QStringLiteral("folder/reference"), QStringLiteral("structured/arcade-action")}}, {QStringLiteral("produces"), QJsonArray{}}, {QStringLiteral("effects"), QJsonArray{QStringLiteral("persists"), QStringLiteral("opens-ui")}}, {QStringLiteral("interactive"), true}, {QStringLiteral("privacy"), QStringLiteral("local")}, {QStringLiteral("platforms"), all}, {QStringLiteral("available"), true},
+                    // Link 1.1: files, folders and pages from the menus, and any app's action (an offer); never on
+                    // every image or video in the browser. Listed after what the selection is for.
+                    {QStringLiteral("surfaces"), QJsonArray{QStringLiteral("file-menu"), QStringLiteral("folder-menu"), QStringLiteral("browser-link"), QStringLiteral("browser-page"), QStringLiteral("palette")}},
+                    {QStringLiteral("rank"), QJsonObject{{QStringLiteral("*"), 10}}},
+                    {QStringLiteral("keywords"), QJsonArray{QStringLiteral("pin"), QStringLiteral("shortcut"), QStringLiteral("favorite")}}},
+        QJsonObject{{QStringLiteral("id"), QStringLiteral("wheel.show")}, {QStringLiteral("version"), 1}, {QStringLiteral("title"), QStringLiteral("Show the Wheel")}, {QStringLiteral("verb"), QStringLiteral("show")}, {QStringLiteral("accepts"), QJsonArray{}}, {QStringLiteral("produces"), QJsonArray{}}, {QStringLiteral("effects"), QJsonArray{QStringLiteral("opens-ui")}}, {QStringLiteral("interactive"), true}, {QStringLiteral("privacy"), QStringLiteral("local")}, {QStringLiteral("platforms"), all}, {QStringLiteral("available"), true}, {QStringLiteral("surfaces"), QJsonArray{QStringLiteral("palette")}}},
     };
 }
 
@@ -98,13 +105,16 @@ QVariantMap WheelLink::draftFor(const QJsonObject &content, QString *error)
         const auto action = data.value(QStringLiteral("action")).toString();
         const auto input = data.value(QStringLiteral("input")).toString(QStringLiteral("none"));
         const QStringList inputs{QStringLiteral("none"), QStringLiteral("clipboard"), QStringLiteral("lens-selection"), QStringLiteral("file-selection")};
-        if (!AppMetadata::apps().contains(app) || action.isEmpty() || data.value(QStringLiteral("version")).toInt(0) < 1 || data.value(QStringLiteral("title")).toString().isEmpty() || !inputs.contains(input) || (data.contains(QStringLiteral("options")) && !data.value(QStringLiteral("options")).isObject())) {
+        // Any Arcade app's action (an offer from Link's shared list names no version: 1), not only the apps this
+        // build knows; whether that app is installed is shown on the slot, as for every Arcade slot.
+        static const QRegularExpression arcadeId(QStringLiteral("^arcade\\.[a-z][a-z0-9-]*$"));
+        if (!arcadeId.match(app).hasMatch() || app == Ids::Wheel || action.isEmpty() || data.value(QStringLiteral("version")).toInt(1) < 1 || data.value(QStringLiteral("title")).toString().isEmpty() || !inputs.contains(input) || (data.contains(QStringLiteral("options")) && !data.value(QStringLiteral("options")).isObject())) {
             if (error) *error = QStringLiteral("The Arcade action reference is incomplete or invalid");
             return {};
         }
-        QJsonObject payload{{QStringLiteral("app"), app}, {QStringLiteral("action"), action}, {QStringLiteral("version"), data.value(QStringLiteral("version"))}, {QStringLiteral("input"), input}, {QStringLiteral("options"), data.value(QStringLiteral("options")).toObject()}};
+        QJsonObject payload{{QStringLiteral("app"), app}, {QStringLiteral("action"), action}, {QStringLiteral("version"), data.value(QStringLiteral("version")).toInt(1)}, {QStringLiteral("input"), input}, {QStringLiteral("options"), data.value(QStringLiteral("options")).toObject()}};
         if (data.contains(QStringLiteral("preset"))) payload.insert(QStringLiteral("preset"), data.value(QStringLiteral("preset")));
-        return {{QStringLiteral("type"), QStringLiteral("arcade")}, {QStringLiteral("name"), data.value(QStringLiteral("title")).toString()}, {QStringLiteral("icon"), QStringLiteral("qrc:/assets/arcade/%1.svg").arg(app)}, {QStringLiteral("payload"), payload.toVariantMap()}};
+        return {{QStringLiteral("type"), QStringLiteral("arcade")}, {QStringLiteral("name"), data.value(QStringLiteral("title")).toString()}, {QStringLiteral("icon"), glyphFor(app)}, {QStringLiteral("payload"), payload.toVariantMap()}};
     }
     if (typeMatches(QStringLiteral("text/url"), type)) {
         const QUrl url = QUrl::fromUserInput(text);
